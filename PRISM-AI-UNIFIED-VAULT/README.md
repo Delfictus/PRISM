@@ -13,6 +13,8 @@ python 03-AUTOMATION/master_executor.py
 ./scripts/enforce_governance.sh    # Validate compliance
 ./scripts/continuous_monitor.sh    # Start monitoring
 ./scripts/run_sprint_1.sh         # Execute Sprint 1
+./scripts/run_full_check.sh       # Full compliance & telemetry snapshot
+./scripts/live_status.sh          # Live task + compliance feed
 ```
 
 ---
