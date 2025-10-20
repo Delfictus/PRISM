@@ -1,0 +1,9 @@
+target/
+
+# Environment variables with API keys (NEVER commit!)
+.env
+.env.local
+.env.*.local
+
+# Cargo lock for libraries
+Cargo.lock

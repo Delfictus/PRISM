@@ -1,0 +1,78 @@
+{
+  "version": "1.0.0",
+  "generated": "2025-10-20T00:30:00Z",
+  "artifacts": {
+    "DSJC125.5.col": {
+      "path": "benchmarks/dimacs/DSJC125.5.col",
+      "sha256": "397532eba35e3ec48967b07da9e4e52f59570292a0adf23618d507ac99baaec6",
+      "vertices": 125,
+      "edges": 3891,
+      "expected_colors": {
+        "world_record": 17,
+        "baseline": 20,
+        "target": 18
+      },
+      "timeout_ms": 5000
+    },
+    "queen8_8.col": {
+      "path": "benchmarks/dimacs/queen8_8.col",
+      "sha256": "1579f7e1cf2d5ab7a0bdd1682a4dad3131084dca54c4690547383dbf44731948",
+      "vertices": 64,
+      "edges": 728,
+      "expected_colors": {
+        "world_record": 9,
+        "baseline": 11,
+        "target": 9
+      },
+      "timeout_ms": 2000
+    },
+    "myciel5.col": {
+      "path": "benchmarks/dimacs/myciel5.col",
+      "sha256": "ed37347e72cac98bef064bf5a39ff2881f47cb2121e3fb8bad3ac68bc175a530",
+      "vertices": 47,
+      "edges": 236,
+      "expected_colors": {
+        "world_record": 6,
+        "baseline": 6,
+        "target": 6
+      },
+      "timeout_ms": 1000
+    },
+    "DSJC500.5.col": {
+      "path": "benchmarks/dimacs/DSJC500.5.col",
+      "sha256": "6ad680975652ea6c1d57652c90aba96cba25c4b921b670281c813edbd2ef7708",
+      "vertices": 500,
+      "edges": 62624,
+      "expected_colors": {
+        "world_record": 48,
+        "baseline": 52,
+        "target": 49
+      },
+      "timeout_ms": 30000
+    },
+    "DSJC1000.5.col": {
+      "path": "benchmarks/dimacs/DSJC1000.5.col",
+      "sha256": "17b395030fbab1e2a6564396c3a161dbb3248423953e6b462377a018b8f4bb6c",
+      "vertices": 1000,
+      "edges": 249826,
+      "expected_colors": {
+        "world_record": 82,
+        "baseline": 122,
+        "target": 82
+      },
+      "timeout_ms": 120000
+    }
+  },
+  "performance_thresholds": {
+    "regression_tolerance": 0.1,
+    "improvement_target": 0.05,
+    "variance_limit": 0.08,
+    "timeout_multiplier": 1.5
+  },
+  "validation": {
+    "min_runs": 5,
+    "percentile": 50,
+    "warmup_runs": 2,
+    "cooldown_ms": 1000
+  }
+}

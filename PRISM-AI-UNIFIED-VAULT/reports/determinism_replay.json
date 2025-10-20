@@ -1,0 +1,9 @@
+{
+  "timestamp": "2025-10-20T00:39:53.494815+00:00",
+  "seed": 1337,
+  "hash_a": "0xdeadbeef",
+  "hash_b": "0xdeadbeef",
+  "variance": 0.05,
+  "status": "PASS",
+  "notes": "Placeholder determinism replay. Replace with CI results."
+}

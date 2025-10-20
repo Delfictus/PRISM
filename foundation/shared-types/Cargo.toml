@@ -1,0 +1,13 @@
+[package]
+name = "shared-types"
+version = "0.1.0"
+edition = "2021"
+authors = ["ARES Team"]
+
+[dependencies]
+# ZERO external dependencies - pure data types only
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+[features]
+default = []
+serde = ["dep:serde"]

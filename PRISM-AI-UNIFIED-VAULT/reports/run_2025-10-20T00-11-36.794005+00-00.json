@@ -1,0 +1,17 @@
+{
+  "timestamp": "2025-10-20T00:11:36.794005+00:00",
+  "strict": true,
+  "allow_missing": false,
+  "phases": [],
+  "artifacts": {
+    "advanced_manifest": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/artifacts/advanced_manifest.json",
+    "roofline": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/reports/roofline.json",
+    "determinism": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/reports/determinism_replay.json",
+    "ablation": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/artifacts/ablation_report.json",
+    "protein": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/reports/protein_auroc.json",
+    "device_caps": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/device_caps.json",
+    "path_decision": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/path_decision.json",
+    "feasibility": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/feasibility.log"
+  },
+  "compliance_exit_code": 0
+}

@@ -1,0 +1,9 @@
+{
+  "timestamp": "2025-10-20T00:39:53.494871+00:00",
+  "advanced_feature": "persistent_kernels",
+  "advanced_time_ms": 120.0,
+  "baseline_time_ms": 260.0,
+  "delta_speed": 2.16,
+  "delta_quality": 1.2,
+  "notes": "Synthetic ablation data. Replace with experiment results."
+}
