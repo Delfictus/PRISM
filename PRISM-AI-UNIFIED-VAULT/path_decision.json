@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-10-20T00:39:53.493276+00:00",
+  "timestamp": "2025-10-21T18:28:20.634167+00:00",
   "strategy": "adaptive",
   "dense_path": {
     "enabled": true,
@@ -12,5 +12,12 @@
     "work_stealing": true
   },
   "decision": "sparse_preferred",
-  "notes": "Placeholder decision. Replace with runtime telemetry."
+  "notes": "Placeholder decision. Replace with runtime telemetry.",
+  "worktree": {
+    "path": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M2",
+    "name": "PRISM-FINNAL-PUSH-M2",
+    "branch": "phase-M2",
+    "commit": "a6c0f1dfc566ea1813b1f150bcfc9b9a0bcbc209",
+    "dirty": true
+  }
 }

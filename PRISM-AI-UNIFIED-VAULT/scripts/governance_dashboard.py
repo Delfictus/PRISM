@@ -10,14 +10,15 @@ task monitor, ensuring CI hooks that reference this file do not fail.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Dict, List
 
-
-def vault_root() -> Path:
-    return Path(__file__).resolve().parents[1]
-
-
+try:
+    from . import vault_root, worktree_context  # type: ignore
+except ImportError:
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from scripts import vault_root, worktree_context  # type: ignore
 def load_metrics() -> Dict[str, object]:
     tasks_path = vault_root() / "05-PROJECT-PLAN" / "tasks.json"
     if not tasks_path.exists():
@@ -32,8 +33,10 @@ def load_metrics() -> Dict[str, object]:
 
 def render() -> str:
     metrics = load_metrics()
+    ctx = worktree_context()
     return (
         "# Governance Dashboard (Placeholder)\n"
+        f"- worktree: {ctx.get('name', 'unknown')} ({ctx.get('branch', 'unknown')})\n"
         f"- phases tracked: {metrics.get('phase_count', 0)}\n"
         f"- total tasks: {metrics.get('tasks_total', 0)}\n"
         "\n"

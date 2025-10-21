@@ -1,9 +1,16 @@
 {
-  "timestamp": "2025-10-20T00:39:53.494871+00:00",
+  "timestamp": "2025-10-21T18:28:20.635547+00:00",
   "advanced_feature": "persistent_kernels",
   "advanced_time_ms": 120.0,
   "baseline_time_ms": 260.0,
   "delta_speed": 2.16,
   "delta_quality": 1.2,
-  "notes": "Synthetic ablation data. Replace with experiment results."
+  "notes": "Synthetic ablation data. Replace with experiment results.",
+  "worktree": {
+    "path": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M2",
+    "name": "PRISM-FINNAL-PUSH-M2",
+    "branch": "phase-M2",
+    "commit": "a6c0f1dfc566ea1813b1f150bcfc9b9a0bcbc209",
+    "dirty": true
+  }
 }

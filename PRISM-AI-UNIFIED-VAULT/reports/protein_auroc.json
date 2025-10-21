@@ -1,8 +1,15 @@
 {
-  "timestamp": "2025-10-20T00:39:53.494924+00:00",
+  "timestamp": "2025-10-21T18:28:20.635605+00:00",
   "status": "PASS",
   "auroc": 0.81,
   "baseline_auroc": 0.78,
   "runtime_delta": 0.02,
-  "notes": "Protein overlay evaluation placeholder."
+  "notes": "Protein overlay evaluation placeholder.",
+  "worktree": {
+    "path": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M2",
+    "name": "PRISM-FINNAL-PUSH-M2",
+    "branch": "phase-M2",
+    "commit": "a6c0f1dfc566ea1813b1f150bcfc9b9a0bcbc209",
+    "dirty": true
+  }
 }

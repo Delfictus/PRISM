@@ -1,9 +1,16 @@
 {
-  "timestamp": "2025-10-20T00:39:53.494815+00:00",
+  "timestamp": "2025-10-21T18:28:20.635485+00:00",
   "seed": 1337,
   "hash_a": "0xdeadbeef",
   "hash_b": "0xdeadbeef",
   "variance": 0.05,
   "status": "PASS",
-  "notes": "Placeholder determinism replay. Replace with CI results."
+  "notes": "Placeholder determinism replay. Replace with CI results.",
+  "worktree": {
+    "path": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M2",
+    "name": "PRISM-FINNAL-PUSH-M2",
+    "branch": "phase-M2",
+    "commit": "a6c0f1dfc566ea1813b1f150bcfc9b9a0bcbc209",
+    "dirty": true
+  }
 }

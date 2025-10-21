@@ -151,6 +151,59 @@ impl ComplianceGate for DeterminismGate {
     }
 }
 
+pub struct OntologyApprovalGate;
+
+impl ComplianceGate for OntologyApprovalGate {
+    fn validate(&self, change: &CodeChange) -> Result<()> {
+        // Ensure the determinism manifest declares ontology hashes
+        let manifest = change.read_json("PRISM-AI-UNIFIED-VAULT/artifacts/determinism_manifest.json")?;
+        let ontology = manifest
+            .get("ontology")
+            .ok_or_else(|| anyhow!("Determinism manifest missing ontology block"))?;
+
+        let manifest_hash = ontology
+            .get("manifest_hash")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| anyhow!("Ontology manifest hash not declared"))?;
+
+        if manifest_hash.len() != 64 {
+            bail!("Ontology manifest hash must be 64 hex characters");
+        }
+
+        if let Some(alignment_hash) = ontology.get("alignment_hash").and_then(|value| value.as_str()) {
+            if alignment_hash.len() != 64 {
+                bail!("Ontology alignment hash must be 64 hex characters");
+            }
+        } else {
+            bail!("Ontology alignment hash missing from determinism manifest");
+        }
+
+        if let Some(coverage) = ontology.get("coverage").and_then(|value| value.as_f64()) {
+            if !(0.0..=1.0).contains(&coverage) {
+                bail!("Ontology alignment coverage must be normalized [0,1]");
+            }
+        }
+
+        // Verify snapshot artifact matches declared hash
+        let snapshot_path = Path::new("PRISM-AI-UNIFIED-VAULT/artifacts/mec/M2/ontology_snapshot.json");
+        if !snapshot_path.exists() {
+            bail!("Ontology snapshot artifact missing: {}", snapshot_path.display());
+        }
+        let snapshot = change.read_json(snapshot_path)?;
+        let digest_hash = snapshot
+            .get("digest")
+            .and_then(|value| value.get("manifest_hash"))
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| anyhow!("Ontology snapshot missing digest.manifest_hash"))?;
+
+        if digest_hash != manifest_hash {
+            bail!("Ontology manifest hash mismatch between snapshot and determinism manifest");
+        }
+
+        Ok(())
+    }
+}
+
 pub struct PerformanceGate;
 
 impl PerformanceGate {

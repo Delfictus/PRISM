@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-10-20T00:39:53.494975+00:00",
+  "timestamp": "2025-10-21T18:28:20.635659+00:00",
   "captured": true,
   "nodes": [
     {
@@ -37,5 +37,12 @@
     "enabled": true,
     "work_stealing": true
   },
-  "notes": "Placeholder graph capture summary."
+  "notes": "Placeholder graph capture summary.",
+  "worktree": {
+    "path": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M2",
+    "name": "PRISM-FINNAL-PUSH-M2",
+    "branch": "phase-M2",
+    "commit": "a6c0f1dfc566ea1813b1f150bcfc9b9a0bcbc209",
+    "dirty": true
+  }
 }

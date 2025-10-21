@@ -49,6 +49,8 @@ pub struct MetaDeterminism {
     pub meta_genome_hash: String,
     pub meta_merkle_root: String,
     pub ontology_hash: Option<String>,
+    pub ontology_alignment_hash: Option<String>,
+    pub ontology_alignment_coverage: Option<f64>,
     pub free_energy_hash: Option<String>,
 }
 

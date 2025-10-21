@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
@@ -67,6 +68,7 @@ ARTIFACT_PATHS: Dict[str, Path] = {
     "graph_capture": Path("reports/graph_capture.json"),
     "graph_exec": Path("reports/graph_exec.bin"),
     "determinism_manifest": Path("artifacts/determinism_manifest.json"),
+    "ontology_snapshot": Path("artifacts/mec/M2/ontology_snapshot.json"),
 }
 
 CRITICAL_ARTIFACTS = {
@@ -76,6 +78,7 @@ CRITICAL_ARTIFACTS = {
     "graph_capture",
     "graph_exec",
     "determinism_manifest",
+    "ontology_snapshot",
 }
 
 META_REGISTRY_PATH = Path("meta/meta_flags.json")
@@ -88,6 +91,8 @@ REQUIRED_META_FLAGS = {
     "federated_meta",
     "meta_prod",
 }
+
+HEX_64 = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass
@@ -362,6 +367,134 @@ def evaluate_artifact_presence(report: ComplianceReport, base: Path, allow_missi
                 )
             )
 
+
+def evaluate_ontology_contract(
+    report: ComplianceReport,
+    manifest_path: Path,
+    snapshot_path: Path,
+) -> None:
+    manifest = load_json(manifest_path)
+    if manifest is None:
+        report.add(
+            Finding(
+                item="ontology:manifest",
+                status="FAIL",
+                severity="BLOCKER",
+                message=f"Determinism manifest missing: {manifest_path}",
+            )
+        )
+        return
+
+    ontology = manifest.get("ontology")
+    if not isinstance(ontology, dict):
+        report.add(
+            Finding(
+                item="ontology:manifest",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Determinism manifest missing ontology block.",
+            )
+        )
+        return
+
+    manifest_hash = ontology.get("manifest_hash")
+    alignment_hash = ontology.get("alignment_hash")
+    coverage = ontology.get("coverage")
+    coverage_value: Optional[float] = None
+
+    if not isinstance(manifest_hash, str) or not HEX_64.match(manifest_hash):
+        report.add(
+            Finding(
+                item="ontology:manifest_hash",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Ontology manifest hash must be a 64 character hex string.",
+            )
+        )
+
+    if not isinstance(alignment_hash, str) or not HEX_64.match(alignment_hash):
+        report.add(
+            Finding(
+                item="ontology:alignment_hash",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Ontology alignment hash must be a 64 character hex string.",
+            )
+        )
+
+    if coverage is not None:
+        try:
+            coverage_value = float(coverage)
+        except (TypeError, ValueError):
+            report.add(
+                Finding(
+                    item="ontology:coverage",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message="Ontology alignment coverage must be numeric.",
+                )
+            )
+        else:
+            if not 0.0 <= coverage_value <= 1.0:
+                report.add(
+                    Finding(
+                        item="ontology:coverage",
+                        status="FAIL",
+                        severity="CRITICAL",
+                        message="Ontology alignment coverage must be within [0, 1].",
+                    )
+                )
+
+    snapshot = load_json(snapshot_path)
+    if snapshot is None:
+        report.add(
+            Finding(
+                item="ontology:snapshot",
+                status="FAIL",
+                severity="BLOCKER",
+                message=f"Ontology snapshot missing: {snapshot_path}",
+            )
+        )
+        return
+
+    snapshot_digest = (snapshot.get("digest") or {}).get("manifest_hash")
+    if isinstance(manifest_hash, str) and snapshot_digest != manifest_hash:
+        report.add(
+            Finding(
+                item="ontology:manifest_consistency",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Ontology manifest hash mismatch between snapshot and determinism manifest.",
+            )
+        )
+
+    snapshot_alignment = (snapshot.get("alignment") or {}).get("alignment_hash")
+    if (
+        isinstance(alignment_hash, str)
+        and snapshot_alignment is not None
+        and snapshot_alignment != alignment_hash
+    ):
+        report.add(
+            Finding(
+                item="ontology:alignment_consistency",
+                status="FAIL",
+                severity="CRITICAL",
+                message="Ontology alignment hash mismatch between snapshot and determinism manifest.",
+            )
+        )
+
+    snapshot_coverage = (snapshot.get("alignment") or {}).get("coverage")
+    if coverage_value is not None and isinstance(snapshot_coverage, (int, float)):
+        delta = abs(float(snapshot_coverage) - coverage_value)
+        if delta > 0.05:
+            report.add(
+                Finding(
+                    item="ontology:coverage_drift",
+                    status="FAIL",
+                    severity="WARNING",
+                    message=f"Ontology alignment coverage drift detected (Δ={delta:.3f}).",
+                )
+            )
 
 def compute_meta_merkle(records: Sequence[Dict[str, object]]) -> str:
     if not records:
@@ -683,6 +816,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     evaluate_task_manifest(report)
 
     evaluate_artifact_presence(report, base, args.allow_missing_artifacts)
+    evaluate_ontology_contract(
+        report,
+        base / ARTIFACT_PATHS["determinism_manifest"],
+        base / ARTIFACT_PATHS["ontology_snapshot"],
+    )
     evaluate_advanced_manifest(report, base / ARTIFACT_PATHS["advanced_manifest"])
     evaluate_meta_contract(report, base)
 

@@ -6,7 +6,8 @@
     "build",
     "seeds",
     "hashes",
-    "artifacts"
+    "artifacts",
+    "ontology"
   ],
   "properties": {
     "build": {
@@ -26,13 +27,25 @@
       "required": ["kernel_hash", "meta_hash"],
       "properties": {
         "kernel_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "meta_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "ontology_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        "meta_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
     },
     "artifacts": {
       "type": "array",
       "items": { "type": "string" }
+    },
+    "ontology": {
+      "type": "object",
+      "required": ["manifest_hash", "alignment_hash"],
+      "properties": {
+        "manifest_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "alignment_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "coverage": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      }
     }
   }
 }

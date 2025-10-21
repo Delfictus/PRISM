@@ -1,5 +1,6 @@
 use crate::features::{registry, MetaFeatureId, MetaFeatureState};
 use crate::governance::determinism::{DeterminismProof, DeterminismRecorder, MetaDeterminism};
+use crate::meta::ontology::{align_variants, FileOntologyStorage, OntologyService};
 use crate::telemetry::{
     ComponentId, EventData, EventLevel, Metrics, TelemetryEntry, TelemetrySink,
 };
@@ -164,6 +165,7 @@ pub struct MetaOrchestrator {
     rng: Arc<std::sync::Mutex<StdRng>>,
     schedule_dimension: usize,
     telemetry: TelemetrySink,
+    ontology_service: Option<OntologyService<FileOntologyStorage>>,
 }
 
 impl MetaOrchestrator {
@@ -173,7 +175,12 @@ impl MetaOrchestrator {
             rng: Arc::new(std::sync::Mutex::new(StdRng::seed_from_u64(seed))),
             schedule_dimension: 5,
             telemetry: TelemetrySink::new("meta_orchestrator"),
+            ontology_service: None,
         })
+    }
+
+    pub fn attach_ontology_service(&mut self, service: OntologyService<FileOntologyStorage>) {
+        self.ontology_service = Some(service);
     }
 
     pub fn run_generation(&self, base_seed: u64, population: usize) -> Result<EvolutionOutcome> {
@@ -190,10 +197,36 @@ impl MetaOrchestrator {
         let best = &evaluations[best_index];
         let manifest = registry().snapshot();
         let free_energy_hash = compute_free_energy_hash(&evaluations, temperature);
+        let (ontology_hash, alignment_hash, alignment_coverage) =
+            if let Some(service) = &self.ontology_service {
+                match align_variants(service, &[best.genome.clone()]) {
+                    Ok(summary) => {
+                        let coverage = summary
+                            .variant_alignments
+                            .get(0)
+                            .map(|alignment| alignment.coverage)
+                            .unwrap_or_default();
+                        (
+                            Some(summary.digest.manifest_hash.clone()),
+                            Some(summary.alignment_hash),
+                            Some(coverage),
+                        )
+                    }
+                    Err(err) => {
+                        eprintln!("ontology alignment failed: {err}");
+                        (None, None, None)
+                    }
+                }
+            } else {
+                (None, None, None)
+            };
+
         let meta = MetaDeterminism {
             meta_genome_hash: best.genome.hash.clone(),
             meta_merkle_root: manifest.merkle_root.clone(),
-            ontology_hash: None,
+            ontology_hash,
+            ontology_alignment_hash: alignment_hash,
+            ontology_alignment_coverage: alignment_coverage,
             free_energy_hash: Some(free_energy_hash.clone()),
         };
 

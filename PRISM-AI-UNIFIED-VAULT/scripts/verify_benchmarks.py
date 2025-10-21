@@ -8,13 +8,20 @@ import json
 import sys
 from pathlib import Path
 
+try:
+    from . import repo_root  # type: ignore
+except ImportError:
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from scripts import repo_root  # type: ignore
+
 
 def verify(manifest_path: Path) -> bool:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     artifacts = manifest.get("artifacts", {})
     ok = True
     for name, entry in artifacts.items():
-        path = Path(entry["path"]).expanduser()
+        path_entry = Path(entry["path"]).expanduser()
+        path = path_entry if path_entry.is_absolute() else repo_root() / path_entry
         expected = entry.get("sha256")
         if not path.exists():
             print(f"❌ Missing benchmark artifact: {path}")

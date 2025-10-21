@@ -20,10 +20,10 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 try:
-    from . import vault_root  # type: ignore
+    from . import vault_root, worktree_context  # type: ignore
 except ImportError:
     sys.path.append(str(Path(__file__).resolve().parents[1]))
-    from scripts import vault_root  # type: ignore
+    from scripts import vault_root, worktree_context  # type: ignore
 
 
 TASKS_PATH = vault_root() / "05-PROJECT-PLAN" / "tasks.json"
@@ -103,12 +103,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     watch_interval = args.watch if args.watch and args.watch > 0 else None
 
     def loop_body() -> int:
+        ctx = worktree_context()
         phases = load_tasks()
         filtered = filter_tasks(phases, args.phase, args.status)
         if not filtered:
-            print("No tasks match the selected filters.")
+            print(f"[{utc_timestamp()}] No tasks match the selected filters for worktree {ctx.get('branch', 'unknown')}.")
         else:
-            print(f"[{utc_timestamp()}] Task Summary")
+            print(f"[{utc_timestamp()}] Task Summary :: {ctx.get('branch', 'unknown')} @ {ctx.get('name', 'unknown')}")
             print("=" * 72)
             print(summarize(filtered))
         if args.run_compliance:

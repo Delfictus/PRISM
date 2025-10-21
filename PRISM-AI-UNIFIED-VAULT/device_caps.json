@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-10-20T00:39:53.493127+00:00",
+  "timestamp": "2025-10-21T18:28:20.633980+00:00",
   "success": true,
   "devices": [
     {
@@ -7,5 +7,12 @@
       "memory_total": "8151 MiB",
       "compute_capability": "12.0"
     }
-  ]
+  ],
+  "worktree": {
+    "path": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M2",
+    "name": "PRISM-FINNAL-PUSH-M2",
+    "branch": "phase-M2",
+    "commit": "a6c0f1dfc566ea1813b1f150bcfc9b9a0bcbc209",
+    "dirty": true
+  }
 }
