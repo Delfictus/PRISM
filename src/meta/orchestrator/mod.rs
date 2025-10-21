@@ -687,9 +687,18 @@ mod tests {
 
     #[test]
     fn halton_sequence_low_discrepancy() {
-        let pts: Vec<f64> = (1..5).map(|i| radical_inverse(i, 2)).collect();
-        assert!(pts[0] < pts[1]);
-        assert!(pts[2] < pts[3]);
+        let pts: Vec<f64> = (1..16).map(|i| radical_inverse(i, 2)).collect();
+        assert!(pts.iter().all(|&p| p > 0.0 && p < 1.0));
+
+        let mut sorted = pts.clone();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+        let max_gap = sorted
+            .windows(2)
+            .map(|w| (w[1] - w[0]).abs())
+            .fold(0.0f64, f64::max);
+
+        assert!(max_gap < 0.4, "halton gaps too large: {}", max_gap);
     }
 
     #[test]

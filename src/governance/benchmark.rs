@@ -224,7 +224,7 @@ mod tests {
 
     fn fixture_manifest(tmp: &tempfile::TempDir) -> PathBuf {
         let manifest_path = tmp.path().join("bench_manifest.json");
-        let data = serde_json::json!({
+        let mut data = serde_json::json!({
             "version": "1.0.0",
             "generated": "2025-01-19T00:00:00Z",
             "artifacts": {
@@ -255,14 +255,21 @@ mod tests {
             }
         });
 
-        let data_string = data.to_string();
         // compute hash for dummy artifact
         let artifact_path = tmp.path().join("sample.col");
         fs::write(&artifact_path, b"1234").unwrap();
         let digest = hex::encode(Sha256::digest(b"1234"));
-        let patched =
-            data_string.replace("\"sha256\": \"\"", &format!("\"sha256\": \"{}\"", digest));
-        fs::write(&manifest_path, patched).unwrap();
+        if let Some(sample) = data
+            .get_mut("artifacts")
+            .and_then(|artifacts| artifacts.get_mut("sample"))
+        {
+            if let Some(obj) = sample.as_object_mut() {
+                obj.insert("sha256".to_string(), serde_json::Value::String(digest));
+            }
+        }
+
+        let json_str = serde_json::to_string_pretty(&data).unwrap();
+        fs::write(&manifest_path, json_str).unwrap();
         manifest_path
     }
 

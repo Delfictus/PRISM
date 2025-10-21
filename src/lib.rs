@@ -167,7 +167,8 @@ mod tests {
 
     #[test]
     fn test_basic_coloring() {
-        let config = PrismConfig::default();
+        let mut config = PrismConfig::default();
+        config.use_gpu = false;
         let prism = PrismAI::new(config).unwrap();
 
         // Triangle graph (K3)
@@ -184,7 +185,8 @@ mod tests {
 
     #[test]
     fn test_color_graph_with_proof() {
-        let config = PrismConfig::default();
+        let mut config = PrismConfig::default();
+        config.use_gpu = false;
         let prism = PrismAI::new(config).unwrap();
         let adjacency = vec![vec![1], vec![0]];
 

@@ -12,6 +12,7 @@ default = ["cuda"]
 cuda = ["dep:bindgen"]
 mlir = []
 protein_folding = []
+examples = []
 
 [build-dependencies]
 cc = "1.0"
@@ -73,31 +74,32 @@ path = "foundation/lib.rs"
 [[example]]
 name = "benchmark_dimacs"
 path = "examples/benchmark_dimacs.rs"
-required-features = ["cuda"]
+required-features = ["cuda", "examples"]
 
 [[example]]
 name = "world_record_attempt"
 path = "examples/world_record_attempt.rs"
-required-features = ["cuda"]
+required-features = ["cuda", "examples"]
 
 [[example]]
 name = "test_prism_pipeline"
 path = "examples/test_prism_pipeline.rs"
-required-features = ["cuda"]
+required-features = ["cuda", "examples"]
 
 [[example]]
 name = "test_ensemble_gpu"
 path = "examples/test_ensemble_gpu.rs"
-required-features = ["cuda"]
+required-features = ["cuda", "examples"]
 
 [[example]]
 name = "test_dsjc1000"
 path = "examples/test_dsjc1000.rs"
-required-features = ["cuda"]
+required-features = ["cuda", "examples"]
 
 [[example]]
 name = "generate_training_data"
 path = "examples/generate_training_data.rs"
+required-features = ["examples"]
 
 [profile.release]
 opt-level = 3
