@@ -353,31 +353,31 @@
           "id": "M2-01",
           "title": "Stand up ontology service API and storage",
           "source": "src/meta/ontology/mod.rs",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M2-02",
           "title": "Implement alignment pipeline between variants and ontology",
           "source": "src/meta/ontology/alignment.rs",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M2-03",
           "title": "Extend determinism manifest with ontology hashes",
           "source": "determinism/meta/manifest_schema.json",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M2-04",
           "title": "Add governance gate for ontology approval workflow",
           "source": "01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M2-05",
           "title": "Publish ontology snapshot artifact and audit trail",
           "source": "artifacts/mec/M2/ontology_snapshot.json",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
