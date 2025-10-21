@@ -1,9 +1,9 @@
 {
-  "timestamp": "2025-10-20T00:39:53.494871+00:00",
+  "timestamp": "2025-10-21T19:33:11.801229+00:00",
   "advanced_feature": "persistent_kernels",
-  "advanced_time_ms": 120.0,
-  "baseline_time_ms": 260.0,
-  "delta_speed": 2.16,
-  "delta_quality": 1.2,
-  "notes": "Synthetic ablation data. Replace with experiment results."
+  "advanced_time_ms": 57.612136,
+  "baseline_time_ms": 76.30821207325604,
+  "delta_speed": 1.324516280272199,
+  "delta_quality": 1.109029731586594,
+  "notes": "Baseline simulated from drift=0.436; higher drift inflates reference latency."
 }

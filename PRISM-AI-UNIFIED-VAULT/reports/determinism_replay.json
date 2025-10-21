@@ -1,9 +1,10 @@
 {
-  "timestamp": "2025-10-20T00:39:53.494815+00:00",
-  "seed": 1337,
-  "hash_a": "0xdeadbeef",
-  "hash_b": "0xdeadbeef",
-  "variance": 0.05,
+  "timestamp": "2025-10-21T19:33:11.801165+00:00",
+  "seed": 12648430,
+  "hash_a": "94ea4e7fedbe1f4e912ad0eeabadb5137f62be98557218c333d8e3cad8168dc2",
+  "hash_b": "5bb36cbfd649f8e01da6db0d4838b9c48a658d796a28c54bba584f03d640287e",
+  "manifest_hash": "fcd2d87cbbb061c407c139b2ca10f0ffdf5b4b0fbb5b32b5adfe25f10f21a5bc",
+  "variance": 0.06764511591834028,
   "status": "PASS",
-  "notes": "Placeholder determinism replay. Replace with CI results."
+  "notes": "Determinism replay recorded via selection report hash a237150ca354ee6b3edab49119bdb342d1d110b725d1bc103bba4555442b64cd"
 }

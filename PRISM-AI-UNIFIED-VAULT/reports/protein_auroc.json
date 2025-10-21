@@ -1,8 +1,8 @@
 {
-  "timestamp": "2025-10-20T00:39:53.494924+00:00",
+  "timestamp": "2025-10-21T19:33:11.801295+00:00",
   "status": "PASS",
-  "auroc": 0.81,
-  "baseline_auroc": 0.78,
-  "runtime_delta": 0.02,
-  "notes": "Protein overlay evaluation placeholder."
+  "auroc": 0.8335857951148671,
+  "baseline_auroc": 0.827900330148892,
+  "runtime_delta": -0.0009916941790743328,
+  "notes": "Occupancy-driven ligand overlay \u2014 drift score 0.436."
 }

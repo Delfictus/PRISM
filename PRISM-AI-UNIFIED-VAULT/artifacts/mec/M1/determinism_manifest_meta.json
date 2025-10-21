@@ -1,15 +1,15 @@
 {
   "master_seed": 12648430,
   "component_seeds": {
-    "ensemble_generation": 14031704882470455154,
-    "cma": 11260532077783130352,
     "quantum_pimc": 4955302038280957656,
-    "neuromorphic": 1557487946971659829,
+    "info_geom": 12550100962110750449,
     "gpu_coloring": 945716460325754659,
+    "neuromorphic": 1557487946971659829,
     "thermodynamic": 11979365913534242684,
-    "info_geom": 12550100962110750449
+    "ensemble_generation": 14031704882470455154,
+    "cma": 11260532077783130352
   },
-  "input_hash": "f9c700da722c5b0ecd982d3609cd49567a5867ec6af1df90d8609c95feb1a739",
+  "input_hash": "94ea4e7fedbe1f4e912ad0eeabadb5137f62be98557218c333d8e3cad8168dc2",
   "output_hash": "5bb36cbfd649f8e01da6db0d4838b9c48a658d796a28c54bba584f03d640287e",
   "intermediate_hashes": [
     {
@@ -21,7 +21,7 @@
       "hash": "8399c7b749b6ca822fe00726d35133de5b64539c0591e5a3cf82e480d0a985e7"
     }
   ],
-  "timestamp": "2025-10-21T05:02:05.643253002Z",
+  "timestamp": "2025-10-21T19:33:11.766097242Z",
   "environment": {
     "cuda_version": null,
     "gpu_model": null,
@@ -31,7 +31,7 @@
   },
   "meta": {
     "meta_genome_hash": "d153a477bd3c249adf276f46120aeb451a413bcd12a8924ad47c851224e9f174",
-    "meta_merkle_root": "82902d178228427cd2891de0aa67697e46afe2d426ca391b0fc63752e2ad534f",
+    "meta_merkle_root": "fcd2d87cbbb061c407c139b2ca10f0ffdf5b4b0fbb5b32b5adfe25f10f21a5bc",
     "ontology_hash": null,
     "free_energy_hash": "c96875de504dcd33d8cd64bd8179c63af3e3e36e9d5e3741dddb566ea01fba13"
   }

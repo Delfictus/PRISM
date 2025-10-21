@@ -1,9 +1,9 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::Utc;
 use prism_ai::features::{registry, MetaFeatureId, MetaFeatureState};
 use prism_ai::meta::MetaOrchestrator;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 fn main() -> Result<()> {
     std::env::set_var("TELEMETRY_EXPECTED_STAGES", "");
@@ -37,13 +37,33 @@ fn main() -> Result<()> {
         artifact_dir.join("evolution_plan.json"),
         serde_json::to_string_pretty(&outcome.plan)?,
     )?;
-    fs::write(
-        artifact_dir.join("selection_report.json"),
-        serde_json::to_string_pretty(&outcome)?,
-    )?;
     outcome
         .determinism_proof
         .write_to_path(artifact_dir.join("determinism_manifest_meta.json"))?;
+
+    let report_path = selection_report_path();
+    if report_path.exists() {
+        let dest = artifact_dir.join("selection_report.json");
+        if report_path != dest {
+            let message = format!(
+                "copying selection report from {} to {}",
+                report_path.display(),
+                dest.display()
+            );
+            fs::copy(&report_path, &dest).context(message)?;
+            println!("Selection report copied to {}", dest.display());
+        } else {
+            println!(
+                "Selection report already materialized at {}",
+                dest.display()
+            );
+        }
+    } else {
+        println!(
+            "Selection report not found at {} (will rely on registry persistence)",
+            report_path.display()
+        );
+    }
 
     println!(
         "Best genome {} with scalar {:.5} (temperature {:.3})",
@@ -53,4 +73,12 @@ fn main() -> Result<()> {
     );
     println!("Artifacts written to {:?}", artifact_dir);
     Ok(())
+}
+
+fn selection_report_path() -> PathBuf {
+    std::env::var("PRISM_SELECTION_REPORT_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            PathBuf::from("PRISM-AI-UNIFIED-VAULT/artifacts/mec/M1/selection_report.json")
+        })
 }

@@ -1,16 +1,17 @@
 {
-  "timestamp": "2025-10-20T00:39:53.493276+00:00",
+  "timestamp": "2025-10-21T19:33:11.799498+00:00",
   "strategy": "adaptive",
   "dense_path": {
     "enabled": true,
     "wmma_padding_applied": true,
-    "reason": "sample data"
+    "reason": "occupancy=0.90, sm_eff=0.84"
   },
   "sparse_path": {
     "enabled": true,
     "persistent_kernel": true,
-    "work_stealing": true
+    "work_stealing": true,
+    "reason": "persistent kernels + work stealing active"
   },
   "decision": "sparse_preferred",
-  "notes": "Placeholder decision. Replace with runtime telemetry."
+  "notes": "runtime latency=57.61 ms, drift_score=0.436, cuda_graphs=yes"
 }

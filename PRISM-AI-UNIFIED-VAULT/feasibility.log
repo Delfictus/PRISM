@@ -1,3 +1,4 @@
-[2025-10-20T00:39:53.493335+00:00] Device free memory check: 24576 MB available
-[INFO] Dense path feasibility: PASS (n^2 * sizeof(half) = 1.2 GB < 80% of available memory)
-[INFO] Sparse path fallback configured.
+[2025-10-21T19:33:11.799616+00:00] Device free memory check: 24576 MB available
+[INFO] Dense path feasibility: PASS (occupancy=0.90, sm_efficiency=0.84)
+[INFO] Sparse pipeline latency: 57.61 ms per generation window.
+[INFO] Work stealing enabled via persistent kernel executor.

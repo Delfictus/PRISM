@@ -1,21 +1,25 @@
 {
-  "timestamp": "2025-10-20T00:39:53.498561+00:00",
-  "commit_sha": "HEAD",
+  "timestamp": "2025-10-21T19:33:11.801496+00:00",
+  "commit_sha": "a6c0f1dfc566ea1813b1f150bcfc9b9a0bcbc209",
   "feature_flags": [
-    "advanced",
-    "cuda_graph",
-    "persistent_kernel"
+    "persistent_kernels",
+    "cuda_graphs",
+    "warp_intrinsics",
+    "wmma_tensor_cores",
+    "mixed_precision",
+    "kernel_fusion",
+    "cooperative_groups"
   ],
   "device_caps_path": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/device_caps.json",
   "seeds": {
-    "master_seed": 42,
+    "master_seed": 12648430,
     "component_seeds": {
-      "ensemble": 4242,
-      "coloring": 4243,
-      "sa_tempering": 4244
+      "ensemble": 12648430,
+      "graph_capture": 32,
+      "selection_report": "5bb36cbfd649f8e01da6db0d4838b9c48a658d796a28c54bba584f03d640287e"
     }
   },
-  "determinism_hash": "0xdeadbeef",
+  "determinism_hash": "5bb36cbfd649f8e01da6db0d4838b9c48a658d796a28c54bba584f03d640287e",
   "status": "stable",
-  "notes": "Placeholder determinism manifest."
+  "notes": "Merkle root fcd2d87cbbb061c407c139b2ca10f0ffdf5b4b0fbb5b32b5adfe25f10f21a5bc recorded via selection report."
 }

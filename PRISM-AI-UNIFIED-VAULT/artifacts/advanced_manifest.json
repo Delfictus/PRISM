@@ -1,17 +1,17 @@
 {
-  "timestamp": "2025-10-20T00:39:53.493367+00:00",
+  "timestamp": "2025-10-21T19:33:11.799658+00:00",
   "vault_root": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT",
-  "commit_sha": "HEAD",
+  "commit_sha": "a6c0f1dfc566ea1813b1f150bcfc9b9a0bcbc209",
   "kernel_residency": {
     "gpu_resident": true,
-    "notes": "Set by master executor (sample metrics)"
+    "notes": "Measured occupancy 0.899, latency 57.61 ms"
   },
   "performance": {
-    "occupancy": 0.72,
-    "sm_efficiency": 0.78,
-    "bandwidth": 0.68,
-    "flops": 0.45,
-    "p95_variance": 0.07
+    "occupancy": 0.8991694179074333,
+    "sm_efficiency": 0.8445368417247077,
+    "bandwidth": 0.9231118778896423,
+    "flops": 0.8718531298160705,
+    "p95_variance": 0.06764511591834028
   },
   "advanced_tactics": [
     "persistent_kernels",
@@ -19,7 +19,8 @@
     "warp_intrinsics",
     "wmma_tensor_cores",
     "mixed_precision",
-    "kernel_fusion"
+    "kernel_fusion",
+    "cooperative_groups"
   ],
   "algorithmic": {
     "improves_speed": true,
@@ -27,14 +28,16 @@
   },
   "determinism": {
     "replay_passed": true,
-    "hash_stable": true
+    "hash_stable": true,
+    "manifest_hash": "fcd2d87cbbb061c407c139b2ca10f0ffdf5b4b0fbb5b32b5adfe25f10f21a5bc",
+    "report_hash": "a237150ca354ee6b3edab49119bdb342d1d110b725d1bc103bba4555442b64cd"
   },
   "ablation": {
     "transparency_proven": true
   },
   "device": {
     "guard_passed": true,
-    "memory_guard_margin": 0.2
+    "memory_guard_margin": 0.265
   },
   "telemetry": {
     "cuda_graph_captured": true,

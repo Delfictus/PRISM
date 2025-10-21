@@ -3,6 +3,66 @@
 
 ---
 
+### **Phase Activation Quickstart**
+
+The unified `master_executor.py` now updates Meta Evolution Cycle (MEC) tracking:
+
+- `python3 03-AUTOMATION/master_executor.py --phase M0 --phase-only --strict`
+  - Marks Phase M0 tasks as `in_progress` in `05-PROJECT-PLAN/tasks.json`.
+  - Regenerates `reports/meta_progress.json` for live dashboards.
+  - Runs governance validation (`--strict`) without rebuilds (`--phase-only`) while still producing compliance artifacts sourced from the latest Meta selection report.
+
+Multiple phases can be activated in a single run by repeating `--phase` or passing comma-separated values (e.g. `--phase M0,M1,M2`).
+
+### **Placeholder Compliance Policy**
+
+- The compliance validator now inspects `05-PROJECT-PLAN/tasks.json` before flagging missing metrics.  
+  *If the tasks that deliver a module are still `pending`/`in_progress`, placeholders downgrade to warnings with the task IDs called out.*
+- Once every mapped task for a module is `done`, placeholders become hard failures unless you set the matching override flag:
+
+| Module Check | Override Flag (requires explicit value) | Backlog Tasks |
+|--------------|-----------------------------------------|---------------|
+| Kernel residency | `PRISM_OVERRIDE_KERNEL_RESIDENCY` | `P2-03`, `P2-04` |
+| Performance metrics (occupancy / SM eff. / bandwidth / FLOPs / p95) | `PRISM_OVERRIDE_PERFORMANCE_METRICS` | `P2-07` |
+| Advanced tactic evidence | `PRISM_OVERRIDE_ADVANCED_TACTICS` | `P2-04` |
+| Algorithmic advantage proof | `PRISM_OVERRIDE_ALGO_ADVANTAGE` | `P2-05`, `M1-02` |
+| Determinism replay gate | `PRISM_OVERRIDE_DETERMINISM_REPLAY` | `P1-01`, `M1-03` |
+| Device guard telemetry | `PRISM_OVERRIDE_DEVICE_GUARDS` | `P1-03` |
+| CUDA Graph telemetry | `PRISM_OVERRIDE_CUDA_GRAPH_TELEMETRY` | `P0-02`, `P2-03` |
+| Persistent kernel telemetry | `PRISM_OVERRIDE_PERSISTENT_KERNEL_TELEMETRY` | `P0-02`, `P2-04` |
+| Mixed-precision policy telemetry | `PRISM_OVERRIDE_MIXED_PRECISION_TELEMETRY` | `P0-02` |
+| Advanced tactic bitmap | `PRISM_OVERRIDE_TACTIC_BITMAP` | `P2-04` |
+
+- Every master executor run now invokes the Meta bootstrapper to emit a fresh
+  `selection_report.json`; latency, occupancy, and tactic evidence in the
+  compliance artifacts come directly from that report rather than synthetic
+  placeholders.
+
+- Overrides can be applied programmatically via the master executor:
+
+  - `--allow-placeholder MODULE_KEY` toggles one module (see table above). Repeat the flag for multiple modules.
+  - `--placeholder-reason` annotates the override reason; defaults to `master_executor_override`.
+
+- Each run also captures governance artifacts automatically:
+  - `reports/meta_flags_snapshot.json` via `meta-flagsctl` (Merkle-backed feature manifest).
+  - `artifacts/mec/M0/ontology_snapshot.json` via `meta-ontologyctl` (bootstrap ontology digest).
+
+- Overrides are intentionally loud: the compliance report emits `OVERRIDE` warnings that must be cleared before sign-off.  Example temporary bypass:
+
+```bash
+PRISM_OVERRIDE_MIXED_PRECISION_TELEMETRY="ops/INC-482 temporary disable" \
+python3 03-AUTOMATION/master_executor.py --phase M2 --phase-only --strict
+```
+
+Or using the CLI helper:
+
+```bash
+python3 03-AUTOMATION/master_executor.py \
+  --phase M2 --phase-only --strict \
+  --allow-placeholder telemetry_mixed_precision \
+  --placeholder-reason "ops/INC-482 temporary disable"
+```
+
 ## **1. MASTER EXECUTION SCRIPT**
 
 ```python

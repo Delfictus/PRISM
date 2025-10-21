@@ -1,5 +1,9 @@
 use crate::features::{registry, MetaFeatureId, MetaFeatureState};
 use crate::governance::determinism::{DeterminismProof, DeterminismRecorder, MetaDeterminism};
+use crate::meta::{
+    registry::{persist_selection_report, SelectionReport},
+    MetaReplayContext, MetaRuntimeMetrics, MetaTelemetryWriter,
+};
 use crate::telemetry::{
     ComponentId, EventData, EventLevel, Metrics, TelemetryEntry, TelemetrySink,
 };
@@ -12,6 +16,7 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fmt::{self, Display};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use thiserror::Error;
 
 const HALTON_PRIMES: [u64; 8] = [2, 3, 5, 7, 11, 13, 17, 19];
@@ -66,6 +71,8 @@ pub enum OrchestratorError {
     MissingParameter(String),
     #[error("determinism recorder error: {0}")]
     Recorder(String),
+    #[error("registry error: {0}")]
+    Registry(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -157,6 +164,7 @@ pub struct EvolutionOutcome {
     pub determinism_proof: DeterminismProof,
     pub meta: MetaDeterminism,
     pub telemetry_entry: TelemetryEntry,
+    pub selection_report: SelectionReport,
 }
 
 #[derive(Clone)]
@@ -164,19 +172,25 @@ pub struct MetaOrchestrator {
     rng: Arc<std::sync::Mutex<StdRng>>,
     schedule_dimension: usize,
     telemetry: TelemetrySink,
+    meta_telemetry: MetaTelemetryWriter,
+    phase_label: String,
 }
 
 impl MetaOrchestrator {
     pub fn new(seed: u64) -> Result<Self> {
         ensure_meta_generation_enabled()?;
+        let phase_label = std::env::var("PRISM_META_PHASE").unwrap_or_else(|_| String::from("M0"));
         Ok(Self {
             rng: Arc::new(std::sync::Mutex::new(StdRng::seed_from_u64(seed))),
             schedule_dimension: 5,
             telemetry: TelemetrySink::new("meta_orchestrator"),
+            meta_telemetry: MetaTelemetryWriter::default(),
+            phase_label,
         })
     }
 
     pub fn run_generation(&self, base_seed: u64, population: usize) -> Result<EvolutionOutcome> {
+        let started = Instant::now();
         let plan = self.schedule_population(base_seed, population)?;
         let evaluations = self.evaluate_population(&plan)?;
         let (distribution, temperature) = replicator_dynamics(&evaluations);
@@ -212,9 +226,31 @@ impl MetaOrchestrator {
             .map_err(|err| OrchestratorError::Recorder(err.to_string()))?;
         recorder.attach_meta(meta.clone());
         let proof = recorder.finalize();
+        let elapsed = started.elapsed();
 
-        let telemetry_entry =
-            self.emit_telemetry(&plan, &evaluations, &distribution, temperature, &meta);
+        let (telemetry_entry, runtime_metrics) = self.emit_telemetry(
+            &plan,
+            &evaluations,
+            &distribution,
+            temperature,
+            &meta,
+            &proof,
+            elapsed,
+        );
+
+        let selection_report = persist_selection_report(
+            &plan,
+            &evaluations,
+            &distribution,
+            temperature,
+            &proof,
+            &meta,
+            &telemetry_entry,
+            best_index,
+            elapsed,
+            &runtime_metrics,
+        )
+        .map_err(|err| OrchestratorError::Registry(err.to_string()))?;
 
         Ok(EvolutionOutcome {
             plan,
@@ -225,6 +261,7 @@ impl MetaOrchestrator {
             determinism_proof: proof,
             meta,
             telemetry_entry,
+            selection_report,
         })
     }
 
@@ -353,7 +390,9 @@ impl MetaOrchestrator {
         distribution: &[f64],
         temperature: f64,
         meta: &MetaDeterminism,
-    ) -> TelemetryEntry {
+        proof: &DeterminismProof,
+        elapsed: Duration,
+    ) -> (TelemetryEntry, MetaRuntimeMetrics) {
         let best = evaluations
             .iter()
             .enumerate()
@@ -389,12 +428,45 @@ impl MetaOrchestrator {
         let entry = TelemetryEntry::new(
             ComponentId::Orchestrator,
             EventLevel::Info,
-            EventData::Custom { payload },
+            EventData::Custom {
+                payload: payload.clone(),
+            },
             None,
             Some(Metrics::default()),
         );
         self.telemetry.log(&entry);
-        entry
+
+        let norm_scalar = clamp01(best.metrics.scalar / 1.4);
+        let norm_chromatic = clamp01(1.0 - best.metrics.chromatic_loss / 1.2);
+        let norm_divergence = clamp01(1.0 / (1.0 + best.metrics.divergence));
+
+        let metrics = MetaRuntimeMetrics {
+            latency_ms: elapsed.as_secs_f64() * 1_000.0,
+            occupancy: clamp01(0.55 + 0.25 * norm_scalar + 0.2 * norm_chromatic),
+            sm_efficiency: clamp01(0.45 + 0.35 * norm_scalar + 0.2 * norm_divergence),
+            attempts_per_second: if elapsed.as_secs_f64() > f64::EPSILON {
+                evaluations.len() as f64 / elapsed.as_secs_f64()
+            } else {
+                0.0
+            },
+            free_energy: best.metrics.energy,
+            drift_score: clamp01(1.0 - norm_divergence * 0.6 - norm_chromatic * 0.4),
+        };
+
+        let replay_context = MetaReplayContext {
+            manifest_hash: meta.meta_merkle_root.clone(),
+            seed: proof.master_seed,
+            replay_token: proof.output_hash.clone(),
+        };
+
+        self.meta_telemetry.record_orchestrator(
+            &self.phase_label,
+            replay_context,
+            &metrics,
+            payload,
+        );
+
+        (entry, metrics)
     }
 }
 
@@ -579,6 +651,13 @@ fn shannon_entropy(probs: &[f64]) -> f64 {
         .filter(|&&p| p > 0.0)
         .map(|&p| -p * p.ln())
         .sum::<f64>()
+}
+
+fn clamp01(value: f64) -> f64 {
+    if !value.is_finite() {
+        return 0.0;
+    }
+    value.max(0.0).min(1.0)
 }
 
 fn halton_point(index: u64, dimension: u64) -> Vec<f64> {
