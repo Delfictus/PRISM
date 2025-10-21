@@ -92,6 +92,105 @@ Exit criteria: DSJC1000.5 ≤ 82 colors, reproducibility certified.
 
 ---
 
+## **Phase M0 · Meta Foundations**
+
+| # | Task | Source | Status |
+|---|------|--------|--------|
+| M0.1 | Publish MEC foundation RFC and charter | `docs/rfc/RFC-M0-Meta-Foundations.md` | ☐ pending |
+| M0.2 | Define meta feature flags and constitution addendum | `00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md` | ☐ pending |
+| M0.3 | Finalize telemetry schema v1 with durability expectations | `meta/telemetry/schema_v1.json` | ☐ pending |
+| M0.4 | Add orchestrator and ontology service stubs | `src/meta/orchestrator/mod.rs` | ☐ pending |
+| M0.5 | Integrate meta CI hook into master executor | `03-AUTOMATION/master_executor.py` | ☐ pending |
+| M0.6 | Record governance sign-off and Merkle anchors | `01-GOVERNANCE/META-GOVERNANCE-LOG.md` | ☐ pending |
+
+Exit criteria: RFC approved, meta flags defined, telemetry schema committed, service stubs live, CI gating active, governance log signed.
+
+---
+
+## **Phase M1 · Meta Orchestrator MVP**
+
+| # | Task | Source | Status |
+|---|------|--------|--------|
+| M1.1 | Implement meta variant registry and genome scaffold | `src/meta/registry.rs` | ☐ pending |
+| M1.2 | Build deterministic evaluation loop and scoring heuristics | `src/meta/orchestrator/mod.rs` | ☐ pending |
+| M1.3 | Emit meta determinism manifest and telemetry payloads | `artifacts/mec/M1/selection_report.json` | ☐ pending |
+| M1.4 | Wire ci-meta-orchestrator pipeline into governance | `scripts/run_full_check.sh` | ☐ pending |
+| M1.5 | Ship meta bootstrap CLI and documentation | `src/bin/meta_bootstrap.rs` | ☐ pending |
+
+Exit criteria: Orchestrator runs deterministically with audit artifacts, CI phase gate enabled.
+
+---
+
+## **Phase M2 · Ontology Integration**
+
+| # | Task | Source | Status |
+|---|------|--------|--------|
+| M2.1 | Stand up ontology service API and storage | `src/meta/ontology/mod.rs` | ☐ pending |
+| M2.2 | Implement alignment pipeline between variants and ontology | `src/meta/ontology/alignment.rs` | ☐ pending |
+| M2.3 | Extend determinism manifest with ontology hashes | `determinism/meta/manifest_schema.json` | ☐ pending |
+| M2.4 | Add governance gate for ontology approval workflow | `01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md` | ☐ pending |
+| M2.5 | Publish ontology snapshot artifact and audit trail | `artifacts/mec/M2/ontology_snapshot.json` | ☐ pending |
+
+Exit criteria: Ontology service live, manifests extended, governance approvals enforced.
+
+---
+
+## **Phase M3 · Reflexive Feedback**
+
+| # | Task | Source | Status |
+|---|------|--------|--------|
+| M3.1 | Implement meta state model and reflexive controller | `src/meta/reflexive/mod.rs` | ☐ pending |
+| M3.2 | Instrument free-energy lattice snapshot telemetry | `artifacts/mec/M3/lattice_report.json` | ☐ pending |
+| M3.3 | Enforce governance guardrails for exploration vs strict modes | `01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md` | ☐ pending |
+| M3.4 | Integrate lattice metrics into determinism manifest | `determinism/meta/lattice_manifest.json` | ☐ pending |
+| M3.5 | Update CI lattice pipeline and compliance validator | `scripts/compliance_validator.py` | ☐ pending |
+
+Exit criteria: Reflex control loop operational with telemetry and governance gating.
+
+---
+
+## **Phase M4 · Semantic Plasticity**
+
+| # | Task | Source | Status |
+|---|------|--------|--------|
+| M4.1 | Create representation adapters for ontology evolution | `src/meta/plasticity/adapters.rs` | ☐ pending |
+| M4.2 | Implement semantic drift detection and regression tests | `tests/meta/semantic_plasticity.rs` | ☐ pending |
+| M4.3 | Generate explainability reports for meta decisions | `artifacts/mec/M4/explainability_report.md` | ☐ pending |
+| M4.4 | Extend compliance validator with representation gate | `scripts/compliance_validator.py` | ☐ pending |
+| M4.5 | Document knowledge evolution runbooks | `docs/runbooks/meta_rollout.md` | ☐ pending |
+
+Exit criteria: Representation layer adaptable with explainability artifacts and compliance gates.
+
+---
+
+## **Phase M5 · Federated Readiness**
+
+| # | Task | Source | Status |
+|---|------|--------|--------|
+| M5.1 | Design genome sharing and federation protocol | `docs/rfc/RFC-M5-Federated-Readiness.md` | ☐ pending |
+| M5.2 | Implement distributed orchestrator interfaces | `src/meta/federated/mod.rs` | ☐ pending |
+| M5.3 | Simulate hybrid orchestration scenarios | `artifacts/mec/M5/federated_plan.md` | ☐ pending |
+| M5.4 | Extend compliance gates for federated modes | `01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md` | ☐ pending |
+| M5.5 | Update runbooks with cross-site governance controls | `docs/runbooks/meta_rollout.md` | ☐ pending |
+
+Exit criteria: Federation designs validated with governance coverage.
+
+---
+
+## **Phase M6 · Hardening & Rollout**
+
+| # | Task | Source | Status |
+|---|------|--------|--------|
+| M6.1 | Produce end-to-end rollout checklist and approvals | `artifacts/mec/M6/rollout_checklist.md` | ☐ pending |
+| M6.2 | Build observability dashboards and alarms for MEC | `scripts/governance_dashboard.py` | ☐ pending |
+| M6.3 | Harden backup and rollback automation | `03-AUTOMATION/master_executor.py` | ☐ pending |
+| M6.4 | Secure production feature flag gating | `meta/meta_flags.json` | ☐ pending |
+| M6.5 | Complete governance ratification and audit package | `01-GOVERNANCE/META-GOVERNANCE-LOG.md` | ☐ pending |
+
+Exit criteria: MEC ready for production enablement with full governance audit trail.
+
+---
+
 ### **How to Update**
 
 1. Modify statuses in `05-PROJECT-PLAN/tasks.yaml` (`pending` → `in_progress` → `done`).
