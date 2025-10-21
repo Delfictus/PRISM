@@ -127,6 +127,8 @@ pub struct FederatedSimulationReport {
     pub ledger_entries: Vec<LedgerEntry>,
     /// Weighted sum across updates—it acts as a deterministic aggregate.
     pub aggregated_delta: i64,
+    /// Placeholder signature derived from the ledger Merkle root.
+    pub signature: String,
 }
 
 /// Primary entry point for coordinating federated meta nodes.
@@ -190,6 +192,7 @@ impl FederatedInterface {
         ledger_entries.sort_by(|a, b| a.node_id.cmp(&b.node_id));
 
         let aggregated_delta = updates.iter().map(|u| u.delta_score).sum::<i64>();
+        let signature = compute_ledger_merkle(&ledger_entries);
         let quorum_reached = self
             .nodes
             .iter()
@@ -203,6 +206,7 @@ impl FederatedInterface {
             aligned_updates: updates,
             ledger_entries,
             aggregated_delta,
+            signature,
         }
     }
 

@@ -11,9 +11,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::Utc;
 use clap::Parser;
-use prism_ai::meta::federated::{
-    compute_ledger_merkle, FederatedInterface, FederationConfig, NodeProfile, NodeRole,
-};
+use prism_ai::meta::federated::{FederatedInterface, FederationConfig, NodeProfile, NodeRole};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -101,7 +99,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut epoch_docs = Vec::with_capacity(reports.len());
     let mut merkle_roots = Vec::with_capacity(reports.len());
     for report in &reports {
-        let merkle = compute_ledger_merkle(&report.ledger_entries);
+        let merkle = report.signature.clone();
         merkle_roots.push(merkle.clone());
         epoch_docs.push(json!({
             "epoch": report.epoch,
@@ -150,7 +148,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
         fs::create_dir_all(&target_dir)?;
         let ledger_path = target_dir.join(format!("epoch_{:03}.json", report.epoch));
-        let merkle_root = compute_ledger_merkle(&report.ledger_entries);
+        let merkle_root = report.signature.clone();
         let ledger_doc = json!({
             "epoch": report.epoch,
             "signature": merkle_root,

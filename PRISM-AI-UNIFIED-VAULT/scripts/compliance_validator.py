@@ -805,6 +805,7 @@ def evaluate_federated_artifacts(report: ComplianceReport, base: Path) -> None:
     if scenario_dir.exists():
         for scenario in sorted(p for p in scenario_dir.glob('*.json')):
             label = scenario.stem
+            summary_ok = True
             if label == 'baseline':
                 summary_path = base / FEDERATION_SUMMARY_PATH
                 ledger_path = ledger_dir
@@ -824,6 +825,7 @@ def evaluate_federated_artifacts(report: ComplianceReport, base: Path) -> None:
                         message=f'Missing or invalid federated summary for scenario {label}: {summary_path}',
                     )
                 )
+                summary_ok = False
             else:
                 reported_label = summary_data.get('label')
                 if reported_label != expected_label:
@@ -838,6 +840,7 @@ def evaluate_federated_artifacts(report: ComplianceReport, base: Path) -> None:
                             ),
                         )
                     )
+                    summary_ok = False
 
                 epochs_data = summary_data.get('epochs', [])
                 scenario_roots: List[str] = []
@@ -857,6 +860,7 @@ def evaluate_federated_artifacts(report: ComplianceReport, base: Path) -> None:
                                 )
                             )
                             scenario_roots.clear()
+                            summary_ok = False
                             break
                         scenario_roots.append(str(merkle))
 
@@ -875,6 +879,7 @@ def evaluate_federated_artifacts(report: ComplianceReport, base: Path) -> None:
                                 ),
                             )
                         )
+                        summary_ok = False
                     else:
                         report.add(
                             Finding(
@@ -885,14 +890,15 @@ def evaluate_federated_artifacts(report: ComplianceReport, base: Path) -> None:
                             )
                         )
 
-                report.add(
-                    Finding(
-                        item=f'federation:scenario:{label}:summary',
-                        status='PASS',
-                        severity='INFO',
-                        message=f'Federated summary present for scenario {label}.',
+                if summary_ok:
+                    report.add(
+                        Finding(
+                            item=f'federation:scenario:{label}:summary',
+                            status='PASS',
+                            severity='INFO',
+                            message=f'Federated summary present for scenario {label}.',
+                        )
                     )
-                )
 
             if not ledger_path.exists():
                 report.add(
