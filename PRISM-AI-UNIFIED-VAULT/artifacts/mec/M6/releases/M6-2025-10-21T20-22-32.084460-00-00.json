@@ -1,0 +1,27 @@
+{
+  "phase": "M6",
+  "generated_at": "2025-10-21T20:22:32.084460+00:00",
+  "strict": true,
+  "allow_missing": false,
+  "snapshot": {
+    "timestamp": "2025-10-21T20-22-32.082676+00-00",
+    "path": "artifacts/mec/M6/backups/2025-10-21T20-22-32.082676+00-00",
+    "composite_hash": "40a84c390b6f2028b0f294afec17e53198434ee1351f465735e534c4c5b46222"
+  },
+  "artifacts": {
+    "advanced_manifest": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/artifacts/advanced_manifest.json",
+    "roofline": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/reports/roofline.json",
+    "determinism": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/reports/determinism_replay.json",
+    "ablation": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/artifacts/ablation_report.json",
+    "protein": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/reports/protein_auroc.json",
+    "graph_capture": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/reports/graph_capture.json",
+    "graph_exec": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/reports/graph_exec.bin",
+    "determinism_manifest": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/artifacts/determinism_manifest.json",
+    "device_caps": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/device_caps.json",
+    "path_decision": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/path_decision.json",
+    "feasibility": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/feasibility.log"
+  },
+  "compliance_exit_code": 0,
+  "phases": [],
+  "meta_registry_root": "d56b60daef3e9efbad7a060f9e9b575bd2193d86eb68a6a6321295ddfbba4f05"
+}

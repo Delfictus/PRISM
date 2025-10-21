@@ -1,7 +1,7 @@
 {
-  "timestamp": "2025-10-20T00:39:53.493367+00:00",
-  "vault_root": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT",
-  "commit_sha": "HEAD",
+  "timestamp": "2025-10-21T20:22:32.101148+00:00",
+  "vault_root": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT",
+  "commit_sha": "a6c0f1dfc566ea1813b1f150bcfc9b9a0bcbc209",
   "kernel_residency": {
     "gpu_resident": true,
     "notes": "Set by master executor (sample metrics)"
@@ -51,11 +51,11 @@
     "cooperative_groups": true
   },
   "artifacts": {
-    "roofline": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/reports/roofline.json",
-    "determinism": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/reports/determinism_replay.json",
-    "ablation": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/artifacts/ablation_report.json",
-    "graph_capture": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/reports/graph_capture.json",
-    "graph_exec": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/reports/graph_exec.bin",
-    "determinism_manifest": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/artifacts/determinism_manifest.json"
+    "roofline": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/reports/roofline.json",
+    "determinism": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/reports/determinism_replay.json",
+    "ablation": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/artifacts/ablation_report.json",
+    "graph_capture": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/reports/graph_capture.json",
+    "graph_exec": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/reports/graph_exec.bin",
+    "determinism_manifest": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/artifacts/determinism_manifest.json"
   }
 }

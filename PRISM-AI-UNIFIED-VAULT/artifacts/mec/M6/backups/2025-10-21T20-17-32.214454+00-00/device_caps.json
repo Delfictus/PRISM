@@ -1,0 +1,11 @@
+{
+  "timestamp": "2025-10-20T00:39:53.493127+00:00",
+  "success": true,
+  "devices": [
+    {
+      "name": "NVIDIA GeForce RTX 5070 Laptop GPU",
+      "memory_total": "8151 MiB",
+      "compute_capability": "12.0"
+    }
+  ]
+}

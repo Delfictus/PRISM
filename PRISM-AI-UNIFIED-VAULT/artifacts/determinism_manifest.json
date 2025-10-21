@@ -1,12 +1,12 @@
 {
-  "timestamp": "2025-10-20T00:39:53.498561+00:00",
-  "commit_sha": "HEAD",
+  "timestamp": "2025-10-21T20:22:32.103071+00:00",
+  "commit_sha": "a6c0f1dfc566ea1813b1f150bcfc9b9a0bcbc209",
   "feature_flags": [
     "advanced",
     "cuda_graph",
     "persistent_kernel"
   ],
-  "device_caps_path": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/device_caps.json",
+  "device_caps_path": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M6/PRISM-AI-UNIFIED-VAULT/device_caps.json",
   "seeds": {
     "master_seed": 42,
     "component_seeds": {

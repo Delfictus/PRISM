@@ -181,11 +181,11 @@ Exit criteria: Federation designs validated with governance coverage.
 
 | # | Task | Source | Status |
 |---|------|--------|--------|
-| M6.1 | Produce end-to-end rollout checklist and approvals | `artifacts/mec/M6/rollout_checklist.md` | ☐ pending |
-| M6.2 | Build observability dashboards and alarms for MEC | `scripts/governance_dashboard.py` | ☐ pending |
-| M6.3 | Harden backup and rollback automation | `03-AUTOMATION/master_executor.py` | ☐ pending |
-| M6.4 | Secure production feature flag gating | `meta/meta_flags.json` | ☐ pending |
-| M6.5 | Complete governance ratification and audit package | `01-GOVERNANCE/META-GOVERNANCE-LOG.md` | ☐ pending |
+| M6.1 | Produce end-to-end rollout checklist and approvals | `artifacts/mec/M6/rollout_checklist.md` | ✅ done |
+| M6.2 | Build observability dashboards and alarms for MEC | `scripts/governance_dashboard.py` | ✅ done |
+| M6.3 | Harden backup and rollback automation | `03-AUTOMATION/master_executor.py` | ✅ done |
+| M6.4 | Secure production feature flag gating | `meta/meta_flags.json` | ✅ done |
+| M6.5 | Complete governance ratification and audit package | `01-GOVERNANCE/META-GOVERNANCE-LOG.md` | ✅ done |
 
 Exit criteria: MEC ready for production enablement with full governance audit trail.
 

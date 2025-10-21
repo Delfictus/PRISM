@@ -1,0 +1,37 @@
+{
+  "phase": "M6",
+  "created_at": "2025-10-21T20:18:01.637236+00:00",
+  "files": {
+    "artifacts/advanced_manifest.json": "0d37c2182aaa8075a2678ab62efd36b480c128d306f1cdb2de73b5634229691c",
+    "artifacts/ablation_report.json": "6de737c9dc42ae7062abbf19a0db0481fb66053cbceaa2a3662aa52fd61858f3",
+    "artifacts/determinism_manifest.json": "5bda7e50d48340da07300fea8450a5e7b242f6bfdfa082bd95084679bb79f3be",
+    "artifacts/mec/M6/rollout_checklist.md": "2db8211f46be9234fa5ad782a1892fbfe217c6d588742195ec33d44f2f74c054",
+    "artifacts/mec/M6/observability_dashboard.html": "c282d2af2c360fca3970ea636809373ebea45fc2ccf33f2b54e11a0be0ed3e63",
+    "reports/roofline.json": "850a334c24e3f2cf1f1292abb49283c3990d86a172fa026d9c33c715a69d1183",
+    "reports/determinism_replay.json": "63f13ba2cdcab963938a94e4893b576963c82c067c8db56a452f66f2358c58f9",
+    "reports/protein_auroc.json": "e11c5348abf436817f9d8960a46181a74764503124e64cede57bf55d15d70fa7",
+    "reports/graph_capture.json": "87b2a1796cf9ed27974393d4be9769c74afbe3bc0cbdfca4ef9e58be314b3dfd",
+    "reports/graph_exec.bin": "bca06e9881a34d5815ca6d019ce1d721674daceb212c19559dd73db1409207f8",
+    "device_caps.json": "409190b095618b650bc694a94e8a61a7219c06dfcda0e452265408f5db9147c8",
+    "path_decision.json": "372fb1d6e5fca2984bc78c6d4a5458cde0c84cb6a6e3f3c7214e15b3f755ca8c",
+    "feasibility.log": "faed3f0d12e0e5fe88965ec8e396dde65893b8c60df3d659199c94fc9f5af967",
+    "meta/meta_flags.json": "ed1a3baa021eac85425b6a29f4e29f2a03e4d73cb0f294647d0b46be4aec17e6"
+  },
+  "composite_hash": "5c0995464e5e07ae2bb7629d32b5671b5cfe8f72e4fa49cdf615980a6d1bd77a",
+  "source_paths": [
+    "artifacts/advanced_manifest.json",
+    "artifacts/ablation_report.json",
+    "artifacts/determinism_manifest.json",
+    "artifacts/mec/M6/rollout_checklist.md",
+    "artifacts/mec/M6/observability_dashboard.html",
+    "reports/roofline.json",
+    "reports/determinism_replay.json",
+    "reports/protein_auroc.json",
+    "reports/graph_capture.json",
+    "reports/graph_exec.bin",
+    "device_caps.json",
+    "path_decision.json",
+    "feasibility.log",
+    "meta/meta_flags.json"
+  ]
+}

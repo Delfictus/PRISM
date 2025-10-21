@@ -1,0 +1,61 @@
+{
+  "timestamp": "2025-10-20T00:39:53.493367+00:00",
+  "vault_root": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT",
+  "commit_sha": "HEAD",
+  "kernel_residency": {
+    "gpu_resident": true,
+    "notes": "Set by master executor (sample metrics)"
+  },
+  "performance": {
+    "occupancy": 0.72,
+    "sm_efficiency": 0.78,
+    "bandwidth": 0.68,
+    "flops": 0.45,
+    "p95_variance": 0.07
+  },
+  "advanced_tactics": [
+    "persistent_kernels",
+    "cuda_graphs",
+    "warp_intrinsics",
+    "wmma_tensor_cores",
+    "mixed_precision",
+    "kernel_fusion"
+  ],
+  "algorithmic": {
+    "improves_speed": true,
+    "improves_quality": true
+  },
+  "determinism": {
+    "replay_passed": true,
+    "hash_stable": true
+  },
+  "ablation": {
+    "transparency_proven": true
+  },
+  "device": {
+    "guard_passed": true,
+    "memory_guard_margin": 0.2
+  },
+  "telemetry": {
+    "cuda_graph_captured": true,
+    "persistent_kernel_used": true,
+    "mixed_precision_policy": true
+  },
+  "tactic_bitmap": {
+    "persistent_kernels": true,
+    "cuda_graphs": true,
+    "warp_intrinsics": true,
+    "wmma_tensor_cores": true,
+    "mixed_precision": true,
+    "kernel_fusion": true,
+    "cooperative_groups": true
+  },
+  "artifacts": {
+    "roofline": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/reports/roofline.json",
+    "determinism": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/reports/determinism_replay.json",
+    "ablation": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/artifacts/ablation_report.json",
+    "graph_capture": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/reports/graph_capture.json",
+    "graph_exec": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/reports/graph_exec.bin",
+    "determinism_manifest": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/artifacts/determinism_manifest.json"
+  }
+}
