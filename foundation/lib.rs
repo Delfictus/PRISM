@@ -33,3 +33,14 @@ pub use ingestion::{
 pub use phase_causal_matrix::{PcmConfig, PhaseCausalMatrixProcessor};
 pub use platform::NeuromorphicQuantumPlatform;
 pub use types::*;
+
+/// Placeholder binary entry point when compiled as `prism-ai`.
+///
+/// The platform is primarily exposed as a library. A no-op `main` keeps
+/// the legacy binary target building cleanly while end-to-end orchestration
+/// flows run from higher-level executors.
+#[allow(dead_code)]
+pub fn main() {
+    env_logger::init();
+    log::info!("PRISM foundation library loaded – no direct CLI actions.");
+}
