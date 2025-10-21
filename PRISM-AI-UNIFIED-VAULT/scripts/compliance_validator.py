@@ -67,6 +67,8 @@ ARTIFACT_PATHS: Dict[str, Path] = {
     "graph_capture": Path("reports/graph_capture.json"),
     "graph_exec": Path("reports/graph_exec.bin"),
     "determinism_manifest": Path("artifacts/determinism_manifest.json"),
+    "lattice_report": Path("artifacts/mec/M3/lattice_report.json"),
+    "lattice_manifest": Path("determinism/meta/lattice_manifest.json"),
 }
 
 CRITICAL_ARTIFACTS = {
@@ -76,6 +78,8 @@ CRITICAL_ARTIFACTS = {
     "graph_capture",
     "graph_exec",
     "determinism_manifest",
+    "lattice_report",
+    "lattice_manifest",
 }
 
 META_REGISTRY_PATH = Path("meta/meta_flags.json")
@@ -171,7 +175,9 @@ def check_keywords(report: ComplianceReport, name: str, path: Path, keywords: Se
         )
 
 
-def evaluate_advanced_manifest(report: ComplianceReport, path: Path) -> None:
+def evaluate_advanced_manifest(
+    report: ComplianceReport, path: Path, lattice_snapshot: Optional[Dict[str, object]] = None
+) -> None:
     data = load_json(path)
     if data is None:
         report.add(
@@ -338,6 +344,386 @@ def evaluate_advanced_manifest(report: ComplianceReport, path: Path) -> None:
                     message=f"Advanced tactics disabled or unreported: {', '.join(missing)}",
                 )
             )
+
+    reflexive = data.get("reflexive", {})
+    if not isinstance(reflexive, dict) or not reflexive:
+        report.add(
+            Finding(
+                item="a-dod:reflexive",
+                status="FAIL",
+                severity="CRITICAL",
+                message="Reflexive snapshot summary missing from advanced manifest.",
+            )
+        )
+        return
+
+    mode = reflexive.get("mode")
+    if mode not in {"strict", "recovery", "exploration"}:
+        report.add(
+            Finding(
+                item="a-dod:reflexive:mode",
+                status="FAIL",
+                severity="CRITICAL",
+                message=f"Invalid reflexive mode reported: {mode!r}.",
+            )
+        )
+
+    entropy = reflexive.get("entropy")
+    divergence = reflexive.get("divergence")
+    fingerprint = reflexive.get("lattice_fingerprint")
+
+    if fingerprint is None:
+        report.add(
+            Finding(
+                item="a-dod:reflexive:fingerprint",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Reflexive lattice fingerprint missing from advanced manifest.",
+            )
+        )
+    else:
+        if not isinstance(fingerprint, str) or len(fingerprint) != 64:
+            report.add(
+                Finding(
+                    item="a-dod:reflexive:fingerprint",
+                    status="FAIL",
+                    severity="BLOCKER",
+                    message="Reflexive lattice fingerprint must be a 64-hex digest.",
+                )
+            )
+        if lattice_snapshot and lattice_snapshot.get("fingerprint") != fingerprint:
+            report.add(
+                Finding(
+                    item="a-dod:reflexive:fingerprint",
+                    status="FAIL",
+                    severity="BLOCKER",
+                    message="Advanced manifest fingerprint does not match lattice snapshot.",
+                )
+            )
+
+    if mode == "exploration" and divergence is not None and divergence >= 0.18:
+        report.add(
+            Finding(
+                item="a-dod:reflexive:divergence",
+                status="FAIL",
+                severity="CRITICAL",
+                message=f"Exploration mode divergence {divergence:.3f} exceeds strict cap 0.18.",
+            )
+        )
+    if mode == "exploration" and entropy is not None and entropy <= 1.05:
+        report.add(
+            Finding(
+                item="a-dod:reflexive:entropy",
+                status="FAIL",
+                severity="CRITICAL",
+                message=f"Exploration mode entropy {entropy:.3f} below guardrail floor 1.05.",
+            )
+        )
+
+
+def evaluate_lattice_snapshot(report: ComplianceReport, path: Path) -> Optional[Dict[str, object]]:
+    data = load_json(path)
+    if data is None:
+        report.add(
+            Finding(
+                item="lattice:snapshot",
+                status="FAIL",
+                severity="BLOCKER",
+                message=f"Lattice snapshot missing or unreadable: {path}",
+            )
+        )
+        return None
+
+    required = [
+        "timestamp",
+        "mode",
+        "entropy",
+        "divergence",
+        "effective_temperature",
+        "lattice_edge",
+        "lattice",
+        "fingerprint",
+    ]
+    missing = [field for field in required if field not in data]
+    if missing:
+        report.add(
+            Finding(
+                item="lattice:snapshot",
+                status="FAIL",
+                severity="BLOCKER",
+                message=f"Lattice snapshot missing fields: {', '.join(missing)}",
+            )
+        )
+        return None
+
+    issues = False
+
+    mode = data.get("mode")
+    if mode not in {"strict", "recovery", "exploration"}:
+        report.add(
+            Finding(
+                item="lattice:mode",
+                status="FAIL",
+                severity="CRITICAL",
+                message=f"Invalid lattice mode {mode!r}.",
+            )
+        )
+        issues = True
+
+    lattice = data.get("lattice")
+    edge = data.get("lattice_edge")
+    if not isinstance(lattice, list) or not all(isinstance(row, list) for row in lattice):
+        report.add(
+            Finding(
+                item="lattice:structure",
+                status="FAIL",
+                severity="CRITICAL",
+                message="Lattice grid must be a 2D list.",
+            )
+        )
+    else:
+        if len(lattice) != edge or any(len(row) != edge for row in lattice):
+            report.add(
+                Finding(
+                    item="lattice:structure",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message=f"Lattice grid shape mismatch (edge={edge}, actual_rows={len(lattice)}).",
+                )
+            )
+        issues = True
+
+    fingerprint = data.get("fingerprint")
+    if not isinstance(fingerprint, str) or len(fingerprint) != 64:
+        report.add(
+            Finding(
+                item="lattice:fingerprint",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Lattice fingerprint must be 64 hex characters.",
+            )
+        )
+        issues = True
+    else:
+        payload = {k: v for k, v in data.items() if k != "fingerprint"}
+        computed = hashlib.sha256(
+            json.dumps(payload, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        if computed != fingerprint:
+            report.add(
+                Finding(
+                    item="lattice:fingerprint",
+                    status="FAIL",
+                    severity="BLOCKER",
+                    message="Lattice fingerprint mismatch (file contents tampered?).",
+                )
+            )
+            issues = True
+
+    alerts = data.get("alerts", [])
+    if any(alert in {"reflexive_disabled", "divergence_cap_exceeded", "entropy_below_floor"} for alert in alerts):
+        report.add(
+            Finding(
+                item="lattice:alerts",
+                status="FAIL",
+                severity="BLOCKER",
+                message=f"Blocking reflexive alert present: {alerts}",
+            )
+        )
+        issues = True
+
+    weights = data.get("distribution_weights")
+    if isinstance(weights, list) and weights:
+        total = sum(weights)
+        if abs(total - 1.0) > 1e-3:
+            report.add(
+                Finding(
+                    item="lattice:weights",
+                    status="FAIL",
+                    severity="WARNING",
+                    message=f"Lattice distribution weights sum to {total:.4f} (expected ≈ 1.0).",
+                )
+            )
+            issues = True
+
+    if not issues:
+        report.add(
+            Finding(
+                item="lattice:snapshot",
+                status="PASS",
+                severity="INFO",
+                message="Lattice snapshot validated.",
+            )
+        )
+    return data
+
+
+def evaluate_lattice_manifest(
+    report: ComplianceReport, path: Path, snapshot: Optional[Dict[str, object]]
+) -> None:
+    data = load_json(path)
+    if data is None:
+        report.add(
+            Finding(
+                item="lattice:manifest",
+                status="FAIL",
+                severity="BLOCKER",
+                message=f"Lattice manifest missing or unreadable: {path}",
+            )
+        )
+        return
+
+    entries = data.get("snapshots")
+    if not isinstance(entries, list) or not entries:
+        report.add(
+            Finding(
+                item="lattice:manifest:snapshots",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Lattice manifest contains no snapshots.",
+            )
+        )
+        return
+
+    fingerprints = [
+        entry.get("fingerprint")
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("fingerprint")
+    ]
+    issues = False
+    computed = hashlib.sha256("".join(sorted(fingerprints)).encode("utf-8")).hexdigest()
+    if data.get("hash") != computed:
+        report.add(
+            Finding(
+                item="lattice:manifest:hash",
+                status="FAIL",
+                severity="CRITICAL",
+                message="Lattice manifest hash does not match snapshot fingerprints.",
+            )
+        )
+        issues = True
+
+    if snapshot:
+        expected = snapshot.get("fingerprint")
+        match = next(
+            (entry for entry in entries if entry.get("fingerprint") == expected), None
+        )
+        if match is None:
+            report.add(
+                Finding(
+                    item="lattice:manifest:fingerprint",
+                    status="FAIL",
+                    severity="BLOCKER",
+                    message=f"Lattice manifest missing fingerprint {expected}.",
+                )
+            )
+            issues = True
+        else:
+            if match.get("mode") != snapshot.get("mode"):
+                report.add(
+                    Finding(
+                        item="lattice:manifest:mode",
+                        status="FAIL",
+                        severity="CRITICAL",
+                        message="Lattice manifest mode disagrees with snapshot.",
+                    )
+                )
+                issues = True
+
+    if not issues:
+        report.add(
+            Finding(
+                item="lattice:manifest",
+                status="PASS",
+                severity="INFO",
+                message="Lattice manifest validated.",
+            )
+        )
+
+
+def evaluate_determinism_manifest(
+    report: ComplianceReport, path: Path, snapshot: Optional[Dict[str, object]]
+) -> None:
+    data = load_json(path)
+    if data is None:
+        report.add(
+            Finding(
+                item="determinism:manifest",
+                status="FAIL",
+                severity="BLOCKER",
+                message=f"Determinism manifest missing or unreadable: {path}",
+            )
+        )
+        return
+
+    issues = False
+
+    reflexive = data.get("reflexive")
+    if not isinstance(reflexive, dict):
+        report.add(
+            Finding(
+                item="determinism:manifest:reflexive",
+                status="FAIL",
+                severity="CRITICAL",
+                message="Determinism manifest missing reflexive section.",
+            )
+        )
+        issues = True
+    else:
+        mode = reflexive.get("mode")
+        if mode not in {"strict", "recovery", "exploration"}:
+            report.add(
+                Finding(
+                    item="determinism:manifest:mode",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message=f"Invalid reflexive mode recorded in determinism manifest: {mode!r}.",
+                )
+            )
+            issues = True
+        fingerprint = reflexive.get("lattice_fingerprint")
+        if not isinstance(fingerprint, str) or len(fingerprint) != 64:
+            report.add(
+                Finding(
+                    item="determinism:manifest:fingerprint",
+                    status="FAIL",
+                    severity="BLOCKER",
+                    message="Determinism manifest lattice fingerprint invalid.",
+                )
+            )
+            issues = True
+        elif snapshot and fingerprint != snapshot.get("fingerprint"):
+            report.add(
+                Finding(
+                    item="determinism:manifest:fingerprint",
+                    status="FAIL",
+                    severity="BLOCKER",
+                    message="Determinism manifest fingerprint does not match lattice snapshot.",
+                )
+            )
+            issues = True
+
+        alerts = reflexive.get("alerts", [])
+        if any(alert in {"reflexive_disabled", "divergence_cap_exceeded"} for alert in alerts):
+            report.add(
+                Finding(
+                    item="determinism:manifest:alerts",
+                    status="FAIL",
+                    severity="BLOCKER",
+                    message=f"Determinism manifest recorded blocking reflexive alerts: {alerts}",
+                )
+            )
+            issues = True
+
+    if not issues:
+        report.add(
+            Finding(
+                item="determinism:manifest",
+                status="PASS",
+                severity="INFO",
+                message="Determinism manifest validated.",
+            )
+        )
 
 
 def evaluate_artifact_presence(report: ComplianceReport, base: Path, allow_missing: bool) -> None:
@@ -683,7 +1069,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     evaluate_task_manifest(report)
 
     evaluate_artifact_presence(report, base, args.allow_missing_artifacts)
-    evaluate_advanced_manifest(report, base / ARTIFACT_PATHS["advanced_manifest"])
+    lattice_snapshot = evaluate_lattice_snapshot(report, base / ARTIFACT_PATHS["lattice_report"])
+    evaluate_advanced_manifest(
+        report, base / ARTIFACT_PATHS["advanced_manifest"], lattice_snapshot
+    )
+    evaluate_lattice_manifest(
+        report, base / ARTIFACT_PATHS["lattice_manifest"], lattice_snapshot
+    )
+    evaluate_determinism_manifest(
+        report, base / ARTIFACT_PATHS["determinism_manifest"], lattice_snapshot
+    )
     evaluate_meta_contract(report, base)
 
     if args.output:

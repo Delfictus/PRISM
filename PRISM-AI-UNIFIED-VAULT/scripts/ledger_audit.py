@@ -13,12 +13,23 @@ import argparse
 from pathlib import Path
 from typing import List
 
+try:
+    from . import vault_root  # type: ignore
+except ImportError:
+    import sys
+
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from scripts import vault_root  # type: ignore
+
+
+DEFAULT_MERKLE_ROOT = vault_root() / "artifacts" / "merkle"
+
 
 def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Audit cognitive ledger entries.")
     parser.add_argument("--thought", metavar="HASH", help="Thought DAG hash to verify.")
     parser.add_argument("--block", metavar="HASH", help="Cognitive block hash to verify.")
-    parser.add_argument("--merkle-root", metavar="PATH", default="PRISM-AI-UNIFIED-VAULT/artifacts/merkle", help="Ledger merkle anchor directory.")
+    parser.add_argument("--merkle-root", metavar="PATH", default=str(DEFAULT_MERKLE_ROOT), help="Ledger merkle anchor directory.")
     return parser.parse_args(argv)
 
 

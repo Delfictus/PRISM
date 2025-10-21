@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ -n "${PRISM_VAULT_ROOT:-}" ]]; then
+  ROOT="$(cd "${PRISM_VAULT_ROOT}" && pwd)"
+else
+  ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
 
 cd "${ROOT}"
 

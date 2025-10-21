@@ -50,6 +50,8 @@ pub struct MetaDeterminism {
     pub meta_merkle_root: String,
     pub ontology_hash: Option<String>,
     pub free_energy_hash: Option<String>,
+    pub reflexive_mode: Option<String>,
+    pub lattice_fingerprint: Option<String>,
 }
 
 impl EnvironmentFingerprint {

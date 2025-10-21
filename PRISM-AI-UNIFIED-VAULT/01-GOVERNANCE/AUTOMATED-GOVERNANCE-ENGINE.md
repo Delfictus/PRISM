@@ -990,6 +990,18 @@ if args.command == "phase":
 - `scripts/reset_context.sh` and `scripts/run_full_check.sh` recompute Merkle anchors under `artifacts/merkle/meta_<phase>.merk`.
 - Rollback requires updating the log with `ROLLBACK` entry and attaching remediation report.
 
+### **8.5 Reflexive Lattice Guardrails (Phase M3)**
+- **Controller**: `ReflexiveController` (`src/meta/reflexive/mod.rs`) analyzes entropy, divergence, and moving average of free-energy.
+- **Guardrail Thresholds**:
+  - Strict mode if divergence ≥ 0.18, entropy ≤ 1.05, or energy trend ≥ 0.075.
+  - Strict clamps exploration temperature to `[0.85, 1.10]` and penalizes high-divergence variants (×0.25 weight).
+  - Recovery mixes distribution with 12% uniform mass, temperature clamped `[0.95, 1.30]`.
+  - Exploration requires entropy ≥ 1.45 and divergence ≤ 0.12, temperature clamped `[1.05, 1.55]` with softened weights.
+- **Artifacts**:
+  - `artifacts/mec/M3/lattice_report.json` – serialized `ReflexiveSnapshot` including lattice grid and SHA-256 fingerprint.
+  - `determinism/meta/lattice_manifest.json` – registry of approved lattice fingerprints enforced by `MetaDeterminismGate`.
+- **Compliance**: `scripts/compliance_validator.py` fails `FreeEnergyGate` if lattice fingerprint missing, mismatched, or alerts contain blocker entries (e.g., `entropy_below_floor`, `divergence_cap_exceeded`).
+
 ---
 
 ## **9. COGNITIVE LEDGER & FEDERATED GOVERNANCE**

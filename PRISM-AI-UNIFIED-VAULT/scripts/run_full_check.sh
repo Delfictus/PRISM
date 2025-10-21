@@ -1,8 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO="$(cd "${ROOT}/.." && pwd)"
+if [[ -n "${PRISM_VAULT_ROOT:-}" ]]; then
+  ROOT="$(cd "${PRISM_VAULT_ROOT}" && pwd)"
+else
+  ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
+
+if [[ -n "${PRISM_REPO_ROOT:-}" ]]; then
+  REPO="$(cd "${PRISM_REPO_ROOT}" && pwd)"
+elif [[ -n "${PRISM_WORKTREE_ROOT:-}" ]]; then
+  REPO="$(cd "${PRISM_WORKTREE_ROOT}" && pwd)"
+else
+  REPO="$(cd "${ROOT}/.." && pwd)"
+fi
 MANIFEST="${REPO}/benchmarks/bench_manifest.json"
 
 step() {

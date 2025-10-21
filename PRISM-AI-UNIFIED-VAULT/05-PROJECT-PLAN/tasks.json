@@ -33,7 +33,7 @@
     },
     {
       "id": "phase1",
-      "name": "Sprint 1 · Harden",
+      "name": "Sprint 1 \u00b7 Harden",
       "description": "Resolve production gaps and high-leverage adjustments.",
       "tasks": [
         {
@@ -106,7 +106,7 @@
     },
     {
       "id": "phase2",
-      "name": "Sprint 2 · Optimize",
+      "name": "Sprint 2 \u00b7 Optimize",
       "description": "Deliver advanced GPU path performance and stability.",
       "tasks": [
         {
@@ -155,7 +155,7 @@
     },
     {
       "id": "phase3",
-      "name": "Sprint 3 · Learn",
+      "name": "Sprint 3 \u00b7 Learn",
       "description": "Integrate RL/GNN components and adaptive fusion.",
       "tasks": [
         {
@@ -192,7 +192,7 @@
     },
     {
       "id": "phase4",
-      "name": "Sprint 4 · Explore",
+      "name": "Sprint 4 \u00b7 Explore",
       "description": "Pursue world-record DSJC1000.5 performance with advanced coupling.",
       "tasks": [
         {
@@ -266,7 +266,7 @@
     },
     {
       "id": "M0",
-      "name": "Phase M0 · Meta Foundations",
+      "name": "Phase M0 \u00b7 Meta Foundations",
       "description": "Lay the groundwork for the Meta Evolution Cycle (MEC) with flags, schemas, and compliance integration.",
       "tasks": [
         {
@@ -309,7 +309,7 @@
     },
     {
       "id": "M1",
-      "name": "Phase M1 · Meta Orchestrator MVP",
+      "name": "Phase M1 \u00b7 Meta Orchestrator MVP",
       "description": "Deliver deterministic candidate generation, evaluation, and audit artifacts for the orchestrator.",
       "tasks": [
         {
@@ -346,7 +346,7 @@
     },
     {
       "id": "M2",
-      "name": "Phase M2 · Ontology Integration",
+      "name": "Phase M2 \u00b7 Ontology Integration",
       "description": "Introduce semantic anchoring, ontology services, and compliance gating for knowledge alignment.",
       "tasks": [
         {
@@ -383,44 +383,44 @@
     },
     {
       "id": "M3",
-      "name": "Phase M3 · Reflexive Feedback",
+      "name": "Phase M3 \u00b7 Reflexive Feedback",
       "description": "Enable reflex control loops, free-energy lattice metrics, and governance awareness of exploration modes.",
       "tasks": [
         {
           "id": "M3-01",
           "title": "Implement meta state model and reflexive controller",
           "source": "src/meta/reflexive/mod.rs",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M3-02",
           "title": "Instrument free-energy lattice snapshot telemetry",
           "source": "artifacts/mec/M3/lattice_report.json",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M3-03",
           "title": "Enforce governance guardrails for exploration vs strict modes",
           "source": "01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M3-04",
           "title": "Integrate lattice metrics into determinism manifest",
           "source": "determinism/meta/lattice_manifest.json",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M3-05",
           "title": "Update CI lattice pipeline and compliance validator",
           "source": "scripts/compliance_validator.py",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
     {
       "id": "M4",
-      "name": "Phase M4 · Semantic Plasticity",
+      "name": "Phase M4 \u00b7 Semantic Plasticity",
       "description": "Deliver representation learning adapters, semantic drift detection, and explainability outputs.",
       "tasks": [
         {
@@ -457,7 +457,7 @@
     },
     {
       "id": "M5",
-      "name": "Phase M5 · Federated Readiness",
+      "name": "Phase M5 \u00b7 Federated Readiness",
       "description": "Prepare distributed orchestration, genome sharing, and hybrid deployment protocols.",
       "tasks": [
         {
@@ -494,7 +494,7 @@
     },
     {
       "id": "M6",
-      "name": "Phase M6 · Hardening & Rollout",
+      "name": "Phase M6 \u00b7 Hardening & Rollout",
       "description": "Finalize documentation, observability, and production rollout approval for MEC.",
       "tasks": [
         {

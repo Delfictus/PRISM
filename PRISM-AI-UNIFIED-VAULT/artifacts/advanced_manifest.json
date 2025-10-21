@@ -1,7 +1,7 @@
 {
-  "timestamp": "2025-10-20T00:39:53.493367+00:00",
-  "vault_root": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT",
-  "commit_sha": "HEAD",
+  "timestamp": "2025-10-21T19:06:51.892634+00:00",
+  "vault_root": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M3/PRISM-AI-UNIFIED-VAULT",
+  "commit_sha": "a6c0f1dfc566ea1813b1f150bcfc9b9a0bcbc209",
   "kernel_residency": {
     "gpu_resident": true,
     "notes": "Set by master executor (sample metrics)"
@@ -41,6 +41,12 @@
     "persistent_kernel_used": true,
     "mixed_precision_policy": true
   },
+  "reflexive": {
+    "mode": "exploration",
+    "entropy": 2.117353,
+    "divergence": 0.112,
+    "lattice_fingerprint": "f139b097ca51ccce8f8008d661e21b350f2ec6aee82c92ef1c7e843514b4d97e"
+  },
   "tactic_bitmap": {
     "persistent_kernels": true,
     "cuda_graphs": true,
@@ -51,11 +57,12 @@
     "cooperative_groups": true
   },
   "artifacts": {
-    "roofline": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/reports/roofline.json",
-    "determinism": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/reports/determinism_replay.json",
-    "ablation": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/artifacts/ablation_report.json",
-    "graph_capture": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/reports/graph_capture.json",
-    "graph_exec": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/reports/graph_exec.bin",
-    "determinism_manifest": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/artifacts/determinism_manifest.json"
+    "roofline": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M3/PRISM-AI-UNIFIED-VAULT/reports/roofline.json",
+    "determinism": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M3/PRISM-AI-UNIFIED-VAULT/reports/determinism_replay.json",
+    "ablation": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M3/PRISM-AI-UNIFIED-VAULT/artifacts/ablation_report.json",
+    "graph_capture": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M3/PRISM-AI-UNIFIED-VAULT/reports/graph_capture.json",
+    "graph_exec": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M3/PRISM-AI-UNIFIED-VAULT/reports/graph_exec.bin",
+    "determinism_manifest": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M3/PRISM-AI-UNIFIED-VAULT/artifacts/determinism_manifest.json",
+    "lattice_report": "/home/diddy/Desktop/PRISM-FINNAL-PUSH-M3/PRISM-AI-UNIFIED-VAULT/artifacts/mec/M3/lattice_report.json"
   }
 }

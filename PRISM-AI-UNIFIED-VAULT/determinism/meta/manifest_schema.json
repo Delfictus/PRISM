@@ -33,6 +33,24 @@
     "artifacts": {
       "type": "array",
       "items": { "type": "string" }
+    },
+    "reflexive": {
+      "type": "object",
+      "required": ["mode", "lattice_fingerprint"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["strict", "recovery", "exploration"]
+        },
+        "lattice_fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "alerts": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
     }
   }
 }

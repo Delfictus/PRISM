@@ -1,5 +1,8 @@
 use crate::features::{registry, MetaFeatureId, MetaFeatureState};
 use crate::governance::determinism::{DeterminismProof, DeterminismRecorder, MetaDeterminism};
+use crate::meta::reflexive::{
+    ReflexiveController, ReflexiveDecision, ReflexiveMetric, ReflexiveSnapshot,
+};
 use crate::telemetry::{
     ComponentId, EventData, EventLevel, Metrics, TelemetryEntry, TelemetrySink,
 };
@@ -153,6 +156,7 @@ pub struct EvolutionOutcome {
     pub evaluations: Vec<VariantEvaluation>,
     pub distribution: Vec<f64>,
     pub temperature: f64,
+    pub reflexive: ReflexiveSnapshot,
     pub best_index: usize,
     pub determinism_proof: DeterminismProof,
     pub meta: MetaDeterminism,
@@ -164,6 +168,7 @@ pub struct MetaOrchestrator {
     rng: Arc<std::sync::Mutex<StdRng>>,
     schedule_dimension: usize,
     telemetry: TelemetrySink,
+    reflexive: Arc<std::sync::Mutex<ReflexiveController>>,
 }
 
 impl MetaOrchestrator {
@@ -173,13 +178,36 @@ impl MetaOrchestrator {
             rng: Arc::new(std::sync::Mutex::new(StdRng::seed_from_u64(seed))),
             schedule_dimension: 5,
             telemetry: TelemetrySink::new("meta_orchestrator"),
+            reflexive: Arc::new(std::sync::Mutex::new(ReflexiveController::default())),
         })
     }
 
     pub fn run_generation(&self, base_seed: u64, population: usize) -> Result<EvolutionOutcome> {
         let plan = self.schedule_population(base_seed, population)?;
         let evaluations = self.evaluate_population(&plan)?;
-        let (distribution, temperature) = replicator_dynamics(&evaluations);
+        let (raw_distribution, raw_temperature) = replicator_dynamics(&evaluations);
+        let metrics: Vec<ReflexiveMetric> = evaluations
+            .iter()
+            .map(|eval| ReflexiveMetric {
+                energy: eval.metrics.energy,
+                chromatic_loss: eval.metrics.chromatic_loss,
+                divergence: eval.metrics.divergence,
+                fitness: eval.metrics.scalar,
+            })
+            .collect();
+
+        let ReflexiveDecision {
+            distribution,
+            temperature,
+            snapshot: reflexive_snapshot,
+        } = {
+            let mut guard = self
+                .reflexive
+                .lock()
+                .expect("reflexive controller lock poisoned");
+            guard.evaluate(&metrics, &raw_distribution, raw_temperature)
+        };
+
         let best_index = evaluations
             .iter()
             .enumerate()
@@ -195,6 +223,8 @@ impl MetaOrchestrator {
             meta_merkle_root: manifest.merkle_root.clone(),
             ontology_hash: None,
             free_energy_hash: Some(free_energy_hash.clone()),
+            reflexive_mode: Some(reflexive_snapshot.mode.as_str().to_string()),
+            lattice_fingerprint: Some(reflexive_snapshot.fingerprint()),
         };
 
         let mut recorder = DeterminismRecorder::new(plan.base_seed);
@@ -213,14 +243,21 @@ impl MetaOrchestrator {
         recorder.attach_meta(meta.clone());
         let proof = recorder.finalize();
 
-        let telemetry_entry =
-            self.emit_telemetry(&plan, &evaluations, &distribution, temperature, &meta);
+        let telemetry_entry = self.emit_telemetry(
+            &plan,
+            &evaluations,
+            &distribution,
+            temperature,
+            &meta,
+            &reflexive_snapshot,
+        );
 
         Ok(EvolutionOutcome {
             plan,
             evaluations,
             distribution,
             temperature,
+            reflexive: reflexive_snapshot,
             best_index,
             determinism_proof: proof,
             meta,
@@ -353,6 +390,7 @@ impl MetaOrchestrator {
         distribution: &[f64],
         temperature: f64,
         meta: &MetaDeterminism,
+        reflexive: &ReflexiveSnapshot,
     ) -> TelemetryEntry {
         let best = evaluations
             .iter()
@@ -379,6 +417,13 @@ impl MetaOrchestrator {
                 },
                 "distribution_entropy": shannon_entropy(distribution),
                 "temperature": temperature,
+                "reflexive": {
+                    "mode": reflexive.mode.as_str(),
+                    "entropy": reflexive.entropy,
+                    "divergence": reflexive.divergence,
+                    "trend": reflexive.energy_trend,
+                    "alerts": reflexive.alerts,
+                },
                 "plan": {
                     "population": plan.genomes.len(),
                     "base_seed": plan.base_seed,

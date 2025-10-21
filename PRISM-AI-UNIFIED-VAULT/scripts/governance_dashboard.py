@@ -11,11 +11,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict
 
+try:
+    from . import vault_root  # type: ignore
+except ImportError:
+    import sys
 
-def vault_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from scripts import vault_root  # type: ignore
 
 
 def load_metrics() -> Dict[str, object]:
