@@ -36,3 +36,28 @@ Phase M0 establishes the groundwork for the Meta Evolution Cycle (MEC). The obje
 - Compliance validator recognizes Phase M0 tasks.
 - Governance log records ratification entry with Merkle hash.
 
+## Integration Topology Snapshot
+
+- Layer stack: Governance & Safety → Blockchain Telemetry → {Meta-Causality, Contextual Grounding, Reflexive Feedback, Semantic Plasticity} → Quantum–Neuromorphic Fusion → Federated Node Network.
+- Meta-Causal Consistency (MCC) requirement: ∀i,j∈LMEC, d/dt (Φi − Φj) < εc to ensure synchronized evolution.
+
+## Shared State Definitions
+
+- Common tensor Ξt = [ψt, St, Θt, Φt, Γt] is the single source of truth for quantum amplitudes, spiking states, meta-policies, semantic embeddings, and governance constraints.
+- Tensor access is mediated by the cognitive ledger; writes require signed ledger entries referencing determinism hashes.
+
+## MEC Interprocess Protocol (MIPP)
+
+```rust
+#[derive(Serialize, Deserialize)]
+pub struct MecMessage {
+    pub origin: ModuleID,
+    pub target: ModuleID,
+    pub payload: Vec<u8>,
+    pub signature: [u8; 64],
+    pub timestamp: u64,
+}
+```
+
+- Communication employs asynchronous Tokio channels + gRPC.
+- Every message must be signed with post-quantum keys, logged via Blockchain Telemetry, and validated by the governance engine before mutation of Ξt.

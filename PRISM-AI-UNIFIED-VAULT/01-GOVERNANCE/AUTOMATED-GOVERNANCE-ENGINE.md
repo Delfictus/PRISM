@@ -992,6 +992,47 @@ if args.command == "phase":
 
 ---
 
+## **9. COGNITIVE LEDGER & FEDERATED GOVERNANCE**
+
+### **9.1 Cognitive Blockchain Ledger (CBL)**
+- Each governance event must produce a `CognitiveBlock` and submit it to the ledger service.
+- Required validation pipeline:
+  1. Compute context Merkle root (decision/thought DAG).
+  2. Generate zk-SNARK proof using the GovernanceCircuit (entropy ≥ 0, ΔF ≤ 0, compliance flag set).
+  3. Sign with node private key; record `node_id` and `governance_signature`.
+  4. Append block via `ledger.commit_block`.
+- Ledger operates in permissioned PBFT/PoA mode; hash chain integrity is audited hourly.
+
+### **9.2 Zero-Knowledge Verification**
+```rust
+pub fn validate_block(block: &CognitiveBlock, vk: &VerifyingKey) -> Result<()> {
+    let proof_ok = zk::verify(&block.zk_proof, vk)?;
+    ensure!(proof_ok, "zk proof failed");
+    ensure!(verify_signature(&block.node_signature, block), "signature mismatch");
+    Ok(())
+}
+```
+- Governance engine rejects any block lacking a valid proof or signature.
+- zk verification runs in parallel on GPU-capable runners; failure triggers `violation_response.handle_blocker`.
+
+### **9.3 Federated Node Synchronization**
+- MEC nodes expose `ledger_sync` endpoints. Governance performs:
+  - **Collect** pending blocks from each node.
+  - **Consensus** using PBFT to agree on block order.
+  - **Merge** into global ledger.
+  - **Distribute** signed checkpoints back to nodes.
+- Any node emitting unsanctioned updates is quarantined (ViolationResponseSystem triggers `handle_blocker`).
+
+### **9.4 Audit & User Verifiability**
+- Users and regulators can request inclusion proofs via `scripts/ledger_audit.py --thought <hash>`.
+- Governance dashboard must show:
+  - Ledger height, latest block hash.
+  - zk verification latency.
+  - Federated node participation set.
+- All telemetry, determinism manifests, and federated updates must reference ledger block IDs to maintain provenance.
+
+---
+
 ## **ENFORCEMENT STATUS**
 
 ```yaml

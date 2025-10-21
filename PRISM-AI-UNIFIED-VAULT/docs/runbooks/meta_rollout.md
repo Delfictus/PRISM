@@ -11,8 +11,9 @@
 1. Verify `meta_generation` feature flag remains disabled in production.
 2. Run `python3 PRISM-AI-UNIFIED-VAULT/scripts/run_full_check.sh --strict`.
 3. Execute `python3 PRISM-AI-UNIFIED-VAULT/03-AUTOMATION/master_executor.py phase --name M6 --strict`.
-4. Review dashboards (governance, telemetry) for regressions.
-5. Obtain sign-off from governance lead and SRE.
+4. Audit cognitive ledger: `python3 PRISM-AI-UNIFIED-VAULT/scripts/ledger_audit.py --block <latest_hash>`.
+5. Review dashboards (governance, telemetry) for regressions.
+6. Obtain sign-off from governance lead and SRE.
 
 ## Rollback Plan
 - Use `master_executor.py --rollback M6` to revert to prior Merkle anchor.
@@ -24,4 +25,3 @@
 - Meta Evolution Lead
 - Governance Engineering
 - SRE On-call
-

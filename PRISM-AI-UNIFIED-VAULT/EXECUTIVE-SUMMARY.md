@@ -87,6 +87,11 @@ Automated enforcement with:
 - Emergency shutdown on blockers
 - Immutable audit trails
 
+### **5. COGNITIVE LEDGER & FEDERATED SYNC**
+- Cognitive Blockchain Ledger (CBL) records every decision with zk-SNARK proofs.
+- Federated MEC nodes synchronize via PBFT/PoA consensus and Merkle anchors.
+- Thought DAGs are auditable; users can verify ethical data usage cryptographically.
+
 ---
 
 ## **PERFORMANCE GUARANTEES**

@@ -28,3 +28,34 @@ Phase M5 prepares the meta orchestrator for multi-site and hybrid deployments. T
 - Simulations produce signed results stored under `artifacts/mec/M5/`.
 - Governance gates updated and validated in CI.
 
+## Federated Node Lifecycle
+
+```rust
+fn federated_meta_cycle(nodes: &mut Vec<Node>, global: &mut MetaState) {
+    nodes.par_iter_mut().for_each(|n| n.load_meta(global));
+    nodes.par_iter_mut().for_each(|n| n.run_local_mec_cycle());
+    let updates: Vec<MetaUpdate> = nodes.iter().map(|n| n.meta_update()).collect();
+    let aligned = dynamic_node_alignment(&updates);
+    let aggregated = aggregate_meta_updates(&aligned);
+    global.apply_update(aggregated);
+}
+```
+
+- Supports dynamic membership, asynchronous nodes, and heterogeneous hardware.
+- Every local update must be committed to the cognitive ledger prior to aggregation.
+- Consensus layer: PBFT/PoA validators running within Governance & Safety.
+
+## Communication & Security
+
+- Transport: zero-trust overlay using Zenoh or MQTT with QUIC encryption.
+- Payload schema extends MIPP envelopes with `federated_epoch`, `node_fingerprint`, and `ledger_block_id`.
+- Failure recovery:
+  - Node heartbeat monitors trigger quarantine if ledgers diverge.
+  - Rollback uses Merkle anchors under `artifacts/merkle/meta_M5.merk`.
+
+## Governance Hooks
+
+- Compliance validator gains `--phase M5` mode that verifies:
+  - Node alignment proofs (hash comparison between updates and ledger).
+  - ZK proof validity for each federated commit.
+  - Sign-off recorded in `META-GOVERNANCE-LOG.md` with action `FEDERATED_APPLY`.

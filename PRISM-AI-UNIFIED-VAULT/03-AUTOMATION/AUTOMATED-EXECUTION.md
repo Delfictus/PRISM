@@ -833,10 +833,14 @@ python 03-AUTOMATION/master_executor.py \
 | `scripts/continuous_monitor.sh` | 5-minute watchdog, alerts on violations | `03-AUTOMATION/AUTOMATED-EXECUTION.md` |
 | `scripts/meta/worktree.sh` | Provision worktrees (retained for future multi-agent mode) | `docs/rfc/RFC-M0-Meta-Foundations.md` |
 | `scripts/meta/bootstrap_agent.sh` | Toolchain bootstrap reminder for meta branches | `docs/rfc/RFC-M0-Meta-Foundations.md` |
+| `scripts/ledger_sync.py` | Synchronize cognitive ledger across MEC nodes | `01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md` |
+| `scripts/ledger_audit.py` | Verify thought/block hashes against Merkle anchors | `artifacts/merkle/README.md` |
 
 - **Meta Phase Entry Point**: `python3 PRISM-AI-UNIFIED-VAULT/03-AUTOMATION/master_executor.py phase --name M0 --strict`
 - **Phase Validation**: `python3 PRISM-AI-UNIFIED-VAULT/scripts/compliance_validator.py --phase M0 --strict`
 - **Status Snapshot**: `python3 PRISM-AI-UNIFIED-VAULT/scripts/task_monitor.py --once`
+- **Ledger Sync**: `python3 PRISM-AI-UNIFIED-VAULT/scripts/ledger_sync.py --nodes localhost --dry-run`
+- **Ledger Audit**: `python3 PRISM-AI-UNIFIED-VAULT/scripts/ledger_audit.py --thought <hash>`
 
 ---
 

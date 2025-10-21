@@ -716,6 +716,80 @@ This constitution remains in effect until:
 
 ---
 
+## **ARTICLE XIV: MEC SYSTEM INTEGRATION & LEDGER**
+
+### **Section 14.1: Integration Topology**
+- PRISM-AI MEC runtime follows the layered topology:
+  - **Governance & Safety Layer (GSL)** controls policy and compliance.
+  - **Blockchain Telemetry & Audit (BTL)** anchors every module decision.
+  - **Meta Modules**: Meta-Causality, Contextual Grounding, Reflexive Feedback, Semantic Plasticity.
+  - **Quantum–Neuromorphic Fusion (QNF)** mediates thermodynamic, quantum, and spiking substrates.
+  - **Federated Node Network** links distributed MEC nodes and edge devices.
+- All modules are autonomous yet interdependent; the system enforces Meta-Causal Consistency (MCC) so that ∀i,j∈LMEC,d/dt(Φi−Φj)<ϵc.
+
+### **Section 14.2: Common State Tensor**
+- Shared tensor Ξt = [ψt, St, Θt, Φt, Γt] maintains global state:
+  - ψt: quantum amplitudes.
+  - St: neuromorphic spike states.
+  - Θt: meta-policies and weights.
+  - Φt: semantic embeddings.
+  - Γt: governance constraints.
+- Tensor synchronization uses blockchain-backed coherence; mutations must include signed ledger entries.
+
+### **Section 14.3: MEC Interprocess Protocol (MIPP)**
+```rust
+#[derive(Serialize, Deserialize)]
+pub struct MecMessage {
+    pub origin: ModuleID,
+    pub target: ModuleID,
+    pub payload: Vec<u8>,
+    pub signature: [u8; 64],
+    pub timestamp: u64,
+}
+```
+- Modules communicate over asynchronous channels (Tokio + gRPC). Every payload is signed with post-quantum keys, logged via Blockchain Telemetry, and validated against Γt.
+
+### **Section 14.4: Cognitive Blockchain Ledger (CBL)**
+```rust
+pub struct CognitiveBlock {
+    pub block_id: String,
+    pub prev_hash: String,
+    pub timestamp: String,
+    pub node_id: String,
+    pub event_type: EventType,
+    pub context_hash: String,
+    pub energy_state: EnergyState,
+    pub algo_snapshot: AlgorithmicSnapshot,
+    pub zk_proof: String,
+    pub node_signature: String,
+}
+```
+- Every decision/reflex/meta event must:
+  1. Hash context (Merkle root over thought DAG).
+  2. Generate zk-SNARK proof for governance invariants (entropy ≥ 0, ΔF ≤ 0).
+  3. Append block to the ledger with Ed25519 signature and governance approval.
+- Blockchain Telemetry is mandatory for compliance reports and determinism manifests.
+
+### **Section 14.5: Federated Node Learning Cycle**
+```rust
+fn federated_meta_cycle(nodes: &mut Vec<Node>, global: &mut MetaState) {
+    nodes.par_iter_mut().for_each(|n| n.load_meta(global));
+    nodes.par_iter_mut().for_each(|n| n.run_local_mec_cycle());
+    let updates: Vec<MetaUpdate> = nodes.iter().map(|n| n.meta_update()).collect();
+    let aligned = dynamic_node_alignment(&updates);
+    let aggregated = aggregate_meta_updates(&aligned);
+    global.apply_update(aggregated);
+}
+```
+- Nodes operate asynchronously with dynamic membership; each update must be logged to the ledger before aggregation.
+- Consensus (PBFT/PoA) ensures only compliant updates modify the global meta state.
+
+### **Section 14.6: Thought Trace Verifiability**
+- Thought DAGs are hashed into Merkle roots and committed on-chain with zk-proofs to certify reasoning compliance while preserving privacy.
+- Users may request inclusion proofs; governance must retain verification artifacts in `artifacts/merkle/meta_<phase>.merk`.
+
+---
+
 ## **SIGNATURES & RATIFICATION**
 
 **Ratified by**: PRISM-AI Governance Board
