@@ -1,8 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO="$(cd "${ROOT}/.." && pwd)"
+if [[ -n "${PRISM_VAULT_ROOT:-}" ]]; then
+  if [[ ! -d "${PRISM_VAULT_ROOT}" ]]; then
+    echo "PRISM_VAULT_ROOT points to missing directory: ${PRISM_VAULT_ROOT}" >&2
+    exit 1
+  fi
+  ROOT="$(cd "${PRISM_VAULT_ROOT}" && pwd)"
+else
+  ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
+
+if [[ -n "${PRISM_REPO_ROOT:-}" ]]; then
+  if [[ ! -d "${PRISM_REPO_ROOT}" ]]; then
+    echo "PRISM_REPO_ROOT points to missing directory: ${PRISM_REPO_ROOT}" >&2
+    exit 1
+  fi
+  REPO="$(cd "${PRISM_REPO_ROOT}" && pwd)"
+else
+  REPO="$(cd "${ROOT}/.." && pwd)"
+fi
 
 usage() {
   cat <<USAGE

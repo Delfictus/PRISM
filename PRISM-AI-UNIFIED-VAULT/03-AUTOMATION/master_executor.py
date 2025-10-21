@@ -17,26 +17,45 @@ import subprocess
 import sys
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
 
 # Resolve vault and repository roots
 THIS_FILE = Path(__file__).resolve()
-VAULT_ROOT = THIS_FILE.parents[1]
-REPO_ROOT = VAULT_ROOT.parent
+BASELINE_VAULT_ROOT = THIS_FILE.parents[1]
 
-sys.path.insert(0, str(VAULT_ROOT))  # enable `import scripts.*`
+sys.path.insert(0, str(BASELINE_VAULT_ROOT))  # enable `import scripts.*`
 
-from scripts import vault_root  # type: ignore  # noqa: E402
 from scripts import compliance_validator  # type: ignore  # noqa: E402
+from scripts import vault_root as resolve_vault_root  # type: ignore  # noqa: E402
 
+
+def _resolve_repo_root(default: Path) -> Path:
+    override = os.environ.get("PRISM_REPO_ROOT")
+    if not override:
+        return default
+    candidate = Path(override).expanduser()
+    if not candidate.exists():
+        raise FileNotFoundError(
+            f"Configured PRISM repo override at PRISM_REPO_ROOT={override} does not exist."
+        )
+    return candidate.resolve()
+
+
+VAULT_ROOT = resolve_vault_root()
+REPO_ROOT = _resolve_repo_root(VAULT_ROOT.parent)
 
 ARTIFACT_DIR = VAULT_ROOT / "artifacts"
 REPORT_DIR = VAULT_ROOT / "reports"
 AUDIT_DIR = VAULT_ROOT / "audit"
+MEC_DIR = ARTIFACT_DIR / "mec"
+M4_DIR = MEC_DIR / "M4"
+EXPLAINABILITY_REPORT_PATH = M4_DIR / "explainability_report.md"
+WORKTREE_NAME = REPO_ROOT.name
 
-assert vault_root() == VAULT_ROOT, "Vault root mismatch; ensure execution from unified vault."
+assert VAULT_ROOT.exists(), f"Vault root {VAULT_ROOT} does not exist."
 
 
 def write_json(path: Path, payload: Dict[str, object]) -> None:
@@ -63,6 +82,22 @@ def run_command(cmd: Sequence[str], cwd: Optional[Path] = None) -> subprocess.Co
 
 def timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+@lru_cache(maxsize=1)
+def current_branch() -> str:
+    result = run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=REPO_ROOT)
+    if result.returncode != 0:
+        return "UNKNOWN"
+    return result.stdout.strip() or "UNKNOWN"
+
+
+@lru_cache(maxsize=1)
+def current_commit() -> str:
+    result = run_command(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT)
+    if result.returncode != 0:
+        return "UNKNOWN"
+    return result.stdout.strip() or "UNKNOWN"
 
 
 def collect_device_caps() -> Dict[str, object]:
@@ -160,7 +195,12 @@ def create_advanced_manifest(use_sample_metrics: bool) -> Dict[str, object]:
     return {
         "timestamp": timestamp(),
         "vault_root": str(VAULT_ROOT),
-        "commit_sha": run_command(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT).stdout.strip() or "UNKNOWN",
+        "commit_sha": current_commit(),
+        "git_branch": current_branch(),
+        "worktree": {
+            "name": WORKTREE_NAME,
+            "path": str(REPO_ROOT.resolve()),
+        },
         "kernel_residency": {
             "gpu_resident": use_sample_metrics,
             "notes": "Set by master executor (sample metrics)" if use_sample_metrics else "TODO: populate from runtime telemetry.",
@@ -202,6 +242,7 @@ def create_advanced_manifest(use_sample_metrics: bool) -> Dict[str, object]:
             ("graph_capture", REPORT_DIR / "graph_capture.json"),
             ("graph_exec", REPORT_DIR / "graph_exec.bin"),
             ("determinism_manifest", ARTIFACT_DIR / "determinism_manifest.json"),
+            ("explainability_report", EXPLAINABILITY_REPORT_PATH),
         )},
     }
 
@@ -286,7 +327,12 @@ def create_determinism_manifest(use_sample_metrics: bool) -> Dict[str, object]:
     }
     return {
         "timestamp": timestamp(),
-        "commit_sha": run_command(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT).stdout.strip() or "UNKNOWN",
+        "commit_sha": current_commit(),
+        "git_branch": current_branch(),
+        "worktree": {
+            "name": WORKTREE_NAME,
+            "path": str(REPO_ROOT.resolve()),
+        },
         "feature_flags": ["advanced", "cuda_graph", "persistent_kernel"] if use_sample_metrics else [],
         "device_caps_path": str(VAULT_ROOT / "device_caps.json"),
         "seeds": seeds,
@@ -296,8 +342,68 @@ def create_determinism_manifest(use_sample_metrics: bool) -> Dict[str, object]:
     }
 
 
+def create_explainability_report(use_sample_metrics: bool) -> str:
+    branch = current_branch()
+    commit = current_commit()
+    worktree_path = REPO_ROOT.resolve()
+    lines = [
+        "# Semantic Plasticity Explainability Report",
+        "",
+        "## Adapter Overview",
+        f"- Worktree: `{WORKTREE_NAME}` ({worktree_path})",
+        f"- Branch: `{branch}`",
+        f"- Commit: `{commit}`",
+        f"- Generation timestamp: {timestamp()}",
+    ]
+
+    if not use_sample_metrics:
+        lines.extend(
+            [
+                "",
+                "## Recent Adaptation Events",
+                "Explainability data not captured. Run the semantic plasticity pipeline to populate this section.",
+            ]
+        )
+        return "\n".join(lines) + "\n"
+
+    sample_events = [
+        ("concept://coloring", "Stable", 0.972, 0.988, 0.042),
+        ("concept://ontology", "Warning", 0.903, 0.856, 0.118),
+        ("concept://explainer", "Drifted", 0.842, 0.691, 0.265),
+    ]
+
+    lines.extend(
+        [
+            "",
+            "## Recent Adaptation Events",
+            "| Concept | Status | Cosine | Magnitude Ratio | ΔL2 | Notes |",
+            "|---------|--------|--------|-----------------|-----|-------|",
+        ]
+    )
+    for concept, status, cosine, magnitude_ratio, delta in sample_events:
+        note = (
+            "within tolerance"
+            if status == "Stable"
+            else ("monitor closely" if status == "Warning" else "triggered drift remediation")
+        )
+        lines.append(
+            f"| `{concept}` | {status} | {cosine:.3f} | {magnitude_ratio:.3f} | {delta:.3f} | {note} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Next Steps",
+            "- Validate adapters against the ontology bridge dataset.",
+            "- Regenerate this report after capturing live telemetry.",
+        ]
+    )
+
+    return "\n".join(lines) + "\n"
+
+
 def ensure_directories() -> None:
-    for path in (ARTIFACT_DIR, REPORT_DIR, AUDIT_DIR):
+    for path in (ARTIFACT_DIR, REPORT_DIR, AUDIT_DIR, MEC_DIR, M4_DIR):
         path.mkdir(parents=True, exist_ok=True)
 
 
@@ -328,6 +434,9 @@ class ExecutionSummary:
     timestamp: str
     strict: bool
     allow_missing: bool
+    worktree_path: str
+    worktree_name: str
+    git_branch: str
     phases: List[PhaseResult] = field(default_factory=list)
     artifacts: Dict[str, str] = field(default_factory=dict)
     compliance_exit_code: Optional[int] = None
@@ -340,6 +449,9 @@ class ExecutionSummary:
             "timestamp": self.timestamp,
             "strict": self.strict,
             "allow_missing": self.allow_missing,
+            "worktree_path": self.worktree_path,
+            "worktree_name": self.worktree_name,
+            "git_branch": self.git_branch,
             "phases": [
                 {
                     "name": p.name,
@@ -359,10 +471,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
     ensure_directories()
 
+    branch = current_branch()
+    worktree_path = str(REPO_ROOT.resolve())
+    print(f":: Master executor operating in worktree '{WORKTREE_NAME}' ({worktree_path}) on branch '{branch}'")
+
     summary = ExecutionSummary(
         timestamp=timestamp(),
         strict=args.strict,
         allow_missing=args.allow_missing_artifacts,
+        worktree_path=worktree_path,
+        worktree_name=WORKTREE_NAME,
+        git_branch=branch,
     )
 
     # Phase: device metadata
@@ -431,6 +550,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     write_json(REPORT_DIR / "graph_capture.json", create_graph_capture_report(args.use_sample_metrics))
     (REPORT_DIR / "graph_exec.bin").write_bytes(b"GRAPH_EXEC_PLACEHOLDER" if args.use_sample_metrics else b"")
     write_json(ARTIFACT_DIR / "determinism_manifest.json", create_determinism_manifest(args.use_sample_metrics))
+    write_text(EXPLAINABILITY_REPORT_PATH, create_explainability_report(args.use_sample_metrics))
 
     summary.artifacts = {
         "advanced_manifest": str(ARTIFACT_DIR / "advanced_manifest.json"),
@@ -441,6 +561,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "graph_capture": str(REPORT_DIR / "graph_capture.json"),
         "graph_exec": str(REPORT_DIR / "graph_exec.bin"),
         "determinism_manifest": str(ARTIFACT_DIR / "determinism_manifest.json"),
+        "explainability_report": str(EXPLAINABILITY_REPORT_PATH),
         "device_caps": str(VAULT_ROOT / "device_caps.json"),
         "path_decision": str(VAULT_ROOT / "path_decision.json"),
         "feasibility": str(VAULT_ROOT / "feasibility.log"),

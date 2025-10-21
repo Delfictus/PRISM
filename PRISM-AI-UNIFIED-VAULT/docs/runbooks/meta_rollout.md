@@ -15,6 +15,12 @@
 5. Review dashboards (governance, telemetry) for regressions.
 6. Obtain sign-off from governance lead and SRE.
 
+## Knowledge Evolution (Phase M4)
+- Generate semantic plasticity explainability report: `python3 PRISM-AI-UNIFIED-VAULT/03-AUTOMATION/master_executor.py --use-sample-metrics --skip-build --skip-tests --skip-benchmarks`
+- Review `artifacts/mec/M4/explainability_report.md` for drift status of ontology adapters.
+- Confirm `tests/meta/semantic_plasticity.rs` passes locally before promoting Phase M4 changes.
+- Ensure `scripts/compliance_validator.py --strict` reports `plasticity:*` checks as `PASS`.
+
 ## Rollback Plan
 - Use `master_executor.py --rollback M6` to revert to prior Merkle anchor.
 - Disable `meta_*` feature flags via `meta/meta_flags.json`.

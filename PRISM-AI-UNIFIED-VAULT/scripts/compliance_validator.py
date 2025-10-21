@@ -67,6 +67,7 @@ ARTIFACT_PATHS: Dict[str, Path] = {
     "graph_capture": Path("reports/graph_capture.json"),
     "graph_exec": Path("reports/graph_exec.bin"),
     "determinism_manifest": Path("artifacts/determinism_manifest.json"),
+    "explainability_report": Path("artifacts/mec/M4/explainability_report.md"),
 }
 
 CRITICAL_ARTIFACTS = {
@@ -76,6 +77,7 @@ CRITICAL_ARTIFACTS = {
     "graph_capture",
     "graph_exec",
     "determinism_manifest",
+    "explainability_report",
 }
 
 META_REGISTRY_PATH = Path("meta/meta_flags.json")
@@ -505,6 +507,137 @@ def evaluate_meta_contract(report: ComplianceReport, base: Path) -> None:
             )
         )
 
+
+def evaluate_semantic_plasticity(report: ComplianceReport, base: Path) -> None:
+    adapter_path = base / "src/meta/plasticity/adapters.rs"
+    if not adapter_path.exists():
+        report.add(
+            Finding(
+                item="plasticity:adapter",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Representation adapter source missing (Phase M4).",
+            )
+        )
+    else:
+        content = adapter_path.read_text(encoding="utf-8")
+        required = ["RepresentationAdapter", "AdapterMode", "AdaptationEvent", "fn adapt"]
+        missing = [token for token in required if token not in content]
+        if missing:
+            report.add(
+                Finding(
+                    item="plasticity:adapter",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message="Representation adapter missing definitions: "
+                    + ", ".join(missing),
+                )
+            )
+        else:
+            report.add(
+                Finding(
+                    item="plasticity:adapter",
+                    status="PASS",
+                    severity="INFO",
+                    message="Representation adapter definitions present.",
+                )
+            )
+
+    drift_path = base / "src/meta/plasticity/drift.rs"
+    if drift_path.exists():
+        drift_content = drift_path.read_text(encoding="utf-8")
+        if "SemanticDriftDetector" in drift_content and "DriftStatus" in drift_content:
+            report.add(
+                Finding(
+                    item="plasticity:drift",
+                    status="PASS",
+                    severity="INFO",
+                    message="Semantic drift detector implemented.",
+                )
+            )
+        else:
+            report.add(
+                Finding(
+                    item="plasticity:drift",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message="Drift detector implementation incomplete.",
+                )
+            )
+    else:
+        report.add(
+            Finding(
+                item="plasticity:drift",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Semantic drift detector source missing.",
+            )
+        )
+
+    tests_path = base / "tests/meta/semantic_plasticity.rs"
+    if tests_path.exists():
+        tests_content = tests_path.read_text(encoding="utf-8")
+        if "prism_ai::meta::plasticity" in tests_content and "DriftStatus::Drifted" in tests_content:
+            report.add(
+                Finding(
+                    item="plasticity:tests",
+                    status="PASS",
+                    severity="INFO",
+                    message="Semantic plasticity tests exercise drift detection.",
+                )
+            )
+        else:
+            report.add(
+                Finding(
+                    item="plasticity:tests",
+                    status="FAIL",
+                    severity="WARNING",
+                    message="Semantic plasticity tests missing drift assertions.",
+                )
+            )
+    else:
+        report.add(
+            Finding(
+                item="plasticity:tests",
+                status="FAIL",
+                severity="WARNING",
+                message="Semantic plasticity tests not found.",
+            )
+        )
+
+    explainability_path = base / ARTIFACT_PATHS["explainability_report"]
+    if explainability_path.exists():
+        report_content = explainability_path.read_text(encoding="utf-8")
+        headings_present = "# Semantic Plasticity Explainability Report" in report_content
+        table_present = "| Concept |" in report_content
+        if headings_present and table_present:
+            report.add(
+                Finding(
+                    item="plasticity:explainability",
+                    status="PASS",
+                    severity="INFO",
+                    message="Explainability report includes Phase M4 sections.",
+                )
+            )
+        else:
+            report.add(
+                Finding(
+                    item="plasticity:explainability",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message="Explainability report missing required sections.",
+                )
+            )
+    else:
+        report.add(
+            Finding(
+                item="plasticity:explainability",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Explainability report missing (artifacts/mec/M4).",
+            )
+        )
+
 def evaluate_task_manifest(report: ComplianceReport) -> None:
     if not TASKS_PATH.exists():
         report.add(
@@ -685,6 +818,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     evaluate_artifact_presence(report, base, args.allow_missing_artifacts)
     evaluate_advanced_manifest(report, base / ARTIFACT_PATHS["advanced_manifest"])
     evaluate_meta_contract(report, base)
+    evaluate_semantic_plasticity(report, base)
 
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

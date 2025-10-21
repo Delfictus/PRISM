@@ -153,11 +153,11 @@ Exit criteria: Reflex control loop operational with telemetry and governance gat
 
 | # | Task | Source | Status |
 |---|------|--------|--------|
-| M4.1 | Create representation adapters for ontology evolution | `src/meta/plasticity/adapters.rs` | ☐ pending |
-| M4.2 | Implement semantic drift detection and regression tests | `tests/meta/semantic_plasticity.rs` | ☐ pending |
-| M4.3 | Generate explainability reports for meta decisions | `artifacts/mec/M4/explainability_report.md` | ☐ pending |
-| M4.4 | Extend compliance validator with representation gate | `scripts/compliance_validator.py` | ☐ pending |
-| M4.5 | Document knowledge evolution runbooks | `docs/runbooks/meta_rollout.md` | ☐ pending |
+| M4.1 | Create representation adapters for ontology evolution | `src/meta/plasticity/adapters.rs` | ◐ in_progress |
+| M4.2 | Implement semantic drift detection and regression tests | `tests/meta/semantic_plasticity.rs` | ◐ in_progress |
+| M4.3 | Generate explainability reports for meta decisions | `artifacts/mec/M4/explainability_report.md` | ◐ in_progress |
+| M4.4 | Extend compliance validator with representation gate | `scripts/compliance_validator.py` | ◐ in_progress |
+| M4.5 | Document knowledge evolution runbooks | `docs/runbooks/meta_rollout.md` | ◐ in_progress |
 
 Exit criteria: Representation layer adaptable with explainability artifacts and compliance gates.
 

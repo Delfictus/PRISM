@@ -10,15 +10,28 @@ and prints placeholder output until live integration is complete.
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 from typing import List
+
+try:
+    from . import vault_root  # type: ignore
+except ImportError:
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from scripts import vault_root  # type: ignore
 
 
 def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Audit cognitive ledger entries.")
     parser.add_argument("--thought", metavar="HASH", help="Thought DAG hash to verify.")
     parser.add_argument("--block", metavar="HASH", help="Cognitive block hash to verify.")
-    parser.add_argument("--merkle-root", metavar="PATH", default="PRISM-AI-UNIFIED-VAULT/artifacts/merkle", help="Ledger merkle anchor directory.")
+    default_merkle = vault_root() / "artifacts" / "merkle"
+    parser.add_argument(
+        "--merkle-root",
+        metavar="PATH",
+        default=str(default_merkle),
+        help="Ledger merkle anchor directory.",
+    )
     return parser.parse_args(argv)
 
 
