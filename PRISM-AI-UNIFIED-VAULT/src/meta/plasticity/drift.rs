@@ -1,5 +1,8 @@
 //! Semantic drift detection utilities used by Phase M4.
 
+use serde::{Deserialize, Serialize};
+use std::fmt;
+
 /// Error type emitted when evaluating semantic drift.
 #[derive(Debug, thiserror::Error)]
 pub enum DriftError {
@@ -14,7 +17,8 @@ pub enum DriftError {
 }
 
 /// Drift severity classification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum DriftStatus {
     Stable,
     Warning,
@@ -32,22 +36,32 @@ impl DriftStatus {
     }
 }
 
-impl core::fmt::Display for DriftStatus {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl fmt::Display for DriftStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
     }
 }
 
 /// Metrics captured for explainability.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct DriftMetrics {
     pub cosine_similarity: f32,
     pub magnitude_ratio: f32,
     pub delta_l2: f32,
 }
 
+impl DriftMetrics {
+    pub fn zero() -> Self {
+        Self {
+            cosine_similarity: 1.0,
+            magnitude_ratio: 1.0,
+            delta_l2: 0.0,
+        }
+    }
+}
+
 /// Drift evaluation outcome.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct DriftEvaluation {
     pub status: DriftStatus,
     pub metrics: DriftMetrics,

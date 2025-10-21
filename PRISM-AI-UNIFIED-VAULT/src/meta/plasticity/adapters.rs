@@ -1,16 +1,22 @@
 //! Semantic plasticity adapters for Phase M4.
 //!
 //! The representation adapter maintains concept prototypes derived from ontology
-//! embeddings and records adaptation events leveraged by explainability reports.
+//! embeddings and records adaptation events that feed explainability artifacts and
+//! governance telemetry.
 
+use crate::meta::ontology::ConceptAnchor;
+use serde::{Deserialize, Serialize};
+use serde_json;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::fs;
+use std::path::Path;
 
 use super::drift::{DriftError, DriftEvaluation, DriftMetrics, DriftStatus, SemanticDriftDetector};
 
 /// Default exponential smoothing factor used when updating concept prototypes.
-const DEFAULT_ADAPTATION_RATE: f32 = 0.25;
-const DEFAULT_HISTORY_CAP: usize = 16;
+pub const DEFAULT_ADAPTATION_RATE: f32 = 0.25;
+pub const DEFAULT_HISTORY_CAP: usize = 16;
 
 /// Error type returned by [`RepresentationAdapter`].
 #[derive(Debug, thiserror::Error)]
@@ -34,7 +40,8 @@ impl From<DriftError> for AdapterError {
 }
 
 /// Operational state of the adapter. Used to contextualize explainability reports.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum AdapterMode {
     ColdStart,
     Warmup,
@@ -69,6 +76,44 @@ impl AdaptationEvent {
             drift,
             timestamp_ms,
             notes: notes.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ConceptState {
+    prototype: Vec<f32>,
+    anchor_hash: Option<String>,
+    observation_count: usize,
+    last_updated_ms: u128,
+    drift: DriftEvaluation,
+}
+
+impl ConceptState {
+    fn new(embedding_dim: usize) -> Self {
+        Self {
+            prototype: vec![0.0; embedding_dim],
+            anchor_hash: None,
+            observation_count: 0,
+            last_updated_ms: current_epoch_ms(),
+            drift: DriftEvaluation {
+                status: DriftStatus::Stable,
+                metrics: DriftMetrics::zero(),
+            },
+        }
+    }
+
+    fn with_prototype(prototype: Vec<f32>) -> Self {
+        let last_updated_ms = current_epoch_ms();
+        Self {
+            prototype,
+            anchor_hash: None,
+            observation_count: 0,
+            last_updated_ms,
+            drift: DriftEvaluation {
+                status: DriftStatus::Stable,
+                metrics: DriftMetrics::zero(),
+            },
         }
     }
 }
@@ -124,13 +169,35 @@ impl RepresentationSnapshot {
     }
 }
 
+/// Manifest representation for governance artifacts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConceptManifest {
+    pub concept_id: String,
+    pub anchor_hash: Option<String>,
+    pub observation_count: usize,
+    pub last_updated_ms: u128,
+    pub drift_status: DriftStatus,
+    pub cosine_similarity: f32,
+    pub magnitude_ratio: f32,
+    pub delta_l2: f32,
+    pub prototype: Vec<f32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepresentationManifest {
+    pub adapter_id: String,
+    pub embedding_dim: usize,
+    pub mode: AdapterMode,
+    pub concepts: Vec<ConceptManifest>,
+}
+
 /// Maintains ontology-aware representation prototypes.
 #[derive(Debug)]
 pub struct RepresentationAdapter {
     adapter_id: String,
     embedding_dim: usize,
     alpha: f32,
-    prototypes: BTreeMap<String, Vec<f32>>,
+    states: BTreeMap<String, ConceptState>,
     history: Vec<AdaptationEvent>,
     max_history: usize,
     adaptation_count: usize,
@@ -148,7 +215,8 @@ impl RepresentationAdapter {
             return Err(AdapterError::EmptyEmbedding);
         }
 
-        for (concept, embedding) in &initial_prototypes {
+        let mut states = BTreeMap::new();
+        for (concept, embedding) in initial_prototypes {
             if embedding.len() != embedding_dim {
                 return Err(AdapterError::DimensionMismatch {
                     expected: embedding_dim,
@@ -159,18 +227,29 @@ impl RepresentationAdapter {
                 !embedding.iter().all(|v| v.is_nan()),
                 "initial embedding for {concept} contains NaN values"
             );
+            states.insert(concept, ConceptState::with_prototype(embedding));
         }
 
         Ok(Self {
             adapter_id: adapter_id.into(),
             embedding_dim,
             alpha: DEFAULT_ADAPTATION_RATE,
-            prototypes: initial_prototypes,
+            states,
             history: Vec::new(),
             max_history: DEFAULT_HISTORY_CAP,
             adaptation_count: 0,
             drift_detector: SemanticDriftDetector::default(),
         })
+    }
+
+    /// Register an ontology anchor so that explainability reports can reference canonical hashes.
+    pub fn register_anchor(&mut self, anchor: &ConceptAnchor) {
+        let hash = anchor.canonical_fingerprint();
+        let state = self
+            .states
+            .entry(anchor.id.clone())
+            .or_insert_with(|| ConceptState::new(self.embedding_dim));
+        state.anchor_hash = Some(hash);
     }
 
     /// Set the exponential smoothing factor.
@@ -197,29 +276,27 @@ impl RepresentationAdapter {
             });
         }
 
-        let prototype = self
-            .prototypes
+        let state = self
+            .states
             .entry(concept_id.to_owned())
-            .or_insert_with(|| vec![0.0; self.embedding_dim]);
+            .or_insert_with(|| ConceptState::new(self.embedding_dim));
 
-        let drift = if self.adaptation_count == 0 && prototype.iter().all(|v| *v == 0.0) {
-            // Cold start, treat as perfect alignment.
+        let drift = if state.observation_count == 0 {
             DriftEvaluation {
                 status: DriftStatus::Stable,
-                metrics: DriftMetrics {
-                    cosine_similarity: 1.0,
-                    magnitude_ratio: 1.0,
-                    delta_l2: 0.0,
-                },
+                metrics: DriftMetrics::zero(),
             }
         } else {
-            self.drift_detector.evaluate(prototype.as_slice(), embedding)?
+            self.drift_detector
+                .evaluate(state.prototype.as_slice(), embedding)?
         };
 
-        // Update prototype with exponential smoothing.
         for (idx, value) in embedding.iter().enumerate() {
-            prototype[idx] = (1.0 - self.alpha) * prototype[idx] + self.alpha * value;
+            state.prototype[idx] = (1.0 - self.alpha) * state.prototype[idx] + self.alpha * value;
         }
+        state.observation_count += 1;
+        state.last_updated_ms = current_epoch_ms();
+        state.drift = drift;
 
         self.adaptation_count += 1;
 
@@ -239,7 +316,7 @@ impl RepresentationAdapter {
 
     /// Fetch the current prototype vector for a concept.
     pub fn prototype(&self, concept_id: &str) -> Option<&[f32]> {
-        self.prototypes.get(concept_id).map(|vec| vec.as_slice())
+        self.states.get(concept_id).map(|state| state.prototype.as_slice())
     }
 
     /// Produce a snapshot used for explainability.
@@ -247,10 +324,54 @@ impl RepresentationAdapter {
         RepresentationSnapshot {
             adapter_id: self.adapter_id.clone(),
             embedding_dim: self.embedding_dim,
-            tracked_concepts: self.prototypes.len(),
+            tracked_concepts: self.states.len(),
             mode: self.mode(),
             recent_events: self.history.clone(),
         }
+    }
+
+    /// Build a manifest for governance artifacts.
+    pub fn manifest(&self) -> RepresentationManifest {
+        let concepts = self
+            .states
+            .iter()
+            .map(|(concept_id, state)| {
+                let DriftMetrics {
+                    cosine_similarity,
+                    magnitude_ratio,
+                    delta_l2,
+                } = state.drift.metrics;
+                ConceptManifest {
+                    concept_id: concept_id.clone(),
+                    anchor_hash: state.anchor_hash.clone(),
+                    observation_count: state.observation_count,
+                    last_updated_ms: state.last_updated_ms,
+                    drift_status: state.drift.status,
+                    cosine_similarity,
+                    magnitude_ratio,
+                    delta_l2,
+                    prototype: state.prototype.clone(),
+                }
+            })
+            .collect();
+
+        RepresentationManifest {
+            adapter_id: self.adapter_id.clone(),
+            embedding_dim: self.embedding_dim,
+            mode: self.mode(),
+            concepts,
+        }
+    }
+
+    /// Write the manifest to disk.
+    pub fn write_manifest<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
+        let manifest = self.manifest();
+        let data = serde_json::to_string_pretty(&manifest)
+            .expect("representation manifest should be serializable");
+        if let Some(parent) = path.as_ref().parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(path, data.as_bytes())
     }
 
     fn mode(&self) -> AdapterMode {

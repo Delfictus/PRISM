@@ -11,6 +11,7 @@ pub use orchestrator::{
     VariantGenome, VariantParameter,
 };
 pub use plasticity::{
-    explainability_report, AdaptationEvent, AdapterError, AdapterMode, DriftError, DriftEvaluation,
-    DriftMetrics, DriftStatus, RepresentationAdapter, RepresentationSnapshot, SemanticDriftDetector,
+    explainability_report, AdaptationEvent, AdapterError, AdapterMode, ConceptManifest, DriftError,
+    DriftEvaluation, DriftMetrics, DriftStatus, RepresentationAdapter, RepresentationManifest,
+    RepresentationSnapshot, SemanticDriftDetector,
 };

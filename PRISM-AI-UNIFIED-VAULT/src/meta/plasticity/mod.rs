@@ -2,7 +2,8 @@ pub mod adapters;
 pub mod drift;
 
 pub use adapters::{
-    AdaptationEvent, AdapterError, AdapterMode, RepresentationAdapter, RepresentationSnapshot,
+    AdaptationEvent, AdapterError, AdapterMode, ConceptManifest, RepresentationAdapter,
+    RepresentationManifest, RepresentationSnapshot,
 };
 pub use drift::{DriftError, DriftEvaluation, DriftMetrics, DriftStatus, SemanticDriftDetector};
 
