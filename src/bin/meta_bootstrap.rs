@@ -1,12 +1,31 @@
 use anyhow::Result;
-use prism_ai::features::registry;
+use chrono::Utc;
+use prism_ai::features::{registry, MetaFeatureId, MetaFeatureState};
 use prism_ai::meta::MetaOrchestrator;
 use std::fs;
 use std::path::Path;
 
 fn main() -> Result<()> {
+    std::env::set_var("TELEMETRY_EXPECTED_STAGES", "");
+
     let manifest = registry().snapshot();
     println!("Meta registry Merkle root: {}", manifest.merkle_root);
+
+    std::env::set_var("TELEMETRY_EXPECTED_STAGES", "meta_variant_emitted");
+
+    let registry = registry();
+    registry
+        .update_state(
+            MetaFeatureId::MetaGeneration,
+            MetaFeatureState::Shadow {
+                actor: "bootstrap".into(),
+                planned_activation: Some(Utc::now()),
+            },
+            "bootstrap",
+            "enable meta_generation for sample run",
+            None,
+        )
+        .ok();
 
     let orchestrator = MetaOrchestrator::new(0xDEADBEEFDEADBEEF)?;
     let outcome = orchestrator.run_generation(0xC0FFEE_u64, 32)?;

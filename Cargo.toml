@@ -55,6 +55,7 @@ parking_lot = "0.12"
 toml = "0.8"
 neuromorphic_engine = { path = "foundation/neuromorphic", package = "neuromorphic-engine" }
 quantum_engine = { path = "foundation/quantum", package = "quantum-engine" }
+futures = "0.3"
 
 # Metrics and profiling
 prometheus = { version = "0.13", optional = true }

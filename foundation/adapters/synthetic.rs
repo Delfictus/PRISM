@@ -5,6 +5,7 @@
 use crate::ingestion::types::{DataPoint, DataSource, SourceInfo};
 use anyhow::Result;
 use chrono::Utc;
+use futures::future::BoxFuture;
 use rand::Rng;
 use std::collections::HashMap;
 
@@ -140,49 +141,53 @@ impl SyntheticDataSource {
     }
 }
 
-#[async_trait::async_trait]
 impl DataSource for SyntheticDataSource {
-    async fn connect(&mut self) -> Result<()> {
-        log::info!("Connected to synthetic data source: {}", self.name);
-        self.counter = 0;
-        Ok(())
+    fn connect(&mut self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            log::info!("Connected to synthetic data source: {}", self.name);
+            self.counter = 0;
+            Ok(())
+        })
     }
 
-    async fn read_batch(&mut self) -> Result<Vec<DataPoint>> {
-        let mut batch = Vec::with_capacity(self.batch_size);
+    fn read_batch(&mut self) -> BoxFuture<'_, Result<Vec<DataPoint>>> {
+        Box::pin(async move {
+            let mut batch = Vec::with_capacity(self.batch_size);
 
-        for _ in 0..self.batch_size {
-            let timestamp = Utc::now().timestamp_millis();
+            for _ in 0..self.batch_size {
+                let timestamp = Utc::now().timestamp_millis();
 
-            let mut values = Vec::with_capacity(self.dimensions);
-            for dim in 0..self.dimensions {
-                values.push(self.generate_value(self.counter, dim));
+                let mut values = Vec::with_capacity(self.dimensions);
+                for dim in 0..self.dimensions {
+                    values.push(self.generate_value(self.counter, dim));
+                }
+
+                let mut metadata = HashMap::new();
+                metadata.insert("source".to_string(), self.name.clone());
+                metadata.insert("type".to_string(), self.data_type.clone());
+                metadata.insert("sample".to_string(), self.counter.to_string());
+
+                batch.push(DataPoint {
+                    timestamp,
+                    values,
+                    metadata,
+                });
+
+                self.counter += 1;
             }
 
-            let mut metadata = HashMap::new();
-            metadata.insert("source".to_string(), self.name.clone());
-            metadata.insert("type".to_string(), self.data_type.clone());
-            metadata.insert("sample".to_string(), self.counter.to_string());
+            let delay_ms = (1000.0 / self.sampling_rate_hz * self.batch_size as f64) as u64;
+            tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
 
-            batch.push(DataPoint {
-                timestamp,
-                values,
-                metadata,
-            });
-
-            self.counter += 1;
-        }
-
-        // Simulate realistic sampling rate
-        let delay_ms = (1000.0 / self.sampling_rate_hz * self.batch_size as f64) as u64;
-        tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
-
-        Ok(batch)
+            Ok(batch)
+        })
     }
 
-    async fn disconnect(&mut self) -> Result<()> {
-        log::info!("Disconnected from synthetic data source");
-        Ok(())
+    fn disconnect(&mut self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            log::info!("Disconnected from synthetic data source");
+            Ok(())
+        })
     }
 
     fn get_source_info(&self) -> SourceInfo {
@@ -215,35 +220,38 @@ impl HighFrequencySource {
     }
 }
 
-#[async_trait::async_trait]
 impl DataSource for HighFrequencySource {
-    async fn connect(&mut self) -> Result<()> {
-        self.counter = 0;
-        Ok(())
+    fn connect(&mut self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            self.counter = 0;
+            Ok(())
+        })
     }
 
-    async fn read_batch(&mut self) -> Result<Vec<DataPoint>> {
-        let timestamp = Utc::now().timestamp_millis();
+    fn read_batch(&mut self) -> BoxFuture<'_, Result<Vec<DataPoint>>> {
+        Box::pin(async move {
+            let timestamp = Utc::now().timestamp_millis();
 
-        let values: Vec<f64> = (0..self.dimensions)
-            .map(|i| (self.counter + i) as f64)
-            .collect();
+            let values: Vec<f64> = (0..self.dimensions)
+                .map(|i| (self.counter + i) as f64)
+                .collect();
 
-        let mut metadata = HashMap::new();
-        metadata.insert("source".to_string(), "high_frequency".to_string());
-        metadata.insert("counter".to_string(), self.counter.to_string());
+            let mut metadata = HashMap::new();
+            metadata.insert("source".to_string(), "high_frequency".to_string());
+            metadata.insert("counter".to_string(), self.counter.to_string());
 
-        self.counter += 1;
+            self.counter += 1;
 
-        Ok(vec![DataPoint {
-            timestamp,
-            values,
-            metadata,
-        }])
+            Ok(vec![DataPoint {
+                timestamp,
+                values,
+                metadata,
+            }])
+        })
     }
 
-    async fn disconnect(&mut self) -> Result<()> {
-        Ok(())
+    fn disconnect(&mut self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move { Ok(()) })
     }
 
     fn get_source_info(&self) -> SourceInfo {

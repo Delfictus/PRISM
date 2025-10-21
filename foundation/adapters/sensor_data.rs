@@ -5,6 +5,7 @@
 use crate::ingestion::types::{DataPoint, DataSource, SourceInfo};
 use anyhow::Result;
 use chrono::Utc;
+use futures::future::BoxFuture;
 use std::collections::HashMap;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
@@ -55,67 +56,69 @@ impl OpticalSensorArray {
     }
 }
 
-#[async_trait::async_trait]
 impl DataSource for OpticalSensorArray {
-    async fn connect(&mut self) -> Result<()> {
-        if self.sensor_addresses.is_empty() {
-            return Err(anyhow::anyhow!("No sensor addresses configured"));
-        }
+    fn connect(&mut self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            if self.sensor_addresses.is_empty() {
+                return Err(anyhow::anyhow!("No sensor addresses configured"));
+            }
 
-        // Connect to first sensor array controller
-        let stream = TcpStream::connect(&self.sensor_addresses[0]).await?;
-        self.client = Some(stream);
+            let stream = TcpStream::connect(&self.sensor_addresses[0]).await?;
+            self.client = Some(stream);
 
-        log::info!(
-            "Connected to optical sensor array: {} sensors at {}",
-            self.num_sensors,
-            self.sensor_addresses[0]
-        );
+            log::info!(
+                "Connected to optical sensor array: {} sensors at {}",
+                self.num_sensors,
+                self.sensor_addresses[0]
+            );
 
-        Ok(())
+            Ok(())
+        })
     }
 
-    async fn read_batch(&mut self) -> Result<Vec<DataPoint>> {
-        let stream = self
-            .client
-            .as_mut()
-            .ok_or_else(|| anyhow::anyhow!("Not connected to sensor array"))?;
+    fn read_batch(&mut self) -> BoxFuture<'_, Result<Vec<DataPoint>>> {
+        Box::pin(async move {
+            let stream = self
+                .client
+                .as_mut()
+                .ok_or_else(|| anyhow::anyhow!("Not connected to sensor array"))?;
 
-        // Read sensor data packet (up to 16KB)
-        let mut buffer = vec![0u8; 16384];
-        let n = stream.read(&mut buffer).await?;
+            let mut buffer = vec![0u8; 16384];
+            let n = stream.read(&mut buffer).await?;
 
-        if n == 0 {
-            return Err(anyhow::anyhow!("Connection closed by sensor array"));
-        }
+            if n == 0 {
+                return Err(anyhow::anyhow!("Connection closed by sensor array"));
+            }
 
-        // Parse sensor readings
-        let readings = Self::parse_sensor_packet(&buffer[..n])?;
+            let readings = Self::parse_sensor_packet(&buffer[..n])?;
 
-        if readings.is_empty() {
-            return Ok(Vec::new());
-        }
+            if readings.is_empty() {
+                return Ok(Vec::new());
+            }
 
-        let timestamp = Utc::now().timestamp_millis();
+            let timestamp = Utc::now().timestamp_millis();
 
-        let mut metadata = HashMap::new();
-        metadata.insert("sensor_type".to_string(), "optical_aperture".to_string());
-        metadata.insert("num_sensors".to_string(), self.num_sensors.to_string());
-        metadata.insert("source".to_string(), self.name.clone());
+            let mut metadata = HashMap::new();
+            metadata.insert("sensor_type".to_string(), "optical_aperture".to_string());
+            metadata.insert("num_sensors".to_string(), self.num_sensors.to_string());
+            metadata.insert("source".to_string(), self.name.clone());
 
-        let point = DataPoint {
-            timestamp,
-            values: readings,
-            metadata,
-        };
+            let point = DataPoint {
+                timestamp,
+                values: readings,
+                metadata,
+            };
 
-        Ok(vec![point])
+            Ok(vec![point])
+        })
     }
 
-    async fn disconnect(&mut self) -> Result<()> {
-        self.client = None;
-        log::info!("Disconnected from optical sensor array");
-        Ok(())
+    fn disconnect(&mut self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            self.client = None;
+            log::info!("Disconnected from optical sensor array");
+            Ok(())
+        })
     }
 
     fn get_source_info(&self) -> SourceInfo {
@@ -161,70 +164,74 @@ impl IoTSensorSource {
     }
 }
 
-#[async_trait::async_trait]
 impl DataSource for IoTSensorSource {
-    async fn connect(&mut self) -> Result<()> {
-        self.client = Some(reqwest::Client::new());
-        log::info!("Connected to IoT sensor endpoint: {}", self.endpoint_url);
-        Ok(())
+    fn connect(&mut self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            self.client = Some(reqwest::Client::new());
+            log::info!("Connected to IoT sensor endpoint: {}", self.endpoint_url);
+            Ok(())
+        })
     }
 
-    async fn read_batch(&mut self) -> Result<Vec<DataPoint>> {
-        let client = self
-            .client
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("Not connected"))?;
+    fn read_batch(&mut self) -> BoxFuture<'_, Result<Vec<DataPoint>>> {
+        Box::pin(async move {
+            let client = self
+                .client
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("Not connected"))?;
 
-        let mut points = Vec::new();
+            let mut points = Vec::new();
 
-        for sensor_id in &self.sensor_ids {
-            let url = format!("{}/sensors/{}/latest", self.endpoint_url, sensor_id);
+            for sensor_id in &self.sensor_ids {
+                let url = format!("{}/sensors/{}/latest", self.endpoint_url, sensor_id);
 
-            let mut request = client.get(&url);
+                let mut request = client.get(&url);
 
-            if let Some(token) = &self.auth_token {
-                request = request.header("Authorization", format!("Bearer {}", token));
-            }
+                if let Some(token) = &self.auth_token {
+                    request = request.header("Authorization", format!("Bearer {}", token));
+                }
 
-            match request.send().await {
-                Ok(response) => {
-                    if let Ok(data) = response.json::<serde_json::Value>().await {
-                        // Parse sensor reading
-                        if let Some(reading) = data.get("value").and_then(|v| v.as_f64()) {
-                            let timestamp = data
-                                .get("timestamp")
-                                .and_then(|t| t.as_i64())
-                                .unwrap_or_else(|| Utc::now().timestamp_millis());
+                match request.send().await {
+                    Ok(response) => {
+                        if let Ok(data) = response.json::<serde_json::Value>().await {
+                            if let Some(reading) = data.get("value").and_then(|v| v.as_f64()) {
+                                let timestamp = data
+                                    .get("timestamp")
+                                    .and_then(|t| t.as_i64())
+                                    .unwrap_or_else(|| Utc::now().timestamp_millis());
 
-                            let mut metadata = HashMap::new();
-                            metadata.insert("sensor_id".to_string(), sensor_id.clone());
-                            metadata.insert("source".to_string(), self.name.clone());
+                                let mut metadata = HashMap::new();
+                                metadata.insert("sensor_id".to_string(), sensor_id.clone());
+                                metadata.insert("source".to_string(), self.name.clone());
 
-                            if let Some(unit) = data.get("unit").and_then(|u| u.as_str()) {
-                                metadata.insert("unit".to_string(), unit.to_string());
+                                if let Some(unit) = data.get("unit").and_then(|u| u.as_str()) {
+                                    metadata.insert("unit".to_string(), unit.to_string());
+                                }
+
+                                points.push(DataPoint {
+                                    timestamp,
+                                    values: vec![reading],
+                                    metadata,
+                                });
                             }
-
-                            points.push(DataPoint {
-                                timestamp,
-                                values: vec![reading],
-                                metadata,
-                            });
                         }
                     }
-                }
-                Err(e) => {
-                    log::warn!("Failed to fetch data for sensor {}: {}", sensor_id, e);
+                    Err(e) => {
+                        log::warn!("Failed to fetch data for sensor {}: {}", sensor_id, e);
+                    }
                 }
             }
-        }
 
-        Ok(points)
+            Ok(points)
+        })
     }
 
-    async fn disconnect(&mut self) -> Result<()> {
-        self.client = None;
-        log::info!("Disconnected from IoT sensor endpoint");
-        Ok(())
+    fn disconnect(&mut self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            self.client = None;
+            log::info!("Disconnected from IoT sensor endpoint");
+            Ok(())
+        })
     }
 
     fn get_source_info(&self) -> SourceInfo {

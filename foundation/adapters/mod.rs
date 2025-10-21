@@ -17,6 +17,7 @@ pub use synthetic::{HighFrequencySource, SyntheticDataSource};
 mod tests {
     use super::*;
     use crate::ingestion::types::{DataPoint, DataSource};
+    use futures::future::BoxFuture;
     use std::collections::HashMap;
 
     /// Test source that fails intermittently for testing error handling
@@ -36,32 +37,33 @@ mod tests {
         }
     }
 
-    #[async_trait::async_trait]
     impl DataSource for FlakeySource {
-        async fn connect(&mut self) -> anyhow::Result<()> {
-            Ok(())
+        fn connect(&mut self) -> BoxFuture<'_, anyhow::Result<()>> {
+            Box::pin(async { Ok(()) })
         }
 
-        async fn read_batch(&mut self) -> anyhow::Result<Vec<DataPoint>> {
-            self.counter += 1;
+        fn read_batch(&mut self) -> BoxFuture<'_, anyhow::Result<Vec<DataPoint>>> {
+            Box::pin(async move {
+                self.counter += 1;
 
-            if self.counter % self.fail_every_n == 0 {
-                return Err(anyhow::anyhow!("Simulated transient failure"));
-            }
+                if self.counter % self.fail_every_n == 0 {
+                    return Err(anyhow::anyhow!("Simulated transient failure"));
+                }
 
-            let mut metadata = HashMap::new();
-            metadata.insert("source".to_string(), self.name.clone());
-            metadata.insert("counter".to_string(), self.counter.to_string());
+                let mut metadata = HashMap::new();
+                metadata.insert("source".to_string(), self.name.clone());
+                metadata.insert("counter".to_string(), self.counter.to_string());
 
-            Ok(vec![DataPoint {
-                timestamp: chrono::Utc::now().timestamp_millis(),
-                values: vec![self.counter as f64],
-                metadata,
-            }])
+                Ok(vec![DataPoint {
+                    timestamp: chrono::Utc::now().timestamp_millis(),
+                    values: vec![self.counter as f64],
+                    metadata,
+                }])
+            })
         }
 
-        async fn disconnect(&mut self) -> anyhow::Result<()> {
-            Ok(())
+        fn disconnect(&mut self) -> BoxFuture<'_, anyhow::Result<()>> {
+            Box::pin(async { Ok(()) })
         }
 
         fn get_source_info(&self) -> crate::ingestion::types::SourceInfo {

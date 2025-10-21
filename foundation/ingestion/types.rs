@@ -1,6 +1,7 @@
 //! Core types for data ingestion
 
 use anyhow::Result;
+use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -51,16 +52,15 @@ pub struct SourceInfo {
 }
 
 /// Generic data source trait
-#[async_trait::async_trait]
 pub trait DataSource: Send + Sync {
     /// Connect to the data source
-    async fn connect(&mut self) -> Result<()>;
+    fn connect(&mut self) -> BoxFuture<'_, Result<()>>;
 
     /// Read a batch of data points
-    async fn read_batch(&mut self) -> Result<Vec<DataPoint>>;
+    fn read_batch(&mut self) -> BoxFuture<'_, Result<Vec<DataPoint>>>;
 
     /// Disconnect from the data source
-    async fn disconnect(&mut self) -> Result<()>;
+    fn disconnect(&mut self) -> BoxFuture<'_, Result<()>>;
 
     /// Get source information
     fn get_source_info(&self) -> SourceInfo;

@@ -1,0 +1,38 @@
+{
+  "master_seed": 12648430,
+  "component_seeds": {
+    "ensemble_generation": 14031704882470455154,
+    "cma": 11260532077783130352,
+    "quantum_pimc": 4955302038280957656,
+    "neuromorphic": 1557487946971659829,
+    "gpu_coloring": 945716460325754659,
+    "thermodynamic": 11979365913534242684,
+    "info_geom": 12550100962110750449
+  },
+  "input_hash": "f9c700da722c5b0ecd982d3609cd49567a5867ec6af1df90d8609c95feb1a739",
+  "output_hash": "5bb36cbfd649f8e01da6db0d4838b9c48a658d796a28c54bba584f03d640287e",
+  "intermediate_hashes": [
+    {
+      "stage": "meta.evaluations",
+      "hash": "564fc39133de74806abf82d619ff50824c7b86ab4832b95894db0d321b61a49d"
+    },
+    {
+      "stage": "meta.distribution",
+      "hash": "8399c7b749b6ca822fe00726d35133de5b64539c0591e5a3cf82e480d0a985e7"
+    }
+  ],
+  "timestamp": "2025-10-21T05:02:05.643253002Z",
+  "environment": {
+    "cuda_version": null,
+    "gpu_model": null,
+    "driver_version": null,
+    "rust_version": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+    "feature_flags": []
+  },
+  "meta": {
+    "meta_genome_hash": "d153a477bd3c249adf276f46120aeb451a413bcd12a8924ad47c851224e9f174",
+    "meta_merkle_root": "82902d178228427cd2891de0aa67697e46afe2d426ca391b0fc63752e2ad534f",
+    "ontology_hash": null,
+    "free_energy_hash": "c96875de504dcd33d8cd64bd8179c63af3e3e36e9d5e3741dddb566ea01fba13"
+  }
+}

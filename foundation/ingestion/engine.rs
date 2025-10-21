@@ -481,33 +481,35 @@ impl IngestionEngine {
 mod tests {
     use super::*;
     use crate::ingestion::types::{DataPoint, DataSource, SourceInfo};
+    use futures::future::BoxFuture;
 
     struct MockSource {
         counter: usize,
         batch_size: usize,
     }
 
-    #[async_trait::async_trait]
     impl DataSource for MockSource {
-        async fn connect(&mut self) -> Result<()> {
-            Ok(())
+        fn connect(&mut self) -> BoxFuture<'_, Result<()>> {
+            Box::pin(async { Ok(()) })
         }
 
-        async fn read_batch(&mut self) -> Result<Vec<DataPoint>> {
-            let mut batch = Vec::new();
-            for _ in 0..self.batch_size {
-                batch.push(DataPoint::new(
-                    chrono::Utc::now().timestamp_millis(),
-                    vec![self.counter as f64],
-                ));
-                self.counter += 1;
-            }
-            tokio::time::sleep(Duration::from_millis(10)).await;
-            Ok(batch)
+        fn read_batch(&mut self) -> BoxFuture<'_, Result<Vec<DataPoint>>> {
+            Box::pin(async move {
+                let mut batch = Vec::new();
+                for _ in 0..self.batch_size {
+                    batch.push(DataPoint::new(
+                        chrono::Utc::now().timestamp_millis(),
+                        vec![self.counter as f64],
+                    ));
+                    self.counter += 1;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                Ok(batch)
+            })
         }
 
-        async fn disconnect(&mut self) -> Result<()> {
-            Ok(())
+        fn disconnect(&mut self) -> BoxFuture<'_, Result<()>> {
+            Box::pin(async { Ok(()) })
         }
 
         fn get_source_info(&self) -> SourceInfo {

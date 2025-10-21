@@ -177,6 +177,7 @@ fn read_expected_stages() -> Vec<String> {
             "consensus_proposed".to_string(),
             "consensus_reached".to_string(),
             "processing_completed".to_string(),
+            "meta_variant_emitted".to_string(),
         ]
     }
 }
@@ -193,6 +194,13 @@ fn extract_stage(event: &crate::telemetry::EventData) -> Option<&'static str> {
         ConsensusProposed { .. } => Some("consensus_proposed"),
         ConsensusReached { .. } => Some("consensus_reached"),
         ConsensusConflict { .. } => Some("consensus_conflict"),
+        Custom { payload } => {
+            if payload.get("meta_variant").is_some() {
+                Some("meta_variant_emitted")
+            } else {
+                None
+            }
+        }
         _ => None,
     }
 }

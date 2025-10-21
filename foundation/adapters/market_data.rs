@@ -5,6 +5,7 @@
 use crate::ingestion::types::{DataPoint, DataSource, SourceInfo};
 use anyhow::Result;
 use chrono::Utc;
+use futures::future::BoxFuture;
 use std::collections::HashMap;
 
 /// Alpaca Market Data Source
@@ -56,55 +57,59 @@ impl AlpacaMarketDataSource {
     }
 }
 
-#[async_trait::async_trait]
 impl DataSource for AlpacaMarketDataSource {
-    async fn connect(&mut self) -> Result<()> {
-        self.client = Some(reqwest::Client::new());
-        log::info!("Connected to Alpaca Market Data API");
-        Ok(())
+    fn connect(&mut self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            self.client = Some(reqwest::Client::new());
+            log::info!("Connected to Alpaca Market Data API");
+            Ok(())
+        })
     }
 
-    async fn read_batch(&mut self) -> Result<Vec<DataPoint>> {
-        let client = self
-            .client
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("Not connected to Alpaca API"))?;
+    fn read_batch(&mut self) -> BoxFuture<'_, Result<Vec<DataPoint>>> {
+        Box::pin(async move {
+            let client = self
+                .client
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("Not connected to Alpaca API"))?;
 
-        let mut points = Vec::new();
+            let mut points = Vec::new();
 
-        for symbol in &self.symbols {
-            let url = format!("{}/{}/trades/latest", self.base_url, symbol);
+            for symbol in &self.symbols {
+                let url = format!("{}/{}/trades/latest", self.base_url, symbol);
 
-            match client
-                .get(&url)
-                .header("APCA-API-KEY-ID", &self.api_key)
-                .header("APCA-API-SECRET-KEY", &self.api_secret)
-                .send()
-                .await
-            {
-                Ok(response) => {
-                    if let Ok(data) = response.json::<serde_json::Value>().await {
-                        if let Some(point) = self.parse_trade_data(symbol, &data) {
-                            points.push(point);
+                match client
+                    .get(&url)
+                    .header("APCA-API-KEY-ID", &self.api_key)
+                    .header("APCA-API-SECRET-KEY", &self.api_secret)
+                    .send()
+                    .await
+                {
+                    Ok(response) => {
+                        if let Ok(data) = response.json::<serde_json::Value>().await {
+                            if let Some(point) = self.parse_trade_data(symbol, &data) {
+                                points.push(point);
+                            }
                         }
                     }
-                }
-                Err(e) => {
-                    log::warn!("Failed to fetch data for {}: {}", symbol, e);
+                    Err(e) => {
+                        log::warn!("Failed to fetch data for {}: {}", symbol, e);
+                    }
                 }
             }
-        }
 
-        // Add small delay to avoid rate limiting
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        Ok(points)
+            Ok(points)
+        })
     }
 
-    async fn disconnect(&mut self) -> Result<()> {
-        self.client = None;
-        log::info!("Disconnected from Alpaca Market Data API");
-        Ok(())
+    fn disconnect(&mut self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            self.client = None;
+            log::info!("Disconnected from Alpaca Market Data API");
+            Ok(())
+        })
     }
 
     fn get_source_info(&self) -> SourceInfo {
@@ -153,53 +158,58 @@ impl RestApiMarketDataSource {
     }
 }
 
-#[async_trait::async_trait]
 impl DataSource for RestApiMarketDataSource {
-    async fn connect(&mut self) -> Result<()> {
-        self.client = Some(reqwest::Client::new());
-        log::info!("Connected to {} API", self.name);
-        Ok(())
+    fn connect(&mut self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            self.client = Some(reqwest::Client::new());
+            log::info!("Connected to {} API", self.name);
+            Ok(())
+        })
     }
 
-    async fn read_batch(&mut self) -> Result<Vec<DataPoint>> {
-        let client = self
-            .client
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("Not connected"))?;
+    fn read_batch(&mut self) -> BoxFuture<'_, Result<Vec<DataPoint>>> {
+        Box::pin(async move {
+            let client = self
+                .client
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("Not connected"))?;
 
-        let mut points = Vec::new();
+            let mut points = Vec::new();
 
-        for symbol in &self.symbols {
-            let url = format!("{}/{}", self.base_url, symbol);
+            for symbol in &self.symbols {
+                let url = format!("{}/{}", self.base_url, symbol);
 
-            let mut request = client.get(&url);
-            for (key, value) in &self.headers {
-                request = request.header(key, value);
-            }
+                let mut request = client.get(&url);
+                for (key, value) in &self.headers {
+                    request = request.header(key, value);
+                }
 
-            match request.send().await {
-                Ok(response) => {
-                    if let Ok(data) = response.json::<serde_json::Value>().await {
-                        if let Some(point) = (self.parse_fn)(symbol, &data) {
-                            points.push(point);
+                match request.send().await {
+                    Ok(response) => {
+                        if let Ok(data) = response.json::<serde_json::Value>().await {
+                            if let Some(point) = (self.parse_fn)(symbol, &data) {
+                                points.push(point);
+                            }
                         }
                     }
-                }
-                Err(e) => {
-                    log::warn!("Failed to fetch data for {}: {}", symbol, e);
+                    Err(e) => {
+                        log::warn!("Failed to fetch data for {}: {}", symbol, e);
+                    }
                 }
             }
-        }
 
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        Ok(points)
+            Ok(points)
+        })
     }
 
-    async fn disconnect(&mut self) -> Result<()> {
-        self.client = None;
-        log::info!("Disconnected from {} API", self.name);
-        Ok(())
+    fn disconnect(&mut self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            self.client = None;
+            log::info!("Disconnected from {} API", self.name);
+            Ok(())
+        })
     }
 
     fn get_source_info(&self) -> SourceInfo {
