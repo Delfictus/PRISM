@@ -33,6 +33,7 @@ rand = "0.8"
 rand_distr = "0.4"
 petgraph = "0.6"
 rayon = "1.7"
+clap = { version = "4.5", features = ["derive"] }
 
 # GPU and CUDA
 cudarc = { version = "0.9", optional = true }
@@ -69,6 +70,14 @@ tempfile = "3"
 [[bin]]
 name = "prism-ai"
 path = "foundation/lib.rs"
+
+[[bin]]
+name = "meta-flagsctl"
+path = "src/bin/meta_flagsctl.rs"
+
+[[bin]]
+name = "meta-ontologyctl"
+path = "src/bin/meta_ontologyctl.rs"
 
 # Examples
 [[example]]

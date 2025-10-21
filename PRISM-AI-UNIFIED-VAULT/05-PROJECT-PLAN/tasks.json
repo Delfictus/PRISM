@@ -33,7 +33,7 @@
     },
     {
       "id": "phase1",
-      "name": "Sprint 1 · Harden",
+      "name": "Sprint 1 \u00b7 Harden",
       "description": "Resolve production gaps and high-leverage adjustments.",
       "tasks": [
         {
@@ -106,7 +106,7 @@
     },
     {
       "id": "phase2",
-      "name": "Sprint 2 · Optimize",
+      "name": "Sprint 2 \u00b7 Optimize",
       "description": "Deliver advanced GPU path performance and stability.",
       "tasks": [
         {
@@ -155,7 +155,7 @@
     },
     {
       "id": "phase3",
-      "name": "Sprint 3 · Learn",
+      "name": "Sprint 3 \u00b7 Learn",
       "description": "Integrate RL/GNN components and adaptive fusion.",
       "tasks": [
         {
@@ -192,7 +192,7 @@
     },
     {
       "id": "phase4",
-      "name": "Sprint 4 · Explore",
+      "name": "Sprint 4 \u00b7 Explore",
       "description": "Pursue world-record DSJC1000.5 performance with advanced coupling.",
       "tasks": [
         {
@@ -266,268 +266,282 @@
     },
     {
       "id": "M0",
-      "name": "Phase M0 · Meta Foundations",
+      "name": "Phase M0 \u00b7 Meta Foundations",
       "description": "Lay the groundwork for the Meta Evolution Cycle (MEC) with flags, schemas, and compliance integration.",
       "tasks": [
         {
           "id": "M0-01",
           "title": "Publish MEC foundation RFC and charter",
           "source": "docs/rfc/RFC-M0-Meta-Foundations.md",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M0-02",
           "title": "Define meta feature flags and constitution addendum",
           "source": "00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M0-03",
           "title": "Finalize telemetry schema v1 with durability expectations",
           "source": "meta/telemetry/schema_v1.json",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M0-04",
           "title": "Add orchestrator and ontology service stubs",
           "source": "src/meta/orchestrator/mod.rs",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M0-05",
           "title": "Integrate meta CI hook into master executor",
           "source": "03-AUTOMATION/master_executor.py",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M0-06",
           "title": "Record governance sign-off and Merkle anchors",
           "source": "01-GOVERNANCE/META-GOVERNANCE-LOG.md",
-          "status": "pending"
+          "status": "done"
         }
-      ]
+      ],
+      "status": "ready",
+      "updated_at": "2025-10-21T17:53:18.502717+00:00"
     },
     {
       "id": "M1",
-      "name": "Phase M1 · Meta Orchestrator MVP",
+      "name": "Phase M1 \u00b7 Meta Orchestrator MVP",
       "description": "Deliver deterministic candidate generation, evaluation, and audit artifacts for the orchestrator.",
       "tasks": [
         {
           "id": "M1-01",
           "title": "Implement meta variant registry and genome scaffold",
           "source": "src/meta/registry.rs",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M1-02",
           "title": "Build deterministic evaluation loop and scoring heuristics",
           "source": "src/meta/orchestrator/mod.rs",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M1-03",
           "title": "Emit meta determinism manifest and telemetry payloads",
           "source": "artifacts/mec/M1/selection_report.json",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M1-04",
           "title": "Wire ci-meta-orchestrator pipeline into governance",
           "source": "scripts/run_full_check.sh",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M1-05",
           "title": "Ship meta bootstrap CLI and documentation",
           "source": "src/bin/meta_bootstrap.rs",
-          "status": "pending"
+          "status": "done"
         }
-      ]
+      ],
+      "status": "in_progress",
+      "updated_at": "2025-10-21T18:33:58.100868+00:00"
     },
     {
       "id": "M2",
-      "name": "Phase M2 · Ontology Integration",
+      "name": "Phase M2 \u00b7 Ontology Integration",
       "description": "Introduce semantic anchoring, ontology services, and compliance gating for knowledge alignment.",
       "tasks": [
         {
           "id": "M2-01",
           "title": "Stand up ontology service API and storage",
           "source": "src/meta/ontology/mod.rs",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M2-02",
           "title": "Implement alignment pipeline between variants and ontology",
           "source": "src/meta/ontology/alignment.rs",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M2-03",
           "title": "Extend determinism manifest with ontology hashes",
           "source": "determinism/meta/manifest_schema.json",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M2-04",
           "title": "Add governance gate for ontology approval workflow",
           "source": "01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M2-05",
           "title": "Publish ontology snapshot artifact and audit trail",
           "source": "artifacts/mec/M2/ontology_snapshot.json",
-          "status": "pending"
+          "status": "in_progress"
         }
-      ]
+      ],
+      "status": "in_progress",
+      "updated_at": "2025-10-21T13:30:47.290871+00:00"
     },
     {
       "id": "M3",
-      "name": "Phase M3 · Reflexive Feedback",
+      "name": "Phase M3 \u00b7 Reflexive Feedback",
       "description": "Enable reflex control loops, free-energy lattice metrics, and governance awareness of exploration modes.",
       "tasks": [
         {
           "id": "M3-01",
           "title": "Implement meta state model and reflexive controller",
           "source": "src/meta/reflexive/mod.rs",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M3-02",
           "title": "Instrument free-energy lattice snapshot telemetry",
           "source": "artifacts/mec/M3/lattice_report.json",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M3-03",
           "title": "Enforce governance guardrails for exploration vs strict modes",
           "source": "01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M3-04",
           "title": "Integrate lattice metrics into determinism manifest",
           "source": "determinism/meta/lattice_manifest.json",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M3-05",
           "title": "Update CI lattice pipeline and compliance validator",
           "source": "scripts/compliance_validator.py",
-          "status": "pending"
+          "status": "in_progress"
         }
-      ]
+      ],
+      "status": "in_progress",
+      "updated_at": "2025-10-21T13:30:47.290873+00:00"
     },
     {
       "id": "M4",
-      "name": "Phase M4 · Semantic Plasticity",
+      "name": "Phase M4 \u00b7 Semantic Plasticity",
       "description": "Deliver representation learning adapters, semantic drift detection, and explainability outputs.",
       "tasks": [
         {
           "id": "M4-01",
           "title": "Create representation adapters for ontology evolution",
           "source": "src/meta/plasticity/adapters.rs",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M4-02",
           "title": "Implement semantic drift detection and regression tests",
           "source": "tests/meta/semantic_plasticity.rs",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M4-03",
           "title": "Generate explainability reports for meta decisions",
           "source": "artifacts/mec/M4/explainability_report.md",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M4-04",
           "title": "Extend compliance validator with representation gate",
           "source": "scripts/compliance_validator.py",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M4-05",
           "title": "Document knowledge evolution runbooks",
           "source": "docs/runbooks/meta_rollout.md",
-          "status": "pending"
+          "status": "in_progress"
         }
-      ]
+      ],
+      "status": "in_progress",
+      "updated_at": "2025-10-21T13:30:47.290875+00:00"
     },
     {
       "id": "M5",
-      "name": "Phase M5 · Federated Readiness",
+      "name": "Phase M5 \u00b7 Federated Readiness",
       "description": "Prepare distributed orchestration, genome sharing, and hybrid deployment protocols.",
       "tasks": [
         {
           "id": "M5-01",
           "title": "Design genome sharing and federation protocol",
           "source": "docs/rfc/RFC-M5-Federated-Readiness.md",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M5-02",
           "title": "Implement distributed orchestrator interfaces",
           "source": "src/meta/federated/mod.rs",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M5-03",
           "title": "Simulate hybrid orchestration scenarios",
           "source": "artifacts/mec/M5/federated_plan.md",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M5-04",
           "title": "Extend compliance gates for federated modes",
           "source": "01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M5-05",
           "title": "Update runbooks with cross-site governance controls",
           "source": "docs/runbooks/meta_rollout.md",
-          "status": "pending"
+          "status": "in_progress"
         }
-      ]
+      ],
+      "status": "in_progress",
+      "updated_at": "2025-10-21T13:30:47.290876+00:00"
     },
     {
       "id": "M6",
-      "name": "Phase M6 · Hardening & Rollout",
+      "name": "Phase M6 \u00b7 Hardening & Rollout",
       "description": "Finalize documentation, observability, and production rollout approval for MEC.",
       "tasks": [
         {
           "id": "M6-01",
           "title": "Produce end-to-end rollout checklist and approvals",
           "source": "artifacts/mec/M6/rollout_checklist.md",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M6-02",
           "title": "Build observability dashboards and alarms for MEC",
           "source": "scripts/governance_dashboard.py",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M6-03",
           "title": "Harden backup and rollback automation",
           "source": "03-AUTOMATION/master_executor.py",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M6-04",
           "title": "Secure production feature flag gating",
           "source": "meta/meta_flags.json",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M6-05",
           "title": "Complete governance ratification and audit package",
           "source": "01-GOVERNANCE/META-GOVERNANCE-LOG.md",
-          "status": "pending"
+          "status": "in_progress"
         }
-      ]
+      ],
+      "status": "in_progress",
+      "updated_at": "2025-10-21T13:30:47.290878+00:00"
     }
   ]
 }

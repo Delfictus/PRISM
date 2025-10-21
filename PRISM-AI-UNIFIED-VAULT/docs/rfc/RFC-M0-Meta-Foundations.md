@@ -1,6 +1,6 @@
 # PRISM-AI RFC: Meta Foundations (Phase M0)
 
-**Status:** Draft  
+**Status:** Ratified  
 **Owner:** Meta Evolution Lead  
 **Last Updated:** 2025-10-21
 
@@ -25,10 +25,10 @@ Phase M0 establishes the groundwork for the Meta Evolution Cycle (MEC). The obje
 - Updates to `03-AUTOMATION/master_executor.py` for meta gating.
 - Signed entry in `01-GOVERNANCE/META-GOVERNANCE-LOG.md`.
 
-## Open Questions
+## Decisions
 
-- Which telemetry stages must be enforced beyond `ingest|orchestrate|evaluate`?
-- Do we require a dedicated storage backend for ontology snapshots in M0?
+- Telemetry coverage must include every enumerated stage (`bootstrap, ingest, orchestrate, evaluate, select, align, reflexive, plasticity, federated, rollout`) via `TELEMETRY_EXPECTED_STAGES`.
+- Ontology snapshots remain JSON artifacts anchored by Merkle proofs; no dedicated storage backend is required for M0.
 
 ## Acceptance Criteria
 

@@ -134,6 +134,27 @@ impl<T: ExistingModule> ConsensusEngine for ModuleAdapter<T> {
 }
 ```
 
+### **Section 3.3: Meta Feature Registry Operations**
+
+Meta Evolution feature flags SHALL be managed through the Merkle-backed registry in `src/features/meta_flags.rs`. All promotions MUST flow through the governance CLI and record artifacts for audit.
+
+```
+$ cargo run --bin meta-flagsctl -- status --json
+$ cargo run --bin meta-flagsctl -- shadow meta_generation \
+    --actor ops --planned 2025-11-01T00:00:00Z \
+    --rationale "Shadow activation rehearsal" --evidence s3://vault/shadow-plan.md
+$ cargo run --bin meta-flagsctl -- gradual ontology_bridge \
+    --actor ops --current-pct 10 --target-pct 60 --eta 2025-12-01T00:00:00Z \
+    --rationale "Ontology rollout" --evidence s3://vault/ontology-plan.md
+```
+
+**MANDATES**
+
+1. **No manual edits** to `meta/meta_flags.json`; all changes originate from `meta-flagsctl` which emits a new Merkle root + ledger entry.
+2. **All transitions recorded** in `artifacts/merkle/` and appended to `artifacts/audit/meta_flags.log` with actor, action, and justification.
+3. **Deterministic enforcement**: `meta_generation` MUST be enabled (or shadow) before MEC orchestrators run; the master executor publishes `reports/meta_flags_snapshot.json` each invocation.
+4. **Override bans**: direct environment overrides (`PRISM_OVERRIDE_*`) are escalation-only and require ticket IDs in the value; production launch requires their absence.
+
 ---
 
 ## **ARTICLE IV: AUTOMATED COMPLIANCE GATES**

@@ -71,7 +71,14 @@ def summarize(phases: Iterable[Dict[str, object]]) -> str:
             counts[task["status"]] = counts.get(task["status"], 0) + 1
 
         total = len(tasks)
-        lines.append(f"{phase['id']} · {phase['name']} ({total} tasks)")
+        status_label = phase.get("status")
+        updated_at = phase.get("updated_at")
+        header = f"{phase['id']} · {phase['name']} ({total} tasks)"
+        if status_label:
+            header += f" — status: {status_label}"
+        if updated_at:
+            header += f" · updated {updated_at}"
+        lines.append(header)
         lines.append(f"  pending: {counts['pending']} | in_progress: {counts['in_progress']} | blocked: {counts['blocked']} | done: {counts['done']}")
         for task in tasks:
             lines.append(f"    [{task['status']}] {task['id']} – {task['title']} ({task['source']})")

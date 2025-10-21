@@ -12,6 +12,8 @@ This overview stays pinned for quick orientation across the entire development t
 - **Governance Validator**: `scripts/compliance_validator.py`
 - **Master Executor**: `03-AUTOMATION/master_executor.py`
 - **Continuous Monitor**: `scripts/continuous_monitor.sh`
+- **Meta Governance Log**: `01-GOVERNANCE/META-GOVERNANCE-LOG.md`
+- **Meta RFCs & Runbooks**: `docs/rfc/`, `docs/runbooks/meta_rollout.md`
 
 ---
 
@@ -30,6 +32,10 @@ python3 scripts/task_monitor.py --watch 300 --run-compliance --strict
 
 - Update task statuses directly in `tasks.json` (`pending`, `in_progress`, `blocked`, `done`).
 - The monitor validates statuses and can trigger the compliance validator on demand.
+- Use the master executor to advance meta phases and regenerate dashboards:
+  ```bash
+  python3 03-AUTOMATION/master_executor.py --phase M0 --phase-only --strict
+  ```
 
 ---
 
@@ -43,6 +49,18 @@ python3 scripts/task_monitor.py --watch 300 --run-compliance --strict
 | Phase 3 | Learn | RL/ADP + GNN integration, adaptive fusion, learning uplift ≥10% |
 | Phase 4 | Explore | World-record DSJC1000.5 ≤ 82 colors, reproducibility audit |
 | Phase 5 | Continuous Ops | Monitoring, determinism rotation, benchmark upkeep |
+
+### **Meta Evolution Cycle**
+
+| Phase | Objective | Exit Criteria (excerpt) |
+|-------|-----------|-------------------------|
+| M0 Foundations | Charter, telemetry durability, feature flags | RFC published, schema v1 committed, governance log entry |
+| M1 Orchestrator MVP | Deterministic variant generation | Selection report + determinism manifest recorded |
+| M2 Ontology Integration | Semantic anchoring + ledger | Ontology snapshot, manifest hashes, governance approval |
+| M3 Reflexive Feedback | Free-energy lattice + reflex control | Lattice telemetry + compliance validator updates |
+| M4 Semantic Plasticity | Representation adapters + explainability | Explainability reports + representation gate |
+| M5 Federated Readiness | Distributed orchestration protocols | Federation RFC + simulator artifacts |
+| M6 Hardening & Rollout | Production gating + dashboards | Rollout runbook + observability automation |
 
 ---
 

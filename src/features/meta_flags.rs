@@ -8,6 +8,7 @@ use std::fmt::{self, Display};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use thiserror::Error;
 
@@ -39,15 +40,31 @@ pub enum MetaFeatureId {
 
 impl Display for MetaFeatureId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let label = match self {
+        f.write_str(self.as_str())
+    }
+}
+
+impl MetaFeatureId {
+    pub fn as_str(&self) -> &'static str {
+        match self {
             MetaFeatureId::MetaGeneration => "meta_generation",
             MetaFeatureId::OntologyBridge => "ontology_bridge",
             MetaFeatureId::FreeEnergySnapshots => "free_energy_snapshots",
             MetaFeatureId::SemanticPlasticity => "semantic_plasticity",
             MetaFeatureId::FederatedMeta => "federated_meta",
             MetaFeatureId::MetaProd => "meta_prod",
-        };
-        f.write_str(label)
+        }
+    }
+
+    pub fn variants() -> &'static [&'static str] {
+        &[
+            "meta_generation",
+            "ontology_bridge",
+            "free_energy_snapshots",
+            "semantic_plasticity",
+            "federated_meta",
+            "meta_prod",
+        ]
     }
 }
 
@@ -133,6 +150,27 @@ pub enum MetaFlagError {
 
     #[error("feature {0} is not enabled")]
     NotEnabled(MetaFeatureId),
+
+    #[error("unknown meta feature '{0}'")]
+    UnknownFeature(String),
+}
+
+impl FromStr for MetaFeatureId {
+    type Err = MetaFlagError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "meta_generation" | "meta-generation" => Ok(MetaFeatureId::MetaGeneration),
+            "ontology_bridge" | "ontology-bridge" => Ok(MetaFeatureId::OntologyBridge),
+            "free_energy_snapshots" | "free-energy-snapshots" => {
+                Ok(MetaFeatureId::FreeEnergySnapshots)
+            }
+            "semantic_plasticity" | "semantic-plasticity" => Ok(MetaFeatureId::SemanticPlasticity),
+            "federated_meta" | "federated-meta" => Ok(MetaFeatureId::FederatedMeta),
+            "meta_prod" | "meta-prod" => Ok(MetaFeatureId::MetaProd),
+            other => Err(MetaFlagError::UnknownFeature(other.to_string())),
+        }
+    }
 }
 
 #[derive(Clone)]

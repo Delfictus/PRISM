@@ -48,6 +48,21 @@ PRISM-AI-UNIFIED-VAULT/
 │   ├── PROTEIN-TESTS.md
 │   └── HIGH-LEVERAGE-IMPROVEMENTS.md [5 immediate impact changes]
 │
+├── 05-PROJECT-PLAN/                  [ROADMAP & TASKS]
+│   ├── MEC-SEQUENTIAL-PLAN.md
+│   ├── MULTI-PHASE-TODO.md
+│   └── tasks.json
+│
+├── docs/                             [OBSIDIAN ARTICLES]
+│   ├── rfc/                          [Phase RFCs – M0, M1, M5]
+│   └── runbooks/                     [Operational runbooks]
+│
+├── meta/                             [MEC LEDGER & FLAGS]
+│   ├── meta_flags.json
+│   ├── merkle/
+│   ├── ontology_ledger.jsonl
+│   └── telemetry/schema_v1.json
+│
 └── .obsidian/                        [VAULT CONFIG]
     └── config.json
 ```
@@ -57,7 +72,7 @@ PRISM-AI-UNIFIED-VAULT/
 ## **✅ WHAT'S INCLUDED**
 
 ### **Constitution & Governance**
-- [x] Implementation Constitution with 12 Articles
+- [x] Implementation Constitution with 14 Articles
 - [x] Zero-tolerance enforcement engine
 - [x] Automated compliance gates (6 active)
 - [x] Violation response system
@@ -85,6 +100,13 @@ PRISM-AI-UNIFIED-VAULT/
 - [x] Determinism manifest (enforces reproducibility)
 - [x] Protein acceptance numerics (AUROC ≥0.7 for funding)
 - [x] Telemetry durability (periodic fsync + alerts)
+
+### **Meta Evolution Cycle (MEC)**
+- [x] RFC stack (`docs/rfc/RFC-M0-Meta-Foundations.md`, `RFC-M1-Meta-Orchestrator.md`, `RFC-M5-Federated-Readiness.md`)
+- [x] Phase charter embedded in constitution (Article XII) with ledger + rollback mandates
+- [x] Master executor integrations for `--phase M0…M6` orchestration and compliance gating
+- [x] Telemetry schema v1 with durability + determinism extensions (`meta/telemetry/schema_v1.json`)
+- [x] Governance log + Merkle anchors in `01-GOVERNANCE/META-GOVERNANCE-LOG.md` and `artifacts/mec/`
 
 ### **Automation**
 - [x] Master executor script

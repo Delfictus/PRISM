@@ -1,16 +1,18 @@
 {
   "version": 1,
-  "generated_at": "2025-10-21T02:41:18.933773412Z",
-  "merkle_root": "99416c636d66af4b369b97a12b5d9c8ae577de1a3c1df0547c434259eb73914e",
+  "generated_at": "2025-10-21T19:33:11.741031255Z",
+  "merkle_root": "fcd2d87cbbb061c407c139b2ca10f0ffdf5b4b0fbb5b32b5adfe25f10f21a5bc",
   "records": [
     {
       "id": "meta_generation",
       "state": {
-        "mode": "disabled"
+        "mode": "shadow",
+        "actor": "bootstrap",
+        "planned_activation": "2025-10-21T19:33:11.741026670Z"
       },
-      "updated_at": "2025-10-21T02:41:18.933637665Z",
+      "updated_at": "2025-10-21T19:33:11.741026964Z",
       "updated_by": "bootstrap",
-      "rationale": "Initial baseline",
+      "rationale": "enable meta_generation for sample run",
       "evidence_uri": null
     },
     {
@@ -66,6 +68,6 @@
   ],
   "invariant_snapshot": {
     "enforced": [],
-    "generation_entropy": "cfcd0be08b684016ecdb13b6906f9a727b795df84d078d8f8c7313d90a5c1e47"
+    "generation_entropy": "b79d799610dfc52c97fca297db87cd1e90c43593acf488d149f8e0ece9e7fa10"
   }
 }
