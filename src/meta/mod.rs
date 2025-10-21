@@ -4,4 +4,7 @@ pub mod ontology;
 pub mod orchestrator;
 
 pub use ontology::{ConceptAnchor, OntologyDigest, OntologyLedger};
-pub use orchestrator::{EvolutionPlan, MetaOrchestrator, VariantGenome, VariantParameter};
+pub use orchestrator::{
+    EvolutionMetrics, EvolutionOutcome, EvolutionPlan, MetaOrchestrator, VariantEvaluation,
+    VariantGenome, VariantParameter,
+};

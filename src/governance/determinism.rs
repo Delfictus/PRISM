@@ -235,6 +235,10 @@ impl DeterminismRecorder {
         self.proof.record_output(value)
     }
 
+    pub fn attach_meta(&mut self, meta: MetaDeterminism) {
+        self.proof.meta = Some(meta);
+    }
+
     pub fn finalize(self) -> DeterminismProof {
         self.proof
     }
