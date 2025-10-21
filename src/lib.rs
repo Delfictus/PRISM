@@ -6,7 +6,9 @@
 pub mod cma;
 pub mod cuda;
 pub mod data;
+pub mod features;
 pub mod governance;
+pub mod meta;
 pub mod neuromorphic;
 pub mod phase6;
 pub mod quantum;

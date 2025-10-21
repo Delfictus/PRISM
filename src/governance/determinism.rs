@@ -26,6 +26,7 @@ pub struct DeterminismProof {
     pub intermediate_hashes: Vec<IntermediateHash>,
     pub timestamp: DateTime<Utc>,
     pub environment: EnvironmentFingerprint,
+    pub meta: Option<MetaDeterminism>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -41,6 +42,14 @@ pub struct EnvironmentFingerprint {
     pub driver_version: Option<String>,
     pub rust_version: Option<String>,
     pub feature_flags: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MetaDeterminism {
+    pub meta_genome_hash: String,
+    pub meta_merkle_root: String,
+    pub ontology_hash: Option<String>,
+    pub free_energy_hash: Option<String>,
 }
 
 impl EnvironmentFingerprint {
@@ -90,6 +99,7 @@ impl DeterminismProof {
             intermediate_hashes: Vec::new(),
             timestamp: Utc::now(),
             environment: EnvironmentFingerprint::capture(),
+            meta: None,
         };
         proof.derive_component_seeds();
         proof
@@ -115,6 +125,10 @@ impl DeterminismProof {
     pub fn record_output<T: Serialize>(&mut self, value: &T) -> Result<()> {
         self.output_hash = compute_hash(value)?;
         Ok(())
+    }
+
+    pub fn attach_meta(&mut self, meta: MetaDeterminism) {
+        self.meta = Some(meta);
     }
 
     pub fn record_intermediate<T: Serialize>(

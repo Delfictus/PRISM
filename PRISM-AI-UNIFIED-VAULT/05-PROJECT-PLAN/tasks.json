@@ -64,43 +64,43 @@
           "id": "P1-05",
           "title": "Sprint gate automation",
           "source": "04-ADJUSTMENTS/SPRINT-GATES.md",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "P1-06",
           "title": "Protein acceptance suite",
           "source": "04-ADJUSTMENTS/PROTEIN-TESTS.md",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "P1-07",
           "title": "WMMA pad-and-scatter safeguard",
           "source": "04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "P1-08",
           "title": "Gate-governance bridge",
           "source": "04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "P1-09",
           "title": "Determinism manifest embedding",
           "source": "04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "P1-10",
           "title": "Protein numerics hardening",
           "source": "04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "P1-11",
           "title": "Telemetry durability enhancements",
           "source": "04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },

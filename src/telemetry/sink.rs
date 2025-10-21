@@ -16,6 +16,6 @@ impl TelemetrySink {
     }
 
     pub fn log(&self, entry: &TelemetryEntry) {
-        self.logger.log(entry);
+        self.logger.log_telemetry_entry(entry);
     }
 }

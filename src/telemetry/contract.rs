@@ -56,16 +56,72 @@ pub enum EventLevel {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum EventData {
-    AdapterStarted { description: String },
-    AdapterProcessed { items: usize, duration_ms: f64 },
-    AdapterFailed { error: String },
-    PathDecision { details: String },
-    Custom { payload: serde_json::Value },
+    AdapterStarted {
+        description: String,
+    },
+    AdapterProcessed {
+        items: usize,
+        duration_ms: f64,
+    },
+    AdapterFailed {
+        error: String,
+    },
+    PathDecision {
+        details: String,
+    },
+    AdapterStopped {
+        reason: String,
+    },
+    ProcessingStarted {
+        graph_size: usize,
+        edges: usize,
+        strategy: String,
+    },
+    ProcessingCompleted {
+        colors_used: u32,
+        duration_ms: f64,
+        iterations: usize,
+    },
+    ProcessingFailed {
+        error: String,
+        recoverable: bool,
+    },
+    ConsensusProposed {
+        vertex: usize,
+        proposed_color: u32,
+        confidence: f64,
+    },
+    ConsensusReached {
+        vertex: usize,
+        final_color: u32,
+        agreement_score: f64,
+    },
+    ConsensusConflict {
+        vertex: usize,
+        proposals: Vec<(ComponentId, u32)>,
+    },
+    MemoryAllocation {
+        bytes: usize,
+        purpose: String,
+    },
+    MemoryPressure {
+        used_mb: usize,
+        available_mb: usize,
+    },
+    PerformanceCheckpoint {
+        phase: String,
+        elapsed_ms: f64,
+        progress_pct: f64,
+    },
+    Custom {
+        payload: serde_json::Value,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Metrics {
     pub cpu_usage_pct: Option<f32>,
+    pub gpu_usage_pct: Option<f32>,
     pub memory_mb: Option<usize>,
     pub gpu_memory_mb: Option<usize>,
     pub throughput_per_sec: Option<f64>,

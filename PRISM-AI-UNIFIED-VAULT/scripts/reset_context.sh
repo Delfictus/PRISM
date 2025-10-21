@@ -54,6 +54,26 @@ status_snapshot() {
   python3 "${ROOT}/scripts/task_monitor.py" --once
 }
 
+meta_snapshot() {
+  echo ":: Meta feature registry snapshot"
+  local registry="${ROOT}/meta/meta_flags.json"
+  if [[ ! -f "${registry}" ]]; then
+    echo "   (meta registry not initialized yet)"
+    return
+  fi
+  REGISTRY_PATH="${registry}" python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+registry_path = Path(os.environ["REGISTRY_PATH"])
+data = json.loads(registry_path.read_text())
+for record in sorted(data["records"], key=lambda r: r["id"]):
+    state = record["state"]["mode"]
+    print(f"   {record['id']:>24s} -> {state}")
+PY
+}
+
 compliance_run() {
   echo ":: Running compliance validator"
   python3 "${ROOT}/scripts/compliance_validator.py" ${STRICT_FLAG}
@@ -72,6 +92,7 @@ show_git_status() {
 cleanup
 benchmark_check
 status_snapshot
+meta_snapshot
 compliance_run
 master_executor
 show_git_status

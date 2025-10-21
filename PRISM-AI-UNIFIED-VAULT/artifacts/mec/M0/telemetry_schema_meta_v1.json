@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PRISM Meta Telemetry v1",
+  "type": "object",
+  "properties": {
+    "meta_variant": {
+      "type": "object",
+      "required": [
+        "genome_hash",
+        "determinism_manifest",
+        "flags",
+        "free_energy",
+        "ontology"
+      ],
+      "properties": {
+        "genome_hash": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "parent_hash": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "determinism_manifest": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "meta_generation",
+              "ontology_bridge",
+              "free_energy_snapshots",
+              "semantic_plasticity",
+              "federated_meta",
+              "meta_prod"
+            ]
+          }
+        },
+        "free_energy": {
+          "type": "object",
+          "required": [
+            "lattice_norm",
+            "mode_confidence",
+            "divergence"
+          ],
+          "properties": {
+            "lattice_norm": { "type": "number" },
+            "mode_confidence": { "type": "number" },
+            "divergence": { "type": "number" }
+          }
+        },
+        "ontology": {
+          "type": "object",
+          "required": ["concept_id", "version"],
+          "properties": {
+            "concept_id": { "type": "string" },
+            "version": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$"
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": ["meta_variant"],
+  "additionalProperties": true
+}

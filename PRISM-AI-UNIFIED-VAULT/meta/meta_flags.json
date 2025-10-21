@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "generated_at": "2025-10-21T02:41:18.933773412Z",
+  "merkle_root": "99416c636d66af4b369b97a12b5d9c8ae577de1a3c1df0547c434259eb73914e",
+  "records": [
+    {
+      "id": "meta_generation",
+      "state": {
+        "mode": "disabled"
+      },
+      "updated_at": "2025-10-21T02:41:18.933637665Z",
+      "updated_by": "bootstrap",
+      "rationale": "Initial baseline",
+      "evidence_uri": null
+    },
+    {
+      "id": "ontology_bridge",
+      "state": {
+        "mode": "disabled"
+      },
+      "updated_at": "2025-10-21T02:41:18.933637665Z",
+      "updated_by": "bootstrap",
+      "rationale": "Initial baseline",
+      "evidence_uri": null
+    },
+    {
+      "id": "free_energy_snapshots",
+      "state": {
+        "mode": "disabled"
+      },
+      "updated_at": "2025-10-21T02:41:18.933637665Z",
+      "updated_by": "bootstrap",
+      "rationale": "Initial baseline",
+      "evidence_uri": null
+    },
+    {
+      "id": "semantic_plasticity",
+      "state": {
+        "mode": "disabled"
+      },
+      "updated_at": "2025-10-21T02:41:18.933637665Z",
+      "updated_by": "bootstrap",
+      "rationale": "Initial baseline",
+      "evidence_uri": null
+    },
+    {
+      "id": "federated_meta",
+      "state": {
+        "mode": "disabled"
+      },
+      "updated_at": "2025-10-21T02:41:18.933637665Z",
+      "updated_by": "bootstrap",
+      "rationale": "Initial baseline",
+      "evidence_uri": null
+    },
+    {
+      "id": "meta_prod",
+      "state": {
+        "mode": "disabled"
+      },
+      "updated_at": "2025-10-21T02:41:18.933637665Z",
+      "updated_by": "bootstrap",
+      "rationale": "Initial baseline",
+      "evidence_uri": null
+    }
+  ],
+  "invariant_snapshot": {
+    "enforced": [],
+    "generation_entropy": "cfcd0be08b684016ecdb13b6906f9a727b795df84d078d8f8c7313d90a5c1e47"
+  }
+}

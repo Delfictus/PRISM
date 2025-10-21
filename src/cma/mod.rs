@@ -56,6 +56,7 @@ impl TelemetryProvider for CMAAdapter {
     fn capture_metrics(&self) -> Option<Metrics> {
         Some(Metrics {
             cpu_usage_pct: None,
+            gpu_usage_pct: None,
             memory_mb: None,
             gpu_memory_mb: None,
             throughput_per_sec: None,

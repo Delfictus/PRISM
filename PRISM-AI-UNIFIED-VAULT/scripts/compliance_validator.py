@@ -9,6 +9,7 @@ inspecting documentation, governance manifests, and execution artifacts.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from dataclasses import dataclass, asdict, field
@@ -75,6 +76,17 @@ CRITICAL_ARTIFACTS = {
     "graph_capture",
     "graph_exec",
     "determinism_manifest",
+}
+
+META_REGISTRY_PATH = Path("meta/meta_flags.json")
+META_SCHEMA_PATH = Path("telemetry/schema/meta_v1.json")
+REQUIRED_META_FLAGS = {
+    "meta_generation",
+    "ontology_bridge",
+    "free_energy_snapshots",
+    "semantic_plasticity",
+    "federated_meta",
+    "meta_prod",
 }
 
 
@@ -351,6 +363,148 @@ def evaluate_artifact_presence(report: ComplianceReport, base: Path, allow_missi
             )
 
 
+def compute_meta_merkle(records: Sequence[Dict[str, object]]) -> str:
+    if not records:
+        return hashlib.sha256(b"meta-empty").hexdigest()
+
+    leaves = []
+    for record in records:
+        payload = json.dumps(record, separators=(",", ":")).encode("utf-8")
+        leaves.append(hashlib.sha256(payload).digest())
+    leaves.sort()
+
+    working = leaves
+    while len(working) > 1:
+        next_level = []
+        for idx in range(0, len(working), 2):
+            left = working[idx]
+            right = working[idx + 1] if idx + 1 < len(working) else working[idx]
+            next_level.append(hashlib.sha256(left + right).digest())
+        working = next_level
+
+    return working[0].hex()
+
+
+def evaluate_meta_contract(report: ComplianceReport, base: Path) -> None:
+    schema_path = base / META_SCHEMA_PATH
+    if not schema_path.exists():
+        report.add(
+            Finding(
+                item="meta:schema",
+                status="FAIL",
+                severity="CRITICAL",
+                message=f"Meta telemetry schema missing: {schema_path}",
+            )
+        )
+    else:
+        report.add(
+            Finding(
+                item="meta:schema",
+                status="PASS",
+                severity="INFO",
+                message="Meta telemetry schema present.",
+            )
+        )
+
+    registry_path = base / META_REGISTRY_PATH
+    if not registry_path.exists():
+        report.add(
+            Finding(
+                item="meta:registry",
+                status="FAIL",
+                severity="CRITICAL",
+                message=f"Meta feature registry missing: {registry_path}",
+            )
+        )
+        return
+
+    data = load_json(registry_path)
+    if data is None:
+        report.add(
+            Finding(
+                item="meta:registry",
+                status="FAIL",
+                severity="CRITICAL",
+                message="Meta feature registry unreadable.",
+            )
+        )
+        return
+
+    records = data.get("records")
+    if not isinstance(records, list):
+        report.add(
+            Finding(
+                item="meta:registry",
+                status="FAIL",
+                severity="CRITICAL",
+                message="Meta feature registry malformed (records missing).",
+            )
+        )
+        return
+
+    observed_flags = {record.get("id") for record in records}
+    missing = REQUIRED_META_FLAGS - observed_flags
+    if missing:
+        report.add(
+            Finding(
+                item="meta:registry_flags",
+                status="FAIL",
+                severity="CRITICAL",
+                message=f"Meta registry missing flags: {', '.join(sorted(missing))}",
+            )
+        )
+    else:
+        report.add(
+            Finding(
+                item="meta:registry_flags",
+                status="PASS",
+                severity="INFO",
+                message="All required meta feature flags present.",
+            )
+        )
+
+    expected_root = compute_meta_merkle(records)
+    actual_root = data.get("merkle_root")
+    if actual_root != expected_root:
+        report.add(
+            Finding(
+                item="meta:merkle",
+                status="FAIL",
+                severity="BLOCKER",
+                message=f"Meta registry Merkle mismatch (expected {expected_root}, got {actual_root}).",
+            )
+        )
+    else:
+        report.add(
+            Finding(
+                item="meta:merkle",
+                status="PASS",
+                severity="INFO",
+                message="Meta registry Merkle root verified.",
+            )
+        )
+
+    invariants = data.get("invariant_snapshot", {})
+    entropy = invariants.get("generation_entropy")
+    if not entropy:
+        report.add(
+            Finding(
+                item="meta:invariants",
+                status="FAIL",
+                severity="WARNING",
+                message="Meta invariant snapshot missing entropy hash.",
+            )
+        )
+    else:
+        report.add(
+            Finding(
+                item="meta:invariants",
+                status="PASS",
+                severity="INFO",
+                message="Meta invariant snapshot present.",
+            )
+        )
+
 def evaluate_task_manifest(report: ComplianceReport) -> None:
     if not TASKS_PATH.exists():
         report.add(
@@ -530,6 +684,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     evaluate_artifact_presence(report, base, args.allow_missing_artifacts)
     evaluate_advanced_manifest(report, base / ARTIFACT_PATHS["advanced_manifest"])
+    evaluate_meta_contract(report, base)
 
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

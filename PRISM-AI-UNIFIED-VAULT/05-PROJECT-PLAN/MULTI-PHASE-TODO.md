@@ -26,13 +26,13 @@ Ordered tasks address the six production gaps, then high-leverage upgrades.
 | 1.2 | Create benchmark manifest with checksums & regression gates | `04-ADJUSTMENTS/BENCHMARK-MANIFEST.md` | done |
 | 1.3 | Add device-aware guards & path decision telemetry | `04-ADJUSTMENTS/DEVICE-AWARE-GUARDS.md` | done |
 | 1.4 | Enforce unified telemetry contract across adapters | `04-ADJUSTMENTS/TELEMETRY-CONTRACT.md` | done |
-| 1.5 | Activate sprint gate feature-lock automation | `04-ADJUSTMENTS/SPRINT-GATES.md` | ☐ pending |
-| 1.6 | Ship protein acceptance harness + AUROC thresholds | `04-ADJUSTMENTS/PROTEIN-TESTS.md` | ☐ pending |
-| 1.7 | Enable WMMA pad-and-scatter safeguards (Tensor Core) | `04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md` | ☐ pending |
-| 1.8 | Bridge CI gates to governance violation pipeline | `04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md` | ☐ pending |
-| 1.9 | Embed determinism manifest in all result payloads | `04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md` | ☐ pending |
-| 1.10 | Harden protein numerics (AUROC ≥0.7) | `04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md` | ☐ pending |
-| 1.11 | Add telemetry durability (fsync + alerts) | `04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md` | ☐ pending |
+| 1.5 | Activate sprint gate feature-lock automation | `04-ADJUSTMENTS/SPRINT-GATES.md` | done |
+| 1.6 | Ship protein acceptance harness + AUROC thresholds | `04-ADJUSTMENTS/PROTEIN-TESTS.md` | done |
+| 1.7 | Enable WMMA pad-and-scatter safeguards (Tensor Core) | `04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md` | done |
+| 1.8 | Bridge CI gates to governance violation pipeline | `04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md` | done |
+| 1.9 | Embed determinism manifest in all result payloads | `04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md` | done |
+| 1.10 | Harden protein numerics (AUROC ≥0.7) | `04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md` | done |
+| 1.11 | Add telemetry durability (fsync + alerts) | `04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md` | done |
 
 Exit criteria: no hard limits, ≥64-color support, dense path guarded, determinism replay passes.
 
