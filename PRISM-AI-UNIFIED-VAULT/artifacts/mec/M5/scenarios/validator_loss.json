@@ -1,0 +1,12 @@
+{
+  "name": "validator-loss",
+  "quorum": 3,
+  "max_ledger_drift": 4,
+  "epoch_start": 20,
+  "nodes": [
+    { "id": "validator-a", "region": "us-west", "role": "core", "stake": 6 },
+    { "id": "validator-b", "region": "eu-central", "role": "core", "stake": 5 },
+    { "id": "validator-c", "region": "us-east", "role": "core", "stake": 4 },
+    { "id": "edge-e", "region": "ap-northeast", "role": "edge", "stake": 3 }
+  ]
+}

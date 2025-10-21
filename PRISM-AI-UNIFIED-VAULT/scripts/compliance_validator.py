@@ -19,13 +19,17 @@ from typing import Dict, List, Optional, Sequence
 
 try:
     from . import vault_root  # type: ignore
+    from . import worktree_root  # type: ignore
 except ImportError:
     sys.path.append(str(Path(__file__).resolve().parents[1]))
     from scripts import vault_root  # type: ignore
+    from scripts import worktree_root  # type: ignore
 
 
-TASKS_PATH = vault_root() / "05-PROJECT-PLAN" / "tasks.json"
-PROJECT_OVERVIEW_PATH = vault_root() / "PROJECT-OVERVIEW.md"
+VAULT_ROOT = vault_root()
+WORKTREE_ROOT = worktree_root()
+TASKS_PATH = VAULT_ROOT / "05-PROJECT-PLAN" / "tasks.json"
+PROJECT_OVERVIEW_PATH = VAULT_ROOT / "PROJECT-OVERVIEW.md"
 ALLOWED_STATUSES = {"pending", "in_progress", "blocked", "done"}
 
 ADVANCED_KEYWORDS: Dict[str, Sequence[str]] = {
@@ -89,6 +93,11 @@ REQUIRED_META_FLAGS = {
     "meta_prod",
 }
 
+FEDERATION_PLAN_PATH = Path("artifacts/mec/M5/federated_plan.md")
+FEDERATION_SUMMARY_PATH = Path("artifacts/mec/M5/simulations/epoch_summary.json")
+FEDERATION_LEDGER_DIR = Path("artifacts/mec/M5/ledger")
+FEDERATION_SCENARIO_DIR = Path("artifacts/mec/M5/scenarios")
+
 
 @dataclass
 class Finding:
@@ -107,6 +116,8 @@ class ComplianceReport:
 
     timestamp: str
     strict: bool
+    worktree_root: str
+    vault_root: str
     findings: List[Finding] = field(default_factory=list)
 
     def add(self, finding: Finding) -> None:
@@ -121,6 +132,8 @@ class ComplianceReport:
         return {
             "timestamp": self.timestamp,
             "strict": self.strict,
+            "worktree_root": self.worktree_root,
+            "vault_root": self.vault_root,
             "passed": self.passed,
             "findings": [asdict(f) for f in self.findings],
         }
@@ -385,6 +398,53 @@ def compute_meta_merkle(records: Sequence[Dict[str, object]]) -> str:
     return working[0].hex()
 
 
+def fnv1a64(value: str) -> int:
+    offset = 0xCBF29CE484222325
+    prime = 0x100000001B3
+    hash_val = offset
+    for byte in value.encode("utf-8"):
+        hash_val ^= byte
+        hash_val = (hash_val * prime) & 0xFFFFFFFFFFFFFFFF
+    return hash_val
+
+
+def compute_ledger_merkle(entries: Sequence[Dict[str, object]]) -> str:
+    if not entries:
+        return f"{fnv1a64('ledger-empty'):016x}"
+
+    leaves = []
+    for entry in entries:
+        node = entry.get("node_id", "")
+        anchor = entry.get("anchor_hash", "")
+        leaves.append(f"{fnv1a64(f'{node}:{anchor}'):016x}")
+    leaves.sort()
+
+    level = leaves
+    while len(level) > 1:
+        next_level: List[str] = []
+        for idx in range(0, len(level), 2):
+            left = level[idx]
+            right = level[idx + 1] if idx + 1 < len(level) else level[idx]
+            next_level.append(f"{fnv1a64(left + right):016x}")
+        level = next_level
+    return level[0]
+
+
+def compute_summary_signature(roots: Sequence[str]) -> str:
+    if not roots:
+        return f"{fnv1a64('summary-empty'):016x}"
+
+    level = sorted(f"{fnv1a64(root):016x}" for root in roots)
+    while len(level) > 1:
+        next_level: List[str] = []
+        for idx in range(0, len(level), 2):
+            left = level[idx]
+            right = level[idx + 1] if idx + 1 < len(level) else level[idx]
+            next_level.append(f"{fnv1a64(left + right):016x}")
+        level = next_level
+    return level[0]
+
+
 def evaluate_meta_contract(report: ComplianceReport, base: Path) -> None:
     schema_path = base / META_SCHEMA_PATH
     if not schema_path.exists():
@@ -504,6 +564,383 @@ def evaluate_meta_contract(report: ComplianceReport, base: Path) -> None:
                 message="Meta invariant snapshot present.",
             )
         )
+
+
+def evaluate_federated_artifacts(report: ComplianceReport, base: Path) -> None:
+    plan_path = base / FEDERATION_PLAN_PATH
+    if not plan_path.exists():
+        report.add(
+            Finding(
+                item="federation:plan",
+                status="FAIL",
+                severity="CRITICAL",
+                message=f"Federation execution plan missing: {plan_path}",
+            )
+        )
+    else:
+        report.add(
+            Finding(
+                item="federation:plan",
+                status="PASS",
+                severity="INFO",
+                message="Federation plan present.",
+            )
+        )
+
+    summary_path = base / FEDERATION_SUMMARY_PATH
+    summary = load_json(summary_path)
+    if summary is None:
+        report.add(
+            Finding(
+                item="federation:summary",
+                status="FAIL",
+                severity="CRITICAL",
+                message=f"Federated simulation summary missing or invalid: {summary_path}",
+            )
+        )
+        return
+
+    epochs = summary.get("epochs")
+    epoch_count = summary.get("epoch_count")
+    declared_merkle: Dict[int, str] = {}
+    merkle_roots: List[str] = []
+    if not isinstance(epochs, list) or not epochs:
+        report.add(
+            Finding(
+                item="federation:summary:epochs",
+                status="FAIL",
+                severity="CRITICAL",
+                message="Federated summary must include a non-empty list of epochs.",
+            )
+        )
+    else:
+        if epoch_count is not None and epoch_count != len(epochs):
+            report.add(
+                Finding(
+                    item="federation:summary:epoch_count",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message=f"Epoch count mismatch (declared {epoch_count}, actual {len(epochs)}).",
+                )
+            )
+        else:
+            report.add(
+                Finding(
+                    item="federation:summary:epoch_count",
+                    status="PASS",
+                    severity="INFO",
+                    message=f"Federated summary reports {len(epochs)} epochs.",
+                )
+            )
+
+        for entry in epochs:
+            if not isinstance(entry, dict):
+                continue
+            epoch_value = entry.get("epoch")
+            merkle_value = entry.get("ledger_merkle")
+            signature_value = entry.get("signature")
+            if not isinstance(epoch_value, int) or merkle_value is None:
+                report.add(
+                    Finding(
+                        item="federation:summary:ledger_merkle",
+                        status="FAIL",
+                        severity="CRITICAL",
+                        message="Federated summary must provide ledger_merkle per epoch.",
+                    )
+                )
+                declared_merkle.clear()
+                merkle_roots.clear()
+                break
+            merkle_str = str(merkle_value)
+            declared_merkle[epoch_value] = merkle_str
+            merkle_roots.append(merkle_str)
+            if signature_value is None or str(signature_value) != merkle_str:
+                report.add(
+                    Finding(
+                        item="federation:summary:signature",
+                        status="FAIL",
+                        severity="CRITICAL",
+                        message=f"Summary signature mismatch for epoch {epoch_value}.",
+                    )
+                )
+
+    if merkle_roots:
+        declared_summary_sig = summary.get("summary_signature")
+        expected_summary_sig = compute_summary_signature(merkle_roots)
+        if declared_summary_sig != expected_summary_sig:
+            report.add(
+                Finding(
+                    item="federation:summary:signature",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message=f"Summary signature mismatch (declared {declared_summary_sig}, expected {expected_summary_sig}).",
+                )
+            )
+        else:
+            report.add(
+                Finding(
+                    item="federation:summary:signature",
+                    status="PASS",
+                    severity="INFO",
+                    message="Summary signature verified.",
+                )
+            )
+
+    ledger_dir = base / FEDERATION_LEDGER_DIR
+    if not ledger_dir.exists():
+        report.add(
+            Finding(
+                item="federation:ledger",
+                status="FAIL",
+                severity="CRITICAL",
+                message=f"Federated ledger directory missing: {ledger_dir}",
+            )
+        )
+        return
+
+    ledger_files = sorted(p for p in ledger_dir.rglob("epoch_*.json") if p.is_file())
+    if not ledger_files:
+        report.add(
+            Finding(
+                item="federation:ledger",
+                status="FAIL",
+                severity="CRITICAL",
+                message="Federated ledger directory contains no epoch files.",
+            )
+        )
+        return
+
+    expected_epochs = set(declared_merkle.keys())
+    if not expected_epochs and isinstance(epochs, list):
+        for entry in epochs:
+            if isinstance(entry, dict):
+                val = entry.get("epoch")
+                if isinstance(val, int):
+                    expected_epochs.add(val)
+
+    found_epochs = set()
+    recomputed_merkle: Dict[int, str] = {}
+    for path in ledger_files:
+        parts = path.stem.split("_")
+        try:
+            epoch = int(parts[-1])
+            found_epochs.add(epoch)
+        except ValueError:
+            report.add(
+                Finding(
+                    item="federation:ledger:naming",
+                    status="FAIL",
+                    severity="WARNING",
+                    message=f"Ledger file has unexpected name format: {path.name}",
+                )
+            )
+            continue
+
+        data = load_json(path)
+        if data is None:
+            report.add(
+                Finding(
+                    item="federation:ledger:read",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message=f"Ledger file unreadable: {path}",
+                )
+            )
+            continue
+        entries = data.get("entries", [])
+        if not isinstance(entries, list) or not entries:
+            report.add(
+                Finding(
+                    item="federation:ledger:entries",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message=f"Ledger file missing entries: {path}",
+                )
+            )
+            continue
+        computed_root = compute_ledger_merkle(entries)
+        file_root = data.get("merkle_root")
+        if file_root != computed_root:
+            report.add(
+                Finding(
+                    item="federation:ledger:merkle",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message=f"Ledger merkle mismatch for epoch {epoch}: expected {computed_root}, found {file_root}",
+                )
+            )
+        recomputed_merkle[epoch] = computed_root
+
+    if expected_epochs:
+        missing_epochs = sorted(expected_epochs - found_epochs)
+        if missing_epochs:
+            report.add(
+                Finding(
+                    item="federation:ledger:coverage",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message=f"Ledger missing epochs: {', '.join(map(str, missing_epochs))}",
+                )
+            )
+        else:
+            report.add(
+                Finding(
+                    item="federation:ledger:coverage",
+                    status="PASS",
+                    severity="INFO",
+                    message="Ledger contains entries for all simulated epochs.",
+                )
+            )
+    else:
+        report.add(
+            Finding(
+                item="federation:ledger:coverage",
+                status="PASS",
+                severity="INFO",
+                message="Ledger files present; summary did not declare explicit epochs.",
+            )
+        )
+
+    scenario_dir = base / FEDERATION_SCENARIO_DIR
+    if scenario_dir.exists():
+        for scenario in sorted(p for p in scenario_dir.glob('*.json')):
+            label = scenario.stem
+            if label == 'baseline':
+                summary_path = base / FEDERATION_SUMMARY_PATH
+                ledger_path = ledger_dir
+                expected_label = 'default'
+            else:
+                summary_path = (base / FEDERATION_SUMMARY_PATH).parent / f'epoch_summary_{label}.json'
+                ledger_path = ledger_dir / label
+                expected_label = label
+
+            summary_data = load_json(summary_path) if summary_path.exists() else None
+            if summary_data is None:
+                report.add(
+                    Finding(
+                        item=f'federation:scenario:{label}:summary',
+                        status='FAIL',
+                        severity='CRITICAL',
+                        message=f'Missing or invalid federated summary for scenario {label}: {summary_path}',
+                    )
+                )
+            else:
+                reported_label = summary_data.get('label')
+                if reported_label != expected_label:
+                    report.add(
+                        Finding(
+                            item=f'federation:scenario:{label}:label',
+                            status='FAIL',
+                            severity='CRITICAL',
+                            message=(
+                                'Summary label mismatch for scenario '
+                                f"{label}: expected {expected_label}, found {reported_label}"
+                            ),
+                        )
+                    )
+
+                epochs_data = summary_data.get('epochs', [])
+                scenario_roots: List[str] = []
+                if isinstance(epochs_data, list):
+                    for entry in epochs_data:
+                        if not isinstance(entry, dict):
+                            continue
+                        merkle = entry.get('ledger_merkle')
+                        signature = entry.get('signature')
+                        if merkle is None or signature is None or str(signature) != str(merkle):
+                            report.add(
+                                Finding(
+                                    item=f'federation:scenario:{label}:epoch_signature',
+                                    status='FAIL',
+                                    severity='CRITICAL',
+                                    message=f'Scenario {label} epoch entry missing signature alignment.',
+                                )
+                            )
+                            scenario_roots.clear()
+                            break
+                        scenario_roots.append(str(merkle))
+
+                if scenario_roots:
+                    declared_sig = summary_data.get('summary_signature')
+                    expected_sig = compute_summary_signature(scenario_roots)
+                    if declared_sig != expected_sig:
+                        report.add(
+                            Finding(
+                                item=f'federation:scenario:{label}:summary_signature',
+                                status='FAIL',
+                                severity='CRITICAL',
+                                message=(
+                                    f'Scenario {label} summary signature mismatch '
+                                    f'(declared {declared_sig}, expected {expected_sig}).'
+                                ),
+                            )
+                        )
+                    else:
+                        report.add(
+                            Finding(
+                                item=f'federation:scenario:{label}:summary_signature',
+                                status='PASS',
+                                severity='INFO',
+                                message=f'Scenario {label} summary signature verified.',
+                            )
+                        )
+
+                report.add(
+                    Finding(
+                        item=f'federation:scenario:{label}:summary',
+                        status='PASS',
+                        severity='INFO',
+                        message=f'Federated summary present for scenario {label}.',
+                    )
+                )
+
+            if not ledger_path.exists():
+                report.add(
+                    Finding(
+                        item=f'federation:scenario:{label}:ledger',
+                        status='FAIL',
+                        severity='CRITICAL',
+                        message=f'Missing federated ledger directory for scenario {label}: {ledger_path}',
+                    )
+                )
+            else:
+                report.add(
+                    Finding(
+                        item=f'federation:scenario:{label}:ledger',
+                        status='PASS',
+                        severity='INFO',
+                        message=f'Federated ledger present for scenario {label}.',
+                    )
+                )
+
+    if declared_merkle and recomputed_merkle:
+        mismatched = {
+            epoch: (declared_merkle.get(epoch), recomputed_merkle.get(epoch))
+            for epoch in declared_merkle
+            if declared_merkle.get(epoch) != recomputed_merkle.get(epoch)
+        }
+        if mismatched:
+            detail = ", ".join(
+                f"{epoch}: declared={declared} actual={actual}"
+                for epoch, (declared, actual) in mismatched.items()
+            )
+            report.add(
+                Finding(
+                    item="federation:merkle_consistency",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message=f"Summary merkle mismatch detected: {detail}",
+                )
+            )
+        else:
+            report.add(
+                Finding(
+                    item="federation:merkle_consistency",
+                    status="PASS",
+                    severity="INFO",
+                    message="Federated merkle roots consistent between summary and ledger.",
+                )
+            )
 
 def evaluate_task_manifest(report: ComplianceReport) -> None:
     if not TASKS_PATH.exists():
@@ -647,10 +1084,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = build_argument_parser()
     args = parser.parse_args(argv)
 
-    base = vault_root()
+    base = VAULT_ROOT
     report = ComplianceReport(
         timestamp=datetime.now(timezone.utc).isoformat(),
         strict=args.strict and not args.allow_missing_artifacts,
+        worktree_root=str(WORKTREE_ROOT),
+        vault_root=str(VAULT_ROOT),
     )
 
     # Documentation keywords
@@ -684,6 +1123,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     evaluate_artifact_presence(report, base, args.allow_missing_artifacts)
     evaluate_advanced_manifest(report, base / ARTIFACT_PATHS["advanced_manifest"])
+    evaluate_federated_artifacts(report, base)
     evaluate_meta_contract(report, base)
 
     if args.output:

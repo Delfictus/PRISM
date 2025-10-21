@@ -1,5 +1,6 @@
 //! Meta Evolutionary Compute (MEC) scaffolding.
 
+pub mod federated;
 pub mod ontology;
 pub mod orchestrator;
 

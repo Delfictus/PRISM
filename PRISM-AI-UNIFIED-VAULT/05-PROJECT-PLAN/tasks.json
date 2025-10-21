@@ -464,19 +464,19 @@
           "id": "M5-01",
           "title": "Design genome sharing and federation protocol",
           "source": "docs/rfc/RFC-M5-Federated-Readiness.md",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M5-02",
           "title": "Implement distributed orchestrator interfaces",
           "source": "src/meta/federated/mod.rs",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M5-03",
           "title": "Simulate hybrid orchestration scenarios",
           "source": "artifacts/mec/M5/federated_plan.md",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M5-04",

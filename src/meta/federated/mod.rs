@@ -68,7 +68,12 @@ pub struct NodeProfile {
 }
 
 impl NodeProfile {
-    pub fn new(id: impl Into<String>, region: impl Into<String>, role: NodeRole, stake: u32) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        region: impl Into<String>,
+        role: NodeRole,
+        stake: u32,
+    ) -> Self {
         Self {
             id: id.into(),
             region: region.into(),
@@ -170,7 +175,10 @@ impl FederatedInterface {
             let delta = Self::derive_delta(epoch, node);
             let anchor = stable_hash(&format!(
                 "{}:{}:{}:{}",
-                node.profile.id, node.profile.region, epoch, node.ledger_height + 1
+                node.profile.id,
+                node.profile.region,
+                epoch,
+                node.ledger_height + 1
             ));
             node.record_anchor(anchor.clone());
             updates.push(NodeUpdate {
@@ -213,16 +221,23 @@ impl FederatedInterface {
         let regional_bias = stable_hash(&node.profile.region);
         let bias = i64::from_str_radix(&regional_bias[0..4], 16).unwrap_or(0) % 11;
         let epoch_penalty = (epoch % 5) as i64;
-        base
-            + i64::from(node.profile.role.is_validator() as u8) * 3
-            - epoch_penalty
-            + bias
+        base + i64::from(node.profile.role.is_validator() as u8) * 3 - epoch_penalty + bias
     }
 
     /// Returns true when all nodes are within the configured ledger drift.
     pub fn ledger_within_drift(&self) -> bool {
-        let min_height = self.nodes.iter().map(|n| n.ledger_height).min().unwrap_or(0);
-        let max_height = self.nodes.iter().map(|n| n.ledger_height).max().unwrap_or(0);
+        let min_height = self
+            .nodes
+            .iter()
+            .map(|n| n.ledger_height)
+            .min()
+            .unwrap_or(0);
+        let max_height = self
+            .nodes
+            .iter()
+            .map(|n| n.ledger_height)
+            .max()
+            .unwrap_or(0);
         max_height - min_height <= self.config.max_ledger_drift
     }
 

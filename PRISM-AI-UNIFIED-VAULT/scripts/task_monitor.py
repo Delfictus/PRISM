@@ -21,13 +21,17 @@ from typing import Dict, Iterable, List, Optional
 
 try:
     from . import vault_root  # type: ignore
+    from . import worktree_root  # type: ignore
 except ImportError:
     sys.path.append(str(Path(__file__).resolve().parents[1]))
     from scripts import vault_root  # type: ignore
+    from scripts import worktree_root  # type: ignore
 
 
-TASKS_PATH = vault_root() / "05-PROJECT-PLAN" / "tasks.json"
-COMPLIANCE_SCRIPT = vault_root() / "scripts" / "compliance_validator.py"
+VAULT_ROOT = vault_root()
+WORKTREE_ROOT = worktree_root()
+TASKS_PATH = VAULT_ROOT / "05-PROJECT-PLAN" / "tasks.json"
+COMPLIANCE_SCRIPT = VAULT_ROOT / "scripts" / "compliance_validator.py"
 ALLOWED_STATUSES = {"pending", "in_progress", "blocked", "done"}
 
 
@@ -83,7 +87,7 @@ def run_compliance(strict: bool) -> int:
     cmd = ["python3", str(COMPLIANCE_SCRIPT)]
     if strict:
         cmd.append("--strict")
-    result = subprocess.run(cmd, cwd=vault_root(), text=True)
+    result = subprocess.run(cmd, cwd=WORKTREE_ROOT, text=True)
     return result.returncode
 
 

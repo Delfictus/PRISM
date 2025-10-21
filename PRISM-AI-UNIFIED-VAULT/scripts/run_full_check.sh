@@ -2,7 +2,11 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO="$(cd "${ROOT}/.." && pwd)"
+if WORKTREE="$(git -C "${ROOT}" rev-parse --show-toplevel 2>/dev/null)"; then
+  REPO="${WORKTREE}"
+else
+  REPO="$(cd "${ROOT}/.." && pwd)"
+fi
 MANIFEST="${REPO}/benchmarks/bench_manifest.json"
 
 step() {
@@ -19,7 +23,7 @@ python3 "${ROOT}/scripts/task_monitor.py" --once
 step "Running strict compliance validator"
 python3 "${ROOT}/scripts/compliance_validator.py" --strict
 
-step "Executing governed master pipeline (sample metrics)"
+step "Executing governed master pipeline (sample metrics + federated sim)"
 python3 "${ROOT}/03-AUTOMATION/master_executor.py" --strict --use-sample-metrics --skip-build --skip-tests --skip-benchmarks
 
 echo

@@ -24,20 +24,20 @@ from typing import Dict, List, Optional, Sequence
 # Resolve vault and repository roots
 THIS_FILE = Path(__file__).resolve()
 VAULT_ROOT = THIS_FILE.parents[1]
-REPO_ROOT = VAULT_ROOT.parent
 
 sys.path.insert(0, str(VAULT_ROOT))  # enable `import scripts.*`
 
-from scripts import vault_root  # type: ignore  # noqa: E402
 from scripts import compliance_validator  # type: ignore  # noqa: E402
+from scripts import vault_root  # type: ignore  # noqa: E402
+from scripts import worktree_root  # type: ignore  # noqa: E402
+
+assert vault_root().resolve() == VAULT_ROOT, "Vault root mismatch; ensure execution from unified vault."
+REPO_ROOT = worktree_root()
 
 
 ARTIFACT_DIR = VAULT_ROOT / "artifacts"
 REPORT_DIR = VAULT_ROOT / "reports"
 AUDIT_DIR = VAULT_ROOT / "audit"
-
-assert vault_root() == VAULT_ROOT, "Vault root mismatch; ensure execution from unified vault."
-
 
 def write_json(path: Path, payload: Dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -63,6 +63,14 @@ def run_command(cmd: Sequence[str], cwd: Optional[Path] = None) -> subprocess.Co
 
 def timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def current_branch() -> str:
+    """Return the active git branch for the current worktree."""
+    result = run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=REPO_ROOT)
+    if result.returncode != 0:
+        return "UNKNOWN"
+    return result.stdout.strip() or "UNKNOWN"
 
 
 def collect_device_caps() -> Dict[str, object]:
@@ -157,10 +165,14 @@ def tactic_bitmap(enabled: bool) -> Dict[str, bool]:
 
 def create_advanced_manifest(use_sample_metrics: bool) -> Dict[str, object]:
     metrics = sample_metrics(use_sample_metrics)
+    commit = run_command(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT)
+    commit_sha = commit.stdout.strip() if commit.returncode == 0 else ""
     return {
         "timestamp": timestamp(),
         "vault_root": str(VAULT_ROOT),
-        "commit_sha": run_command(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT).stdout.strip() or "UNKNOWN",
+        "worktree_root": str(REPO_ROOT),
+        "branch": current_branch(),
+        "commit_sha": commit_sha or "UNKNOWN",
         "kernel_residency": {
             "gpu_resident": use_sample_metrics,
             "notes": "Set by master executor (sample metrics)" if use_sample_metrics else "TODO: populate from runtime telemetry.",
@@ -287,6 +299,7 @@ def create_determinism_manifest(use_sample_metrics: bool) -> Dict[str, object]:
     return {
         "timestamp": timestamp(),
         "commit_sha": run_command(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT).stdout.strip() or "UNKNOWN",
+        "branch": current_branch(),
         "feature_flags": ["advanced", "cuda_graph", "persistent_kernel"] if use_sample_metrics else [],
         "device_caps_path": str(VAULT_ROOT / "device_caps.json"),
         "seeds": seeds,
@@ -328,6 +341,9 @@ class ExecutionSummary:
     timestamp: str
     strict: bool
     allow_missing: bool
+    vault_root: str
+    worktree_root: str
+    branch: str
     phases: List[PhaseResult] = field(default_factory=list)
     artifacts: Dict[str, str] = field(default_factory=dict)
     compliance_exit_code: Optional[int] = None
@@ -340,6 +356,9 @@ class ExecutionSummary:
             "timestamp": self.timestamp,
             "strict": self.strict,
             "allow_missing": self.allow_missing,
+            "vault_root": self.vault_root,
+            "worktree_root": self.worktree_root,
+            "branch": self.branch,
             "phases": [
                 {
                     "name": p.name,
@@ -359,10 +378,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
     ensure_directories()
 
+    branch = current_branch()
     summary = ExecutionSummary(
         timestamp=timestamp(),
         strict=args.strict,
         allow_missing=args.allow_missing_artifacts,
+        vault_root=str(VAULT_ROOT),
+        worktree_root=str(REPO_ROOT),
+        branch=branch,
     )
 
     # Phase: device metadata
@@ -432,6 +455,87 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     (REPORT_DIR / "graph_exec.bin").write_bytes(b"GRAPH_EXEC_PLACEHOLDER" if args.use_sample_metrics else b"")
     write_json(ARTIFACT_DIR / "determinism_manifest.json", create_determinism_manifest(args.use_sample_metrics))
 
+    # Federated simulation artifacts (Phase M5)
+    federated_dir = VAULT_ROOT / "artifacts" / "mec" / "M5"
+    scenarios_dir = federated_dir / "scenarios"
+    scenario_files = sorted(p for p in scenarios_dir.glob("*.json"))
+    federated_artifacts: Dict[str, str] = {}
+
+    if scenario_files:
+        for index, scenario in enumerate(scenario_files):
+            cmd = [
+                "cargo",
+                "run",
+                "--bin",
+                "federated_sim",
+                "--",
+                "--epochs",
+                "5",
+            ]
+            if index == 0:
+                cmd.append("--clean")
+            cmd.extend(["--scenario", str(scenario)])
+
+            label = scenario.stem
+            if label != "baseline":
+                cmd.extend(["--label", label])
+
+            result = run_command(cmd, cwd=REPO_ROOT)
+            summary.add_phase(
+                PhaseResult(
+                    name=f"federated_sim:{label}",
+                    command=cmd,
+                    returncode=result.returncode,
+                    stdout=result.stdout,
+                    stderr=result.stderr,
+                )
+            )
+            if result.returncode != 0 and args.strict:
+                print(f"❌ Federated simulation failed for scenario '{label}'. Aborting.")
+                return result.returncode
+
+            if label == "baseline":
+                federated_artifacts["federated_summary"] = str(
+                    federated_dir / "simulations" / "epoch_summary.json"
+                )
+                federated_artifacts["federated_ledger_dir"] = str(federated_dir / "ledger")
+            else:
+                federated_artifacts[f"federated_summary:{label}"] = str(
+                    federated_dir / "simulations" / f"epoch_summary_{label}.json"
+                )
+                federated_artifacts[f"federated_ledger_dir:{label}"] = str(
+                    federated_dir / "ledger" / label
+                )
+    else:
+        # Fallback to baseline placeholder run if scenarios missing.
+        cmd = [
+            "cargo",
+            "run",
+            "--bin",
+            "federated_sim",
+            "--",
+            "--epochs",
+            "5",
+            "--clean",
+        ]
+        result = run_command(cmd, cwd=REPO_ROOT)
+        summary.add_phase(
+            PhaseResult(
+                name="federated_sim:default",
+                command=cmd,
+                returncode=result.returncode,
+                stdout=result.stdout,
+                stderr=result.stderr,
+            )
+        )
+        if result.returncode != 0 and args.strict:
+            print("❌ Federated simulation failed. Aborting.")
+            return result.returncode
+        federated_artifacts["federated_summary"] = str(
+            federated_dir / "simulations" / "epoch_summary.json"
+        )
+        federated_artifacts["federated_ledger_dir"] = str(federated_dir / "ledger")
+
     summary.artifacts = {
         "advanced_manifest": str(ARTIFACT_DIR / "advanced_manifest.json"),
         "roofline": str(REPORT_DIR / "roofline.json"),
@@ -445,6 +549,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "path_decision": str(VAULT_ROOT / "path_decision.json"),
         "feasibility": str(VAULT_ROOT / "feasibility.log"),
     }
+    summary.artifacts.update(federated_artifacts)
 
     # Run compliance validator
     validator_args = []

@@ -2,7 +2,11 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO="$(cd "${ROOT}/.." && pwd)"
+if WORKTREE="$(git -C "${ROOT}" rev-parse --show-toplevel 2>/dev/null)"; then
+  REPO="${WORKTREE}"
+else
+  REPO="$(cd "${ROOT}/.." && pwd)"
+fi
 
 usage() {
   cat <<USAGE
@@ -80,7 +84,7 @@ compliance_run() {
 }
 
 master_executor() {
-  echo ":: Running governed master executor"
+  echo ":: Running governed master executor (includes federated simulation)"
   python3 "${ROOT}/03-AUTOMATION/master_executor.py" --strict --use-sample-metrics --skip-build --skip-tests --skip-benchmarks
 }
 

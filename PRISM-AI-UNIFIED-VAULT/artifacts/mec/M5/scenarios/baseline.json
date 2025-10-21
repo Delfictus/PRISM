@@ -1,0 +1,26 @@
+{
+  "name": "baseline-triple-site",
+  "quorum": 2,
+  "max_ledger_drift": 2,
+  "epoch_start": 1,
+  "nodes": [
+    {
+      "id": "validator-a",
+      "region": "us-west",
+      "role": "core",
+      "stake": 5
+    },
+    {
+      "id": "validator-b",
+      "region": "eu-central",
+      "role": "core",
+      "stake": 4
+    },
+    {
+      "id": "edge-c",
+      "region": "ap-south",
+      "role": "edge",
+      "stake": 2
+    }
+  ]
+}

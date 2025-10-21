@@ -1,0 +1,23 @@
+{
+  "entries": [
+    {
+      "anchor_hash": "8e740377eca9be4b",
+      "node_id": "edge-e"
+    },
+    {
+      "anchor_hash": "823a2df922aaf91a",
+      "node_id": "validator-a"
+    },
+    {
+      "anchor_hash": "513079d504a64c4f",
+      "node_id": "validator-b"
+    },
+    {
+      "anchor_hash": "5a7dcd1644d86e36",
+      "node_id": "validator-c"
+    }
+  ],
+  "epoch": 22,
+  "merkle_root": "661e4d17d6c9f207",
+  "signature": "661e4d17d6c9f207"
+}

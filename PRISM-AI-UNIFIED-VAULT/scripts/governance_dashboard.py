@@ -10,16 +10,22 @@ task monitor, ensuring CI hooks that reference this file do not fail.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Dict, List
 
+try:
+    from . import vault_root  # type: ignore
+except ImportError:
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from scripts import vault_root  # type: ignore
 
-def vault_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+
+VAULT_ROOT = vault_root()
 
 
 def load_metrics() -> Dict[str, object]:
-    tasks_path = vault_root() / "05-PROJECT-PLAN" / "tasks.json"
+    tasks_path = VAULT_ROOT / "05-PROJECT-PLAN" / "tasks.json"
     if not tasks_path.exists():
         return {}
     with tasks_path.open("r", encoding="utf-8") as handle:
