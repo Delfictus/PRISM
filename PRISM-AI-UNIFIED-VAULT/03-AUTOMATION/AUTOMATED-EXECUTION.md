@@ -821,6 +821,25 @@ python 03-AUTOMATION/master_executor.py \
 
 ---
 
+## **8. OPERATIONAL SCRIPT INDEX**
+
+| Script | Purpose | Linked Vault Doc |
+|--------|---------|------------------|
+| `scripts/reset_context.sh` | Cleans artifacts, replays compliance, snapshots task status | `03-AUTOMATION/AUTOMATED-EXECUTION.md`, `05-PROJECT-PLAN/tasks.json` |
+| `scripts/run_full_check.sh` | Runs full compliance suite (governance + master executor) | `01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md` |
+| `scripts/task_monitor.py` | Prints live phase/task summary, optional compliance run | `05-PROJECT-PLAN/MULTI-PHASE-TODO.md` |
+| `scripts/compliance_validator.py` | Validates constitutional gates, supports `--phase` for MEC | `00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md` |
+| `scripts/enforce_governance.sh` | Shell harness for zero-tolerance preflight | `01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md` |
+| `scripts/continuous_monitor.sh` | 5-minute watchdog, alerts on violations | `03-AUTOMATION/AUTOMATED-EXECUTION.md` |
+| `scripts/meta/worktree.sh` | Provision worktrees (retained for future multi-agent mode) | `docs/rfc/RFC-M0-Meta-Foundations.md` |
+| `scripts/meta/bootstrap_agent.sh` | Toolchain bootstrap reminder for meta branches | `docs/rfc/RFC-M0-Meta-Foundations.md` |
+
+- **Meta Phase Entry Point**: `python3 PRISM-AI-UNIFIED-VAULT/03-AUTOMATION/master_executor.py phase --name M0 --strict`
+- **Phase Validation**: `python3 PRISM-AI-UNIFIED-VAULT/scripts/compliance_validator.py --phase M0 --strict`
+- **Status Snapshot**: `python3 PRISM-AI-UNIFIED-VAULT/scripts/task_monitor.py --once`
+
+---
+
 ## **2. CONTINUOUS EXECUTION MONITOR**
 
 ```bash

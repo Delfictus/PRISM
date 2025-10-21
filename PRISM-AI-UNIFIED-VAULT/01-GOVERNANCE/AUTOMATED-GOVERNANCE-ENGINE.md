@@ -954,6 +954,44 @@ impl ComplianceGate for ProteinAcceptanceGate {
 
 ---
 
+## **8. META EVOLUTION GOVERNANCE**
+
+### **8.1 Meta Phase Gate**
+- **Command Path**: `python3 PRISM-AI-UNIFIED-VAULT/03-AUTOMATION/master_executor.py phase --name Mx --strict`
+- **Validators Loaded**: `MetaDeterminismGate`, `MetaTelemetryGate`, `OntologyAlignmentGate`, `FreeEnergyGate` (see `src/meta/governance`).
+- **Artifacts Required**:
+  - `artifacts/mec/<phase>/phase_report.json`
+  - `determinism/meta_<phase>.json`
+  - `PRISM-AI-UNIFIED-VAULT/01-GOVERNANCE/META-GOVERNANCE-LOG.md` entry with signer + hash
+- **Failure Response**: master executor triggers `violation_response.handle_blocker` and aborts the phase promotion.
+
+```python
+# master_executor.py (excerpt)
+if args.command == "phase":
+    meta_validator = MetaPhaseValidator(args.name)
+    governance.ensure_zero_tolerance(meta_validator.phase_contract())
+    success, violations = governance.validate(args.name, meta_validator.snapshot())
+    if not success:
+        governance.emergency_shutdown(violations[0])
+```
+
+### **8.2 Telemetry Durability Enforcement**
+- `TelemetryExpectations::from_env()` consumes `TELEMETRY_FSYNC_INTERVAL_MS`, `TELEMETRY_EXPECTED_STAGES`, `TELEMETRY_ALERT_WEBHOOK`.
+- Missing stages raise `DurabilityViolation` → governance engine pages on-call and blocks the promotion.
+- `scripts/task_monitor.py --phase Mx --once` surfaces telemetry status inline with task summaries.
+
+### **8.3 Determinism Manifest Extensions**
+- Manifest schema expanded with `meta_hash`, `variant_hash`, `ontology_hash`.
+- `scripts/compliance_validator.py --phase Mx` verifies hashes and compares against `artifacts/mec/<phase>/determinism_expected.json`.
+- Non-matching hashes escalate to blocker violations; master executor runs rollback workflow.
+
+### **8.4 Governance Log & Merkle Anchoring**
+- Every phase promotion appends to `META-GOVERNANCE-LOG.md` (signer, timestamp, Merkle root).
+- `scripts/reset_context.sh` and `scripts/run_full_check.sh` recompute Merkle anchors under `artifacts/merkle/meta_<phase>.merk`.
+- Rollback requires updating the log with `ROLLBACK` entry and attaching remediation report.
+
+---
+
 ## **ENFORCEMENT STATUS**
 
 ```yaml

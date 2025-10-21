@@ -331,6 +331,34 @@ impl MandatoryTelemetry {
 }
 ```
 
+### **Section 7.2: Durability & Stage Guarantees**
+1. **Buffered Persistence**: All telemetry streams must flow through the durability logger (`TelemetryLogger`) using `BufWriter` + interval `fsync`. Direct writes to raw files are prohibited.
+2. **Configurable Guarantees**: The following environment contracts are mandatory:
+   - `TELEMETRY_FSYNC_INTERVAL_MS` (default 5000) – maximum delay between persisted checkpoints.
+   - `TELEMETRY_EXPECTED_STAGES` – comma list of required stages (`ingest`, `orchestrate`, `evaluate`, etc.).
+   - `TELEMETRY_ALERT_WEBHOOK` – optional governance hook for durability breaches.
+3. **Stage Integrity**: Each stage event (`TelemetryEntry`) must be observed at least once per run. Missing stages elevate a `DurabilityViolation::MissingStages`.
+4. **Resilience**: On IO errors the logger retries with exponential backoff and emits `governance.telemetry` alerts; multiple failures mandate emergency stop.
+
+```rust
+pub fn log_entry(&self, entry: &TelemetryEntry) -> Result<()> {
+    let mut state = self.state.lock()?;
+    state.write_entry(entry)?;
+
+    if state.requires_fsync(self.fsync_interval) {
+        state.flush_and_fsync()?;
+    }
+
+    self.alert_on_missing_stages(&state)?;
+    Ok(())
+}
+```
+
+### **Section 7.3: Determinism Manifest Integration**
+1. Every telemetry payload must embed `determinism.meta_hash` alongside `determinism.kernel_hash`.
+2. Determinism manifests extend to MEC phases with artifacts recorded under `artifacts/mec/<phase>/`.
+3. Regenerating telemetry requires replaying deterministic seeds; non-matching hashes block promotion.
+
 ---
 
 ## **ARTICLE VIII: TESTING & VALIDATION FRAMEWORK**
@@ -627,22 +655,60 @@ impl EnforcementEngine {
 
 ---
 
-## **ARTICLE XII: FINAL PROVISIONS**
+## **ARTICLE XII: META EVOLUTION LIFECYCLE**
 
-### **Section 12.1: Amendment Process**
+### **Section 12.1: Phase Charter**
+| Phase | Objective | Required Artifacts | Compliance Hook |
+|-------|-----------|--------------------|-----------------|
+| **M0 – Foundations** | Establish meta registry, telemetry schema v1, compliance integration | `docs/rfc/RFC-M0-Meta-Foundations.md`, `artifacts/mec/M0/telemetry_schema_v1.json`, `src/meta/registry.rs` | `governance.meta.bootstrap` |
+| **M1 – Orchestrator MVP** | Deterministic candidate generation & evaluation loop | `src/meta/orchestrator/mod.rs`, `artifacts/mec/M1/selection_report.json`, `determinism/meta_manifest.json` | `ci-meta-orchestrator` |
+| **M2 – Ontology Integration** | Semantic anchoring & alignment validators | `src/meta/ontology/mod.rs`, `artifacts/mec/M2/ontology_snapshot.json` | `governance.meta.ontology` |
+| **M3 – Reflexive Feedback** | Reflex control loop & free-energy lattice snapshots | `src/meta/reflexive/mod.rs`, `artifacts/mec/M3/lattice_report.json` | `ci-lattice` |
+| **M4 – Semantic Plasticity** | Representation adapters & explainability metrics | `src/meta/plasticity/mod.rs`, `artifacts/mec/M4/explainability_report.md` | `ci-representation` |
+| **M5 – Federated Readiness** | Distributed orchestration protocols | `src/meta/federated/mod.rs`, `artifacts/mec/M5/federated_plan.md` | `governance.meta.federated` |
+| **M6 – Hardening & Rollout** | Production gating, runbooks, observability dashboards | `docs/runbooks/meta_rollout.md`, `artifacts/mec/M6/rollout_checklist.md` | `governance.meta.rollout` |
+
+### **Section 12.2: Compliance Gates**
+1. **Phase Promotion**: Advancement requires passing `scripts/compliance_validator.py --strict --phase <Mx>`.
+2. **Determinism Checkpoints**: Each phase emits `determinism/meta_<phase>.json`. Hash mismatch blocks merge.
+3. **Telemetry Coverage**: `TelemetryExpectations::from_env()` must assert presence of all phase-specific stages.
+4. **Governance Sign-off**: `PRISM-AI-UNIFIED-VAULT/01-GOVERNANCE/META-GOVERNANCE-LOG.md` must receive a signed entry.
+
+### **Section 12.3: Automation Contracts**
+```bash
+# Bootstrap sequence (enforced by master executor)
+python3 PRISM-AI-UNIFIED-VAULT/scripts/reset_context.sh
+python3 PRISM-AI-UNIFIED-VAULT/03-AUTOMATION/master_executor.py phase --name M0 --strict
+
+# Phase validation (gates are ZERO_TOLERANCE)
+python3 PRISM-AI-UNIFIED-VAULT/03-AUTOMATION/master_executor.py validate --phase M1
+python3 PRISM-AI-UNIFIED-VAULT/scripts/task_monitor.py --phase M1 --once
+```
+
+### **Section 12.4: Rollback & Recovery**
+1. **Merkle Anchors**: `artifacts/merkle/meta_<phase>.merk` must be updated on every promotion.
+2. **Rollback Plan**: Each phase RFC includes a `Rollback` chapter with scripted steps and validation criteria.
+3. **Reset Authority**: Only the master executor may invoke `--rollback <phase>`; manual git resets are prohibited.
+4. **Post-Rollback Audit**: `artifacts/mec/<phase>/rollback_report.md` must capture cause, steps, and remediation.
+
+---
+
+## **ARTICLE XIII: FINAL PROVISIONS**
+
+### **Section 13.1: Amendment Process**
 1. Amendments require approval from 3 senior engineers
 2. Must pass all existing compliance gates
 3. Must demonstrate improvement via A/B testing
 4. Automated rollback if SLOs degrade >5%
 
-### **Section 12.2: Emergency Override**
+### **Section 13.2: Emergency Override**
 Emergency override requires:
 - Two-person authentication
 - Audit log entry with justification
 - Automatic review within 24 hours
 - Rollback plan documented
 
-### **Section 12.3: Perpetual Enforcement**
+### **Section 13.3: Perpetual Enforcement**
 This constitution remains in effect until:
 - Superseded by a new version (requires unanimous approval)
 - Emergency override with board approval
