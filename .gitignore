@@ -1,5 +1,3 @@
-target/
-
 # Environment variables with API keys (NEVER commit!)
 .env
 .env.local
@@ -7,3 +5,13 @@ target/
 
 # Cargo lock for libraries
 Cargo.lock
+
+# Large binary artifacts and build outputs
+deps/
+target/
+*.rlib
+*.d
+libonnxruntime*.so*
+comprehensive_gpu_benchmark
+__pycache__/
+telemetry/
