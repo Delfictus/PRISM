@@ -88,6 +88,38 @@ master_executor() {
   python3 "${ROOT}/03-AUTOMATION/master_executor.py" --strict --use-sample-metrics --skip-build --skip-tests --skip-benchmarks
 }
 
+verify_federated_signatures() {
+  echo ":: Verifying federated signatures"
+  local scenario
+  local label
+  local summary
+  local ledger
+  local expected
+
+  for scenario in "${ROOT}/artifacts/mec/M5/scenarios"/*.json; do
+    [[ -f "${scenario}" ]] || continue
+    label="$(basename "${scenario}")"
+    label="${label%.json}"
+
+    if [[ "${label}" == "baseline" ]]; then
+      summary="${ROOT}/artifacts/mec/M5/simulations/epoch_summary.json"
+      expected="default"
+    else
+      summary="${ROOT}/artifacts/mec/M5/simulations/epoch_summary_${label}.json"
+      expected="${label}"
+    fi
+    ledger="${ROOT}/artifacts/mec/M5/ledger"
+
+    if [[ ! -f "${summary}" ]]; then
+      echo "❌ Missing federated summary for scenario '${label}': ${summary}"
+      exit 1
+    fi
+
+    cargo run --quiet --manifest-path "${REPO}/Cargo.toml" --bin federated_sim -- \
+      --verify-summary "${summary}" --verify-ledger "${ledger}" --expect-label "${expected}"
+  done
+}
+
 show_git_status() {
   echo ":: Git status"
   git -C "${REPO}" status -sb
@@ -99,6 +131,7 @@ status_snapshot
 meta_snapshot
 compliance_run
 master_executor
+verify_federated_signatures
 show_git_status
 
 echo "✅ Context refresh complete"
