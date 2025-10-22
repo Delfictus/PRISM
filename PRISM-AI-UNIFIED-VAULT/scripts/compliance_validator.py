@@ -68,6 +68,7 @@ ARTIFACT_PATHS: Dict[str, Path] = {
     "graph_exec": Path("reports/graph_exec.bin"),
     "determinism_manifest": Path("artifacts/determinism_manifest.json"),
     "explainability_report": Path("artifacts/mec/M4/explainability_report.md"),
+    "representation_manifest": Path("artifacts/mec/M4/representation_manifest.json"),
 }
 
 CRITICAL_ARTIFACTS = {
@@ -77,6 +78,7 @@ CRITICAL_ARTIFACTS = {
     "graph_capture",
     "graph_exec",
     "determinism_manifest",
+    "representation_manifest",
     "explainability_report",
 }
 
@@ -509,6 +511,58 @@ def evaluate_meta_contract(report: ComplianceReport, base: Path) -> None:
 
 
 def evaluate_semantic_plasticity(report: ComplianceReport, base: Path) -> None:
+    dataset_path = base / "meta/representation/dataset.json"
+    if dataset_path.exists():
+        try:
+            dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            report.add(
+                Finding(
+                    item="plasticity:dataset",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message=f"Representation dataset invalid JSON: {exc}",
+                )
+            )
+        else:
+            concepts = dataset.get("concepts", [])
+            if not concepts:
+                report.add(
+                    Finding(
+                        item="plasticity:dataset",
+                        status="FAIL",
+                        severity="CRITICAL",
+                        message="Representation dataset contains no concepts.",
+                    )
+                )
+            elif dataset.get("dimension", 0) <= 0:
+                report.add(
+                    Finding(
+                        item="plasticity:dataset",
+                        status="FAIL",
+                        severity="CRITICAL",
+                        message="Representation dataset must define embedding dimension > 0.",
+                    )
+                )
+            else:
+                report.add(
+                    Finding(
+                        item="plasticity:dataset",
+                        status="PASS",
+                        severity="INFO",
+                        message="Representation dataset present.",
+                    )
+                )
+    else:
+        report.add(
+            Finding(
+                item="plasticity:dataset",
+                status="FAIL",
+                severity="CRITICAL",
+                message=f"Representation dataset missing: {dataset_path}",
+            )
+        )
+
     adapter_path = base / "src/meta/plasticity/adapters.rs"
     if not adapter_path.exists():
         report.add(
@@ -637,6 +691,53 @@ def evaluate_semantic_plasticity(report: ComplianceReport, base: Path) -> None:
                 message="Explainability report missing (artifacts/mec/M4).",
             )
         )
+
+    manifest_path = base / ARTIFACT_PATHS["representation_manifest"]
+    manifest = load_json(manifest_path)
+    if manifest is None:
+        report.add(
+            Finding(
+                item="plasticity:manifest",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Representation manifest missing.",
+            )
+        )
+    else:
+        concepts = manifest.get("concepts", [])
+        if not concepts:
+            report.add(
+                Finding(
+                    item="plasticity:manifest",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message="Representation manifest missing concept entries.",
+                )
+            )
+        else:
+            invalid = [
+                concept.get("concept_id")
+                for concept in concepts
+                if "drift_status" not in concept or "prototype" not in concept
+            ]
+            if invalid:
+                report.add(
+                    Finding(
+                        item="plasticity:manifest",
+                        status="FAIL",
+                        severity="CRITICAL",
+                        message=f"Representation manifest missing fields for: {', '.join(sorted(str(i) for i in invalid))}",
+                    )
+                )
+            else:
+                report.add(
+                    Finding(
+                        item="plasticity:manifest",
+                        status="PASS",
+                        severity="INFO",
+                        message="Representation manifest present.",
+                    )
+                )
 
 def evaluate_task_manifest(report: ComplianceReport) -> None:
     if not TASKS_PATH.exists():

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import os
 import subprocess
@@ -18,8 +19,9 @@ import sys
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
 from functools import lru_cache
+from math import sqrt
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 
 # Resolve vault and repository roots
@@ -53,7 +55,16 @@ AUDIT_DIR = VAULT_ROOT / "audit"
 MEC_DIR = ARTIFACT_DIR / "mec"
 M4_DIR = MEC_DIR / "M4"
 EXPLAINABILITY_REPORT_PATH = M4_DIR / "explainability_report.md"
+REPRESENTATION_MANIFEST_PATH = M4_DIR / "representation_manifest.json"
+REPRESENTATION_DATASET_PATH = VAULT_ROOT / "meta" / "representation" / "dataset.json"
 WORKTREE_NAME = REPO_ROOT.name
+
+DEFAULT_ADAPTATION_RATE = 0.25
+DEFAULT_HISTORY_CAP = 16
+WARNING_COSINE = 0.92
+DRIFT_COSINE = 0.85
+WARNING_MAGNITUDE_RATIO = 0.85
+DRIFT_MAGNITUDE_RATIO = 0.70
 
 assert VAULT_ROOT.exists(), f"Vault root {VAULT_ROOT} does not exist."
 
@@ -245,6 +256,349 @@ def create_advanced_manifest(use_sample_metrics: bool) -> Dict[str, object]:
             ("explainability_report", EXPLAINABILITY_REPORT_PATH),
         )},
     }
+
+
+def epoch_ms() -> int:
+    return int(datetime.now(timezone.utc).timestamp() * 1000)
+
+
+def load_representation_dataset(path: Path) -> Optional[Dict[str, object]]:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid representation dataset JSON: {path}") from exc
+
+
+def canonical_anchor_hash(concept: Dict[str, object]) -> str:
+    hasher = hashlib.sha256()
+    hasher.update(str(concept.get("id", "")).encode("utf-8"))
+    hasher.update(str(concept.get("description", "")).encode("utf-8"))
+    attributes = concept.get("attributes", {})
+    if isinstance(attributes, dict):
+        for key in sorted(attributes):
+            hasher.update(key.encode("utf-8"))
+            hasher.update(str(attributes[key]).encode("utf-8"))
+    related = concept.get("related", []) or []
+    for rel in sorted(str(item) for item in related):
+        hasher.update(rel.encode("utf-8"))
+    return hasher.hexdigest()
+
+
+def _dot(left: Sequence[float], right: Sequence[float]) -> float:
+    return sum(a * b for a, b in zip(left, right))
+
+
+def _l2_norm(vector: Sequence[float]) -> float:
+    return sqrt(sum(value * value for value in vector))
+
+
+def _l2_distance(left: Sequence[float], right: Sequence[float]) -> float:
+    return sqrt(sum((a - b) ** 2 for a, b in zip(left, right)))
+
+
+def compute_drift(previous: Sequence[float], current: Sequence[float], count: int) -> Dict[str, object]:
+    if count == 0:
+        return {
+            "status": "stable",
+            "metrics": {
+                "cosine_similarity": 1.0,
+                "magnitude_ratio": 1.0,
+                "delta_l2": 0.0,
+            },
+        }
+
+    baseline_norm = _l2_norm(previous)
+    candidate_norm = _l2_norm(current)
+    if baseline_norm == 0 or candidate_norm == 0:
+        return {
+            "status": "stable",
+            "metrics": {
+                "cosine_similarity": 1.0,
+                "magnitude_ratio": 1.0,
+                "delta_l2": 0.0,
+            },
+        }
+
+    cosine = _dot(previous, current) / (baseline_norm * candidate_norm)
+    cosine = max(min(cosine, 1.0), -1.0)
+    magnitude_ratio = candidate_norm / baseline_norm if baseline_norm != 0 else 1.0
+    delta = _l2_distance(previous, current)
+
+    if cosine < DRIFT_COSINE or magnitude_ratio < DRIFT_MAGNITUDE_RATIO:
+        status = "drifted"
+    elif cosine < WARNING_COSINE or magnitude_ratio < WARNING_MAGNITUDE_RATIO:
+        status = "warning"
+    else:
+        status = "stable"
+
+    return {
+        "status": status,
+        "metrics": {
+            "cosine_similarity": cosine,
+            "magnitude_ratio": magnitude_ratio,
+            "delta_l2": delta,
+        },
+    }
+
+
+def _notes_for_status(status: str) -> str:
+    if status == "stable":
+        return "baseline alignment maintained"
+    if status == "warning":
+        return "representation drift approaching threshold"
+    return "representation drift exceeds tolerance"
+
+
+def _adapter_mode(adaptation_count: int) -> str:
+    if adaptation_count <= 1:
+        return "cold_start"
+    if adaptation_count <= 8:
+        return "warmup"
+    return "stable"
+
+
+def build_semantic_plasticity_from_dataset(dataset: Dict[str, object]) -> Tuple[Dict[str, object], str]:
+    adapter_id = str(dataset.get("adapter_id") or "semantic_plasticity")
+    dimension = int(dataset.get("dimension", 0))
+    if dimension <= 0:
+        raise ValueError("Representation dataset must specify dimension > 0.")
+
+    concepts = dataset.get("concepts", [])
+    observations = dataset.get("observations", [])
+
+    states: Dict[str, Dict[str, object]] = {}
+    for concept in concepts:
+        cid = str(concept.get("id"))
+        embedding = concept.get("embedding", [])
+        if not isinstance(embedding, list) or len(embedding) != dimension:
+            raise ValueError(f"Concept {cid} embedding dimension mismatch.")
+        states[cid] = {
+            "prototype": [float(x) for x in embedding],
+            "anchor_hash": canonical_anchor_hash(concept),
+            "observation_count": 0,
+            "last_updated_ms": 0,
+            "drift": {
+                "status": "stable",
+                "metrics": {
+                    "cosine_similarity": 1.0,
+                    "magnitude_ratio": 1.0,
+                    "delta_l2": 0.0,
+                },
+            },
+        }
+
+    history: List[Dict[str, object]] = []
+    adaptation_count = 0
+    sorted_observations = sorted(
+        observations,
+        key=lambda obs: int(obs.get("timestamp_ms") or 0),
+    )
+
+    for obs in sorted_observations:
+        concept_id = str(obs.get("concept_id"))
+        embedding = obs.get("embedding", [])
+        if not isinstance(embedding, list) or len(embedding) != dimension:
+            raise ValueError(f"Observation for {concept_id} dimension mismatch.")
+        target = states.setdefault(
+            concept_id,
+            {
+                "prototype": [0.0 for _ in range(dimension)],
+                "anchor_hash": None,
+                "observation_count": 0,
+                "last_updated_ms": 0,
+                "drift": {
+                    "status": "stable",
+                    "metrics": {
+                        "cosine_similarity": 1.0,
+                        "magnitude_ratio": 1.0,
+                        "delta_l2": 0.0,
+                    },
+                },
+            },
+        )
+
+        drift = compute_drift(target["prototype"], embedding, target["observation_count"])
+        timestamp_value = int(obs.get("timestamp_ms") or epoch_ms())
+
+        updated = []
+        for prev, value in zip(target["prototype"], embedding):
+            updated.append((1.0 - DEFAULT_ADAPTATION_RATE) * prev + DEFAULT_ADAPTATION_RATE * float(value))
+        target["prototype"] = updated
+        target["observation_count"] += 1
+        target["last_updated_ms"] = timestamp_value
+        target["drift"] = drift
+
+        adaptation_count += 1
+
+        note = _notes_for_status(str(drift["status"]))
+        extra = obs.get("notes")
+        if extra:
+            note = f"{note} | {extra}"
+        source = obs.get("source")
+        if source:
+            note = f"{note} | source={source}" if note else f"source={source}"
+
+        history.append(
+            {
+                "concept_id": concept_id,
+                "drift": drift,
+                "timestamp_ms": timestamp_value,
+                "notes": note,
+            }
+        )
+        if len(history) > DEFAULT_HISTORY_CAP:
+            history.pop(0)
+
+    manifest_concepts = []
+    for concept_id in sorted(states):
+        state = states[concept_id]
+        metrics = state["drift"]["metrics"]
+        manifest_concepts.append(
+            {
+                "concept_id": concept_id,
+                "anchor_hash": state["anchor_hash"],
+                "observation_count": state["observation_count"],
+                "last_updated_ms": state["last_updated_ms"],
+                "drift_status": state["drift"]["status"],
+                "cosine_similarity": metrics["cosine_similarity"],
+                "magnitude_ratio": metrics["magnitude_ratio"],
+                "delta_l2": metrics["delta_l2"],
+                "prototype": [round(value, 6) for value in state["prototype"]],
+            }
+        )
+
+    manifest = {
+        "adapter_id": adapter_id,
+        "embedding_dim": dimension,
+        "mode": _adapter_mode(adaptation_count),
+        "concepts": manifest_concepts,
+    }
+
+    report = render_semantic_plasticity_report(manifest, history)
+    return manifest, report
+
+
+def sample_representation_manifest() -> Dict[str, object]:
+    concepts = [
+        {
+            "concept_id": "concept://coloring",
+            "anchor_hash": None,
+            "observation_count": 0,
+            "last_updated_ms": 0,
+            "drift_status": "stable",
+            "cosine_similarity": 1.0,
+            "magnitude_ratio": 1.0,
+            "delta_l2": 0.0,
+            "prototype": [0.2, 0.5, 0.3, 0.4],
+        },
+        {
+            "concept_id": "concept://ontology",
+            "anchor_hash": None,
+            "observation_count": 0,
+            "last_updated_ms": 0,
+            "drift_status": "warning",
+            "cosine_similarity": 0.903,
+            "magnitude_ratio": 0.856,
+            "delta_l2": 0.118,
+            "prototype": [0.1, 0.1, 0.1, 0.1],
+        },
+        {
+            "concept_id": "concept://explainer",
+            "anchor_hash": None,
+            "observation_count": 0,
+            "last_updated_ms": 0,
+            "drift_status": "drifted",
+            "cosine_similarity": 0.842,
+            "magnitude_ratio": 0.691,
+            "delta_l2": 0.265,
+            "prototype": [0.3, 0.3, 0.3, 0.3],
+        },
+    ]
+    return {
+        "adapter_id": "semantic_plasticity",
+        "embedding_dim": 4,
+        "mode": "warmup",
+        "concepts": concepts,
+    }
+
+
+def generate_semantic_plasticity_artifacts(use_sample_metrics: bool) -> None:
+    dataset = load_representation_dataset(REPRESENTATION_DATASET_PATH)
+    if dataset is not None:
+        manifest, report = build_semantic_plasticity_from_dataset(dataset)
+        write_json(REPRESENTATION_MANIFEST_PATH, manifest)
+        write_text(EXPLAINABILITY_REPORT_PATH, report)
+        return
+
+    if not use_sample_metrics:
+        raise FileNotFoundError(
+            f"Representation dataset missing: {REPRESENTATION_DATASET_PATH}. "
+            "Provide dataset.json or run with --use-sample-metrics."
+        )
+
+    # Fallback to seeded sample artifacts.
+    write_json(REPRESENTATION_MANIFEST_PATH, sample_representation_manifest())
+    write_text(EXPLAINABILITY_REPORT_PATH, create_explainability_report(True))
+
+
+def render_semantic_plasticity_report(manifest: Dict[str, object], events: List[Dict[str, object]]) -> str:
+    concepts = manifest.get("concepts", [])
+    lines = [
+        "# Semantic Plasticity Explainability Report",
+        "",
+        "## Adapter Overview",
+        f"- Adapter ID: `{manifest.get('adapter_id', 'semantic_plasticity')}`",
+        f"- Embedding dimension: {manifest.get('embedding_dim', 0)}",
+        f"- Concepts tracked: {len(concepts)}",
+        f"- Mode: {manifest.get('mode', 'cold_start')}",
+        "",
+        "## Concept Metrics",
+    ]
+
+    if not concepts:
+        lines.append("No concepts tracked yet.")
+    else:
+        lines.append("| Concept | Status | Cosine | Magnitude Ratio | ΔL2 | Observations | Anchor |")
+        lines.append("|---------|--------|--------|-----------------|-----|-------------|--------|")
+        for concept in concepts:
+            lines.append(
+                "| `{concept}` | {status} | {cosine:.3f} | {ratio:.3f} | {delta:.3f} | {count} | {anchor} |".format(
+                    concept=concept.get("concept_id", "<unknown>"),
+                    status=concept.get("drift_status", "stable"),
+                    cosine=float(concept.get("cosine_similarity", 0.0)),
+                    ratio=float(concept.get("magnitude_ratio", 0.0)),
+                    delta=float(concept.get("delta_l2", 0.0)),
+                    count=int(concept.get("observation_count", 0)),
+                    anchor=concept.get("anchor_hash") or "-",
+                )
+            )
+
+    lines.append("")
+    lines.append("## Recent Adaptation Events")
+    if not events:
+        lines.append("No adaptation events recorded yet.")
+    else:
+        for event in events:
+            drift = event.get("drift", {})
+            metrics = drift.get("metrics", {})
+            lines.append(
+                "- `{concept}` @ {timestamp} → status: {status}, cosine={cosine:.3f}, "
+                "magnitude_ratio={ratio:.3f}, ΔL2={delta:.3f}".format(
+                    concept=event.get("concept_id", "<unknown>"),
+                    timestamp=event.get("timestamp_ms", 0),
+                    status=drift.get("status", "stable"),
+                    cosine=float(metrics.get("cosine_similarity", 0.0)),
+                    ratio=float(metrics.get("magnitude_ratio", 0.0)),
+                    delta=float(metrics.get("delta_l2", 0.0)),
+                )
+            )
+            notes = event.get("notes")
+            if notes:
+                lines.append(f"  - notes: {notes}")
+
+    return "\n".join(lines) + "\n"
 
 
 def create_roofline_report(use_sample_metrics: bool) -> Dict[str, object]:
@@ -550,7 +904,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     write_json(REPORT_DIR / "graph_capture.json", create_graph_capture_report(args.use_sample_metrics))
     (REPORT_DIR / "graph_exec.bin").write_bytes(b"GRAPH_EXEC_PLACEHOLDER" if args.use_sample_metrics else b"")
     write_json(ARTIFACT_DIR / "determinism_manifest.json", create_determinism_manifest(args.use_sample_metrics))
-    write_text(EXPLAINABILITY_REPORT_PATH, create_explainability_report(args.use_sample_metrics))
+    generate_semantic_plasticity_artifacts(args.use_sample_metrics)
 
     summary.artifacts = {
         "advanced_manifest": str(ARTIFACT_DIR / "advanced_manifest.json"),
@@ -562,6 +916,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "graph_exec": str(REPORT_DIR / "graph_exec.bin"),
         "determinism_manifest": str(ARTIFACT_DIR / "determinism_manifest.json"),
         "explainability_report": str(EXPLAINABILITY_REPORT_PATH),
+        "representation_manifest": str(REPRESENTATION_MANIFEST_PATH),
         "device_caps": str(VAULT_ROOT / "device_caps.json"),
         "path_decision": str(VAULT_ROOT / "path_decision.json"),
         "feasibility": str(VAULT_ROOT / "feasibility.log"),

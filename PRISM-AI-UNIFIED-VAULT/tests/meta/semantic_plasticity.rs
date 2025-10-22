@@ -4,9 +4,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use prism_ai::meta::ontology::ConceptAnchor;
 use prism_ai::meta::plasticity::{
-    explainability_report, AdapterMode, DriftStatus, RepresentationAdapter, RepresentationManifest,
-    SemanticDriftDetector,
+    explainability_report, AdapterMode, DriftStatus, RepresentationAdapter, RepresentationDataset,
+    RepresentationManifest, SemanticDriftDetector,
 };
+use serde_json;
 use serde_json;
 
 fn build_adapter() -> RepresentationAdapter {
@@ -117,6 +118,49 @@ fn manifest_serialization_roundtrip() {
     let decoded: RepresentationManifest = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded.concepts.len(), manifest.concepts.len());
     assert_eq!(decoded.mode, manifest.mode);
+}
+
+#[test]
+fn dataset_ingestion_produces_expected_concepts() {
+    let dataset_json = r#"
+    {
+        "adapter_id": "semantic_plasticity_test",
+        "dimension": 3,
+        "concepts": [
+            {
+                "id": "concept://alpha",
+                "description": "Alpha concept",
+                "embedding": [0.1, 0.2, 0.3]
+            },
+            {
+                "id": "concept://beta",
+                "description": "Beta concept",
+                "embedding": [0.3, 0.2, 0.1]
+            }
+        ],
+        "observations": [
+            {
+                "concept_id": "concept://alpha",
+                "embedding": [0.15, 0.25, 0.35],
+                "timestamp_ms": 123
+            },
+            {
+                "concept_id": "concept://beta",
+                "embedding": [0.28, 0.22, 0.12],
+                "timestamp_ms": 456
+            }
+        ]
+    }
+    "#;
+
+    let dataset: RepresentationDataset = serde_json::from_str(dataset_json).unwrap();
+    let adapter = RepresentationAdapter::from_dataset(&dataset).unwrap();
+    let manifest = adapter.manifest();
+    assert_eq!(manifest.concepts.len(), 2);
+    assert!(manifest
+        .concepts
+        .iter()
+        .any(|concept| concept.concept_id == "concept://alpha"));
 }
 
 fn sample_anchor(id: &str) -> ConceptAnchor {
