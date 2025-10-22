@@ -44,7 +44,7 @@ fn compile_cuda_kernels() {
     //   - H200 runs sm_90 PTX natively
     //   - RTX 5070 (CC 12.0) JIT-compiles sm_90 PTX to native code at runtime
     let status = Command::new(&nvcc)
-        .args(&[
+        .args([
             "--ptx",                    // Compile to PTX (portable, forward-compatible)
             "-O3",                      // Optimize
             "--gpu-architecture=sm_90", // Hopper architecture (H200 + forward-compat for newer GPUs)

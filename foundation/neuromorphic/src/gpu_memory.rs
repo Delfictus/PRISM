@@ -3,10 +3,10 @@
 //! Provides efficient memory pooling, allocation strategies, and resource management
 //! for CUDA operations in the neuromorphic-quantum platform
 
+use anyhow::{anyhow, Result};
 use cudarc::driver::*;
-use anyhow::{Result, anyhow};
-use std::sync::{Arc, Mutex};
 use dashmap::DashMap;
+use std::sync::{Arc, Mutex};
 
 /// GPU memory pool for efficient buffer reuse
 /// Eliminates allocation overhead that would reduce the 89% performance gain
@@ -36,10 +36,10 @@ pub struct AllocationStats {
 /// Memory buffer type for different use cases
 #[derive(Debug, Clone, Copy)]
 pub enum BufferType {
-    Matrix,        // Large matrices (reservoir weights)
-    Vector,        // State vectors (neuron states)
-    Input,         // Input vectors (spike patterns)
-    Temporary,     // Scratch buffers for computation
+    Matrix,    // Large matrices (reservoir weights)
+    Vector,    // State vectors (neuron states)
+    Input,     // Input vectors (spike patterns)
+    Temporary, // Scratch buffers for computation
 }
 
 /// GPU memory configuration for RTX 5070 optimization
@@ -54,7 +54,7 @@ pub struct GpuMemoryConfig {
 impl Default for GpuMemoryConfig {
     fn default() -> Self {
         Self {
-            max_cache_size_mb: 4096,  // 4GB cache for RTX 5070's 8GB VRAM (optimized)
+            max_cache_size_mb: 4096, // 4GB cache for RTX 5070's 8GB VRAM (optimized)
             prealloc_buffer_sizes: vec![
                 100,      // Small vectors
                 1000,     // Medium vectors
@@ -64,8 +64,8 @@ impl Default for GpuMemoryConfig {
                 4000000,  // Extra large matrices (2000x2000 reservoir)
                 10000000, // Massive matrices for advanced reservoirs
             ],
-            enable_unified_memory: true,  // RTX 5070 supports unified memory
-            memory_growth_factor: 2.0,    // More aggressive growth for large allocations
+            enable_unified_memory: true, // RTX 5070 supports unified memory
+            memory_growth_factor: 2.0,   // More aggressive growth for large allocations
         }
     }
 }
@@ -112,7 +112,9 @@ impl GpuMemoryPool {
                 let mut stats = self.allocation_stats.lock().unwrap();
                 stats.total_allocations += 4;
                 stats.current_memory_usage_mb += (size * 4 * 4) as f32 / 1024.0 / 1024.0;
-                stats.peak_memory_usage_mb = stats.peak_memory_usage_mb.max(stats.current_memory_usage_mb);
+                stats.peak_memory_usage_mb = stats
+                    .peak_memory_usage_mb
+                    .max(stats.current_memory_usage_mb);
             }
         }
 
@@ -137,17 +139,15 @@ impl GpuMemoryPool {
         // Cache miss - allocate new buffer
         let stream = self.device.default_stream();
         let buffer = match buffer_type {
-            BufferType::Matrix | BufferType::Vector => {
-                stream.alloc_zeros::<f32>(size)?
-            },
+            BufferType::Matrix | BufferType::Vector => stream.alloc_zeros::<f32>(size)?,
             BufferType::Input => {
                 // Input buffers might benefit from pinned memory
                 stream.alloc_zeros::<f32>(size)?
-            },
+            }
             BufferType::Temporary => {
                 // Temporary buffers for intermediate computation
                 stream.alloc_zeros::<f32>(size)?
-            },
+            }
         };
 
         // Update stats
@@ -156,7 +156,9 @@ impl GpuMemoryPool {
             stats.cache_misses += 1;
             stats.total_allocations += 1;
             stats.current_memory_usage_mb += (size * 4) as f32 / 1024.0 / 1024.0;
-            stats.peak_memory_usage_mb = stats.peak_memory_usage_mb.max(stats.current_memory_usage_mb);
+            stats.peak_memory_usage_mb = stats
+                .peak_memory_usage_mb
+                .max(stats.current_memory_usage_mb);
         }
 
         Ok(buffer)
@@ -167,14 +169,20 @@ impl GpuMemoryPool {
         // Check if we're under pool size limit
         let current_pool_size = self.pools.get(&size).map(|v| v.len()).unwrap_or(0);
 
-        if current_pool_size < 8 {  // Max 8 buffers per size in pool
+        if current_pool_size < 8 {
+            // Max 8 buffers per size in pool
             // Clear buffer memory for reuse (need mutable reference)
             let mut buffer_mut = buffer;
-            self.device.default_stream().memset_zeros(&mut buffer_mut)
+            self.device
+                .default_stream()
+                .memset_zeros(&mut buffer_mut)
                 .map_err(|e| anyhow!("Failed to clear buffer: {}", e))?;
 
             // Add to pool
-            self.pools.entry(size).or_insert_with(Vec::new).push(buffer_mut);
+            self.pools
+                .entry(size)
+                .or_insert_with(Vec::new)
+                .push(buffer_mut);
         }
         // If pool is full, buffer will be automatically freed when dropped
 
@@ -209,10 +217,13 @@ impl GpuMemoryPool {
         host_data: &[T],
     ) -> Result<CudaSlice<T>> {
         if let Some(stream) = self.transfer_stream.lock().unwrap().as_ref() {
-            stream.memcpy_stod(host_data)
+            stream
+                .memcpy_stod(host_data)
                 .map_err(|e| anyhow!("Failed to copy host to device: {}", e))
         } else {
-            self.device.default_stream().memcpy_stod(host_data)
+            self.device
+                .default_stream()
+                .memcpy_stod(host_data)
                 .map_err(|e| anyhow!("Failed to copy host to device: {}", e))
         }
     }
@@ -223,10 +234,13 @@ impl GpuMemoryPool {
         device_buffer: &CudaSlice<T>,
     ) -> Result<Vec<T>> {
         if let Some(stream) = self.transfer_stream.lock().unwrap().as_ref() {
-            stream.memcpy_dtov(device_buffer)
+            stream
+                .memcpy_dtov(device_buffer)
                 .map_err(|e| anyhow!("Failed to copy device to host: {}", e))
         } else {
-            self.device.default_stream().memcpy_dtov(device_buffer)
+            self.device
+                .default_stream()
+                .memcpy_dtov(device_buffer)
                 .map_err(|e| anyhow!("Failed to copy device to host: {}", e))
         }
     }
@@ -278,13 +292,15 @@ impl ManagedGpuBuffer {
 
     /// Get reference to underlying buffer
     pub fn buffer(&self) -> Result<&CudaSlice<f32>> {
-        self.buffer.as_ref()
+        self.buffer
+            .as_ref()
             .ok_or_else(|| anyhow!("Buffer has been consumed"))
     }
 
     /// Get mutable reference to underlying buffer
     pub fn buffer_mut(&mut self) -> Result<&mut CudaSlice<f32>> {
-        self.buffer.as_mut()
+        self.buffer
+            .as_mut()
             .ok_or_else(|| anyhow!("Buffer has been consumed"))
     }
 
@@ -293,7 +309,8 @@ impl ManagedGpuBuffer {
         if self.is_borrowed {
             return Err(anyhow!("Cannot take buffer that is currently borrowed"));
         }
-        self.buffer.take()
+        self.buffer
+            .take()
             .ok_or_else(|| anyhow!("Buffer has already been taken"))
     }
 
@@ -336,7 +353,9 @@ impl<'a> GpuBufferBorrow<'a> {
         if !self.active {
             return Err(anyhow!("Borrow has been released"));
         }
-        self.buffer_ref.buffer.as_ref()
+        self.buffer_ref
+            .buffer
+            .as_ref()
             .ok_or_else(|| anyhow!("Buffer has been consumed"))
     }
 
@@ -345,7 +364,9 @@ impl<'a> GpuBufferBorrow<'a> {
         if !self.active {
             return Err(anyhow!("Borrow has been released"));
         }
-        self.buffer_ref.buffer.as_mut()
+        self.buffer_ref
+            .buffer
+            .as_mut()
             .ok_or_else(|| anyhow!("Buffer has been consumed"))
     }
 }
@@ -405,7 +426,8 @@ impl NeuromorphicGpuMemoryManager {
 
         // Pre-allocate state buffers (current, previous, temporary)
         let mut state_buffers = Vec::new();
-        for _ in 0..4 {  // Current, previous, temp, input
+        for _ in 0..4 {
+            // Current, previous, temp, input
             let buffer = ManagedGpuBuffer::new(
                 memory_pool.clone(),
                 reservoir_size.max(input_size),
@@ -489,8 +511,10 @@ mod tests {
             assert!(stats.total_allocations > 0);
             assert!(stats.current_memory_usage_mb > 0.0);
 
-            println!("Memory pool created with {} allocations, {:.1}MB used",
-                    stats.total_allocations, stats.current_memory_usage_mb);
+            println!(
+                "Memory pool created with {} allocations, {:.1}MB used",
+                stats.total_allocations, stats.current_memory_usage_mb
+            );
         }
     }
 
@@ -516,8 +540,10 @@ mod tests {
             // Should have more cache hits in final stats
             assert!(final_stats.cache_hits > initial_stats.cache_hits);
 
-            println!("Buffer reuse test: {} cache hits, {} cache misses",
-                    final_stats.cache_hits, final_stats.cache_misses);
+            println!(
+                "Buffer reuse test: {} cache hits, {} cache misses",
+                final_stats.cache_hits, final_stats.cache_misses
+            );
         }
     }
 
@@ -543,8 +569,10 @@ mod tests {
             assert!(state_buffer.is_ok());
 
             let stats = manager.get_memory_stats();
-            println!("Neuromorphic memory manager: {:.1}MB allocated",
-                    stats.current_memory_usage_mb);
+            println!(
+                "Neuromorphic memory manager: {:.1}MB allocated",
+                stats.current_memory_usage_mb
+            );
         }
     }
 }

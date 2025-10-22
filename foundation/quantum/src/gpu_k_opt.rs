@@ -4,9 +4,9 @@
 //! Massive parallelism for exploring neighborhood moves
 
 use anyhow::Result;
-use std::sync::Arc;
 use cudarc::driver::{CudaContext, LaunchConfig};
 use ndarray::Array2;
+use std::sync::Arc;
 
 /// GPU k-opt optimizer for TSP
 pub struct GpuKOpt {
@@ -141,8 +141,8 @@ impl GpuKOpt {
         let mut best_tour = tour.to_vec();
         let mut best_delta = 0.0f32;
 
-        for i in 0..n-1 {
-            for j in i+2..n {
+        for i in 0..n - 1 {
+            for j in i + 2..n {
                 let a = tour[i];
                 let b = tour[i + 1];
                 let c = tour[j];
@@ -156,7 +156,7 @@ impl GpuKOpt {
                     best_delta = delta;
                     // Reverse tour[i+1..j]
                     best_tour = tour.to_vec();
-                    best_tour[i+1..=j].reverse();
+                    best_tour[i + 1..=j].reverse();
                 }
             }
         }

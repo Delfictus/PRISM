@@ -3,7 +3,7 @@
 //! Implements high-performance graph coloring on NVIDIA GPUs using cudarc.
 //! Accelerates adjacency matrix construction, conflict detection, and DSATUR heuristic.
 
-use anyhow::{Result, Context, anyhow};
+use anyhow::{anyhow, Context, Result};
 use cudarc::driver::*;
 use ndarray::Array2;
 use num_complex::Complex64;
@@ -30,17 +30,10 @@ pub struct GpuChromaticColoring {
 
 impl GpuChromaticColoring {
     /// Create new GPU-accelerated chromatic coloring
-    pub fn new_adaptive(
-        coupling_matrix: &Array2<Complex64>,
-        target_colors: usize,
-    ) -> Result<Self> {
+    pub fn new_adaptive(coupling_matrix: &Array2<Complex64>, target_colors: usize) -> Result<Self> {
         let device = CudaContext::new(0).context("Failed to initialize CUDA device")?;
 
-        let threshold = Self::find_optimal_threshold_gpu(
-            &device,
-            coupling_matrix,
-            target_colors,
-        )?;
+        let threshold = Self::find_optimal_threshold_gpu(&device, coupling_matrix, target_colors)?;
 
         Self::new(coupling_matrix, target_colors, threshold, device)
     }
@@ -62,7 +55,8 @@ impl GpuChromaticColoring {
         }
 
         // Build adjacency matrix on GPU (returns module and adjacency)
-        let (module, gpu_adjacency) = Self::build_adjacency_gpu(&device, coupling_matrix, threshold)?;
+        let (module, gpu_adjacency) =
+            Self::build_adjacency_gpu(&device, coupling_matrix, threshold)?;
 
         // Compute coloring using Jones-Plassmann parallel algorithm on GPU
         let coloring = Self::jones_plassmann_gpu(&device, &gpu_adjacency, n, target_colors)?;
@@ -96,7 +90,8 @@ impl GpuChromaticColoring {
         if n != coupling_matrix.ncols() {
             return Err(anyhow!(
                 "Coupling matrix must be square: got {}x{}",
-                n, coupling_matrix.ncols()
+                n,
+                coupling_matrix.ncols()
             ));
         }
 
@@ -115,7 +110,9 @@ impl GpuChromaticColoring {
                 if !strength.is_finite() {
                     return Err(anyhow!(
                         "Invalid coupling strength at ({}, {}): {}",
-                        i, j, strength
+                        i,
+                        j,
+                        strength
                     ));
                 }
                 coupling_flat.push(strength as f32);
@@ -124,12 +121,14 @@ impl GpuChromaticColoring {
 
         // Use stream-based API
         let stream = device.default_stream();
-        let gpu_coupling = stream.memcpy_stod(&coupling_flat)
+        let gpu_coupling = stream
+            .memcpy_stod(&coupling_flat)
             .context("Failed to upload coupling matrix to GPU")?;
 
         // Allocate adjacency matrix on GPU (packed as bits in u8 for efficiency)
         let adjacency_bytes = (n * n + 7) / 8;
-        let gpu_adjacency = stream.alloc_zeros::<u8>(adjacency_bytes)
+        let gpu_adjacency = stream
+            .alloc_zeros::<u8>(adjacency_bytes)
             .context("Failed to allocate GPU adjacency matrix")?;
 
         // Load PTX kernel - try OUT_DIR first, then fallback to target/ptx/
@@ -141,14 +140,24 @@ impl GpuChromaticColoring {
             } else {
                 // Fallback to runtime location
                 let runtime_path = std::path::Path::new("target/ptx/graph_coloring.ptx");
-                std::fs::read_to_string(runtime_path)
-                    .map_err(|e| anyhow!("Failed to load PTX from {:?}: {}. Run: cargo build --release", runtime_path, e))?
+                std::fs::read_to_string(runtime_path).map_err(|e| {
+                    anyhow!(
+                        "Failed to load PTX from {:?}: {}. Run: cargo build --release",
+                        runtime_path,
+                        e
+                    )
+                })?
             }
         } else {
             // Runtime: use known location
             let runtime_path = std::path::Path::new("target/ptx/graph_coloring.ptx");
-            std::fs::read_to_string(runtime_path)
-                .map_err(|e| anyhow!("Failed to load PTX from {:?}: {}. Run: cargo build --release", runtime_path, e))?
+            std::fs::read_to_string(runtime_path).map_err(|e| {
+                anyhow!(
+                    "Failed to load PTX from {:?}: {}. Run: cargo build --release",
+                    runtime_path,
+                    e
+                )
+            })?
         };
 
         if ptx.is_empty() || !ptx.contains("build_adjacency") {
@@ -158,11 +167,13 @@ impl GpuChromaticColoring {
         }
 
         // Load module using cudarc 0.17 API
-        let module = device.load_module(ptx.into())
+        let module = device
+            .load_module(ptx.into())
             .context("Failed to load PTX module - check CUDA driver version")?;
 
         // Launch kernel: build_adjacency(coupling, threshold, adjacency, n)
-        let build_adjacency = module.load_function("build_adjacency")
+        let build_adjacency = module
+            .load_function("build_adjacency")
             .context("Failed to get build_adjacency kernel from PTX module")?;
 
         let cfg = LaunchConfig::for_num_elems((n * n) as u32);
@@ -177,11 +188,13 @@ impl GpuChromaticColoring {
         launch_args.arg(&n_u32);
 
         unsafe {
-            launch_args.launch(cfg)
+            launch_args
+                .launch(cfg)
                 .context("GPU kernel launch failed - check CUDA runtime")?;
         }
 
-        stream.synchronize()
+        stream
+            .synchronize()
             .context("GPU synchronization failed after adjacency construction")?;
 
         Ok((module, gpu_adjacency))
@@ -197,13 +210,15 @@ impl GpuChromaticColoring {
         let adjacency_bytes = (n * n + 7) / 8;
 
         let stream = device.default_stream();
-        let packed = stream.memcpy_dtov(gpu_adjacency)
+        let packed = stream
+            .memcpy_dtov(gpu_adjacency)
             .context("Failed to download adjacency matrix from GPU")?;
 
         if packed.len() != adjacency_bytes {
             return Err(anyhow!(
                 "Adjacency buffer size mismatch: expected {} bytes, got {}",
-                adjacency_bytes, packed.len()
+                adjacency_bytes,
+                packed.len()
             ));
         }
 
@@ -212,7 +227,8 @@ impl GpuChromaticColoring {
         // PRODUCTION: Unpack bits from GPU byte array
         // Note: CUDA kernel writes to 32-bit words, so we need to read accordingly
         // Convert byte array to 32-bit words for correct bit extraction
-        let words: Vec<u32> = packed.chunks(4)
+        let words: Vec<u32> = packed
+            .chunks(4)
             .map(|chunk| {
                 let mut bytes = [0u8; 4];
                 for (i, &b) in chunk.iter().enumerate() {
@@ -237,7 +253,7 @@ impl GpuChromaticColoring {
         // PRODUCTION: Enforce symmetry for undirected graphs
         // GPU kernel should set both (i,j) and (j,i), but ensure consistency
         for i in 0..n {
-            for j in (i+1)..n {
+            for j in (i + 1)..n {
                 if adjacency[[i, j]] != adjacency[[j, i]] {
                     // Make symmetric by taking logical OR
                     let has_edge = adjacency[[i, j]] || adjacency[[j, i]];
@@ -265,8 +281,13 @@ impl GpuChromaticColoring {
         let ptx = if let Ok(out_dir) = std::env::var("OUT_DIR") {
             let ptx_path = std::path::Path::new(&out_dir).join("parallel_coloring.ptx");
             if ptx_path.exists() {
-                std::fs::read_to_string(&ptx_path)
-                    .map_err(|e| anyhow!("Failed to load parallel_coloring PTX from {:?}: {}", ptx_path, e))?
+                std::fs::read_to_string(&ptx_path).map_err(|e| {
+                    anyhow!(
+                        "Failed to load parallel_coloring PTX from {:?}: {}",
+                        ptx_path,
+                        e
+                    )
+                })?
             } else {
                 let runtime_path = std::path::Path::new("target/ptx/parallel_coloring.ptx");
                 std::fs::read_to_string(runtime_path)
@@ -279,18 +300,25 @@ impl GpuChromaticColoring {
         };
 
         // Load module using cudarc 0.17 API
-        let module = Arc::new(device.load_module(ptx.into())
-            .context("Failed to load parallel coloring PTX module")?);
+        let module = Arc::new(
+            device
+                .load_module(ptx.into())
+                .context("Failed to load parallel coloring PTX module")?,
+        );
 
         // Allocate GPU buffers using stream-based API
         let stream = device.default_stream();
-        let mut gpu_priorities = stream.alloc_zeros::<f32>(n)
+        let mut gpu_priorities = stream
+            .alloc_zeros::<f32>(n)
             .context("Failed to allocate priorities buffer")?;
-        let mut gpu_colors = stream.alloc_zeros::<u32>(n)
+        let mut gpu_colors = stream
+            .alloc_zeros::<u32>(n)
             .context("Failed to allocate colors buffer")?;
-        let mut gpu_can_color = stream.alloc_zeros::<u32>(n)
+        let mut gpu_can_color = stream
+            .alloc_zeros::<u32>(n)
             .context("Failed to allocate can_color buffer")?;
-        let mut gpu_uncolored_count = stream.alloc_zeros::<u32>(1)
+        let mut gpu_uncolored_count = stream
+            .alloc_zeros::<u32>(1)
             .context("Failed to allocate uncolored_count buffer")?;
 
         let cfg = LaunchConfig::for_num_elems(n as u32);
@@ -300,7 +328,8 @@ impl GpuChromaticColoring {
             .as_secs();
 
         // Initialize priorities and colors
-        let init_priorities = module.load_function("init_priorities")
+        let init_priorities = module
+            .load_function("init_priorities")
             .context("Failed to get init_priorities kernel")?;
 
         let n_u32 = n as u32;
@@ -311,17 +340,21 @@ impl GpuChromaticColoring {
         launch_args.arg(&seed);
 
         unsafe {
-            launch_args.launch(cfg)
+            launch_args
+                .launch(cfg)
                 .context("Failed to launch init_priorities kernel")?;
         }
         stream.synchronize()?;
 
         // Load kernel functions once before loop
-        let find_independent_set = module.load_function("find_independent_set")
+        let find_independent_set = module
+            .load_function("find_independent_set")
             .context("Failed to get find_independent_set kernel")?;
-        let color_independent_set = module.load_function("color_independent_set")
+        let color_independent_set = module
+            .load_function("color_independent_set")
             .context("Failed to get color_independent_set kernel")?;
-        let count_uncolored = module.load_function("count_uncolored")
+        let count_uncolored = module
+            .load_function("count_uncolored")
             .context("Failed to get count_uncolored kernel")?;
 
         // Jones-Plassmann algorithm: iteratively color independent sets
@@ -337,7 +370,8 @@ impl GpuChromaticColoring {
             launch_args1.arg(&n_u32);
 
             unsafe {
-                launch_args1.launch(cfg)
+                launch_args1
+                    .launch(cfg)
                     .context("Failed to launch find_independent_set kernel")?;
             }
             stream.synchronize()?;
@@ -361,7 +395,8 @@ impl GpuChromaticColoring {
             launch_args2.arg(&max_colors_u32);
 
             unsafe {
-                launch_args2.launch(cfg_with_shared)
+                launch_args2
+                    .launch(cfg_with_shared)
                     .context("Failed to launch color_independent_set kernel")?;
             }
             stream.synchronize()?;
@@ -376,7 +411,8 @@ impl GpuChromaticColoring {
             launch_args3.arg(&n_u32);
 
             unsafe {
-                launch_args3.launch(cfg)
+                launch_args3
+                    .launch(cfg)
                     .context("Failed to launch count_uncolored kernel")?;
             }
             stream.synchronize()?;
@@ -389,11 +425,13 @@ impl GpuChromaticColoring {
         }
 
         // Download coloring from GPU
-        let gpu_coloring: Vec<u32> = stream.memcpy_dtov(&gpu_colors)
+        let gpu_coloring: Vec<u32> = stream
+            .memcpy_dtov(&gpu_colors)
             .context("Failed to download coloring from GPU")?;
 
         // Convert to usize and validate
-        let coloring: Vec<usize> = gpu_coloring.iter()
+        let coloring: Vec<usize> = gpu_coloring
+            .iter()
             .map(|&c| {
                 if c == 0xFFFFFFFF {
                     return Err(anyhow!("Some vertices remain uncolored"));
@@ -479,13 +517,12 @@ impl GpuChromaticColoring {
                 .len();
 
             // Degree: count total neighbors (excluding self)
-            let degree = (0..n)
-                .filter(|&u| u != v && adjacency[[v, u]])
-                .count();
+            let degree = (0..n).filter(|&u| u != v && adjacency[[v, u]]).count();
 
             // DSATUR: Select vertex with highest saturation
             // Break ties by highest degree
-            if saturation > max_saturation || (saturation == max_saturation && degree > max_degree) {
+            if saturation > max_saturation || (saturation == max_saturation && degree > max_degree)
+            {
                 max_saturation = saturation;
                 max_degree = degree;
                 best_vertex = v;
@@ -503,7 +540,9 @@ impl GpuChromaticColoring {
         if n != adjacency.nrows() || n != adjacency.ncols() {
             return Err(anyhow!(
                 "Dimension mismatch: coloring has {} vertices but adjacency is {}x{}",
-                n, adjacency.nrows(), adjacency.ncols()
+                n,
+                adjacency.nrows(),
+                adjacency.ncols()
             ));
         }
 
@@ -517,7 +556,7 @@ impl GpuChromaticColoring {
         // Check for conflicts (adjacent vertices with same color)
         let mut conflicts = Vec::new();
         for i in 0..n {
-            for j in (i+1)..n {
+            for j in (i + 1)..n {
                 if adjacency[[i, j]] && coloring[i] == coloring[j] {
                     conflicts.push((i, j, coloring[i]));
                 }
@@ -525,8 +564,9 @@ impl GpuChromaticColoring {
         }
 
         if !conflicts.is_empty() {
-            let conflict_list: Vec<String> = conflicts.iter()
-                .take(5)  // Show first 5 conflicts
+            let conflict_list: Vec<String> = conflicts
+                .iter()
+                .take(5) // Show first 5 conflicts
                 .map(|(i, j, c)| format!("({}-{}: color {})", i, j, c))
                 .collect();
 
@@ -540,11 +580,12 @@ impl GpuChromaticColoring {
 
         // Verify adjacency matrix is symmetric (for undirected graphs)
         for i in 0..n {
-            for j in (i+1)..n {
+            for j in (i + 1)..n {
                 if adjacency[[i, j]] != adjacency[[j, i]] {
                     return Err(anyhow!(
                         "Adjacency matrix is not symmetric at ({}, {})",
-                        i, j
+                        i,
+                        j
                     ));
                 }
             }
@@ -573,7 +614,9 @@ impl GpuChromaticColoring {
         let gpu_conflicts = stream.alloc_zeros::<u32>(1)?;
 
         // Launch kernel: count_conflicts(adjacency, coloring, conflicts, n)
-        let count_conflicts = self.module.load_function("count_conflicts")
+        let count_conflicts = self
+            .module
+            .load_function("count_conflicts")
             .context("Failed to get count_conflicts kernel")?;
         let cfg = LaunchConfig::for_num_elems((n * n) as u32);
 
@@ -636,7 +679,8 @@ impl GpuChromaticColoring {
             let mid_threshold = strengths[mid_idx];
 
             // Build graph with this threshold (on GPU)
-            let (_module, gpu_adjacency) = Self::build_adjacency_gpu(device, coupling_matrix, mid_threshold)?;
+            let (_module, gpu_adjacency) =
+                Self::build_adjacency_gpu(device, coupling_matrix, mid_threshold)?;
             let cpu_adjacency = Self::download_adjacency(device, &gpu_adjacency, n)?;
 
             // Test k-colorability

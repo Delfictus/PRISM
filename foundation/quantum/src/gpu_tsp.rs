@@ -6,12 +6,12 @@
 //! - Greedy nearest-neighbor construction (CPU)
 //! - Iterative 2-opt improvement (GPU)
 
+use anyhow::{anyhow, Context, Result};
+use cudarc::driver::*;
 use ndarray::Array2;
 use num_complex::Complex64;
-use anyhow::{Result, Context, anyhow};
-use cudarc::driver::*;
-use std::sync::Arc;
 use std::collections::HashSet;
+use std::sync::Arc;
 
 /// GPU-accelerated TSP solver
 pub struct GpuTspSolver {
@@ -42,26 +42,35 @@ impl GpuTspSolver {
         }
 
         if coupling_matrix.ncols() != n {
-            return Err(anyhow!("Coupling matrix must be square, got {}×{}", n, coupling_matrix.ncols()));
+            return Err(anyhow!(
+                "Coupling matrix must be square, got {}×{}",
+                n,
+                coupling_matrix.ncols()
+            ));
         }
 
         // Initialize CUDA device
-        let device = CudaContext::new(0)
-            .context("Failed to initialize CUDA device 0. Check:\n  \
+        let device = CudaContext::new(0).context(
+            "Failed to initialize CUDA device 0. Check:\n  \
                      1. NVIDIA driver is installed (nvidia-smi)\n  \
                      2. GPU is accessible from WSL2 (/dev/dxg exists)\n  \
-                     3. LD_LIBRARY_PATH includes /usr/lib/wsl/lib")?;
+                     3. LD_LIBRARY_PATH includes /usr/lib/wsl/lib",
+        )?;
 
         println!("🔧 Initializing GPU TSP Solver for {} cities...", n);
 
         // Compute distance matrix on GPU (returns module and matrix)
-        let (module, distance_matrix) = Self::compute_distance_matrix_gpu(&device, coupling_matrix)?;
+        let (module, distance_matrix) =
+            Self::compute_distance_matrix_gpu(&device, coupling_matrix)?;
 
         // Initialize with nearest-neighbor tour (CPU)
         let tour = Self::nearest_neighbor_tour(&distance_matrix);
         let tour_length = Self::calculate_tour_length(&tour, &distance_matrix);
 
-        println!("  ✓ Initial tour (nearest-neighbor): length = {:.2}", tour_length);
+        println!(
+            "  ✓ Initial tour (nearest-neighbor): length = {:.2}",
+            tour_length
+        );
 
         Ok(Self {
             device,
@@ -90,14 +99,24 @@ impl GpuTspSolver {
             } else {
                 // Fallback to runtime location
                 let runtime_path = std::path::Path::new("target/ptx/tsp_solver.ptx");
-                std::fs::read_to_string(runtime_path)
-                    .map_err(|e| anyhow!("Failed to load PTX from {:?}: {}. Run: cargo build --release", runtime_path, e))?
+                std::fs::read_to_string(runtime_path).map_err(|e| {
+                    anyhow!(
+                        "Failed to load PTX from {:?}: {}. Run: cargo build --release",
+                        runtime_path,
+                        e
+                    )
+                })?
             }
         } else {
             // Runtime: use known location
             let runtime_path = std::path::Path::new("target/ptx/tsp_solver.ptx");
-            std::fs::read_to_string(runtime_path)
-                .map_err(|e| anyhow!("Failed to load PTX from {:?}: {}. Run: cargo build --release", runtime_path, e))?
+            std::fs::read_to_string(runtime_path).map_err(|e| {
+                anyhow!(
+                    "Failed to load PTX from {:?}: {}. Run: cargo build --release",
+                    runtime_path,
+                    e
+                )
+            })?
         };
 
         if ptx.is_empty() || !ptx.contains("compute_distance_matrix") {
@@ -107,14 +126,18 @@ impl GpuTspSolver {
         }
 
         // Load module using cudarc 0.17 API
-        let module = device.load_module(ptx.into())
+        let module = device
+            .load_module(ptx.into())
             .context("Failed to load PTX module - check CUDA driver version")?;
 
-        let compute_fn = module.load_function("compute_distance_matrix")
+        let compute_fn = module
+            .load_function("compute_distance_matrix")
             .context("Failed to get compute_distance_matrix kernel")?;
-        let find_max_fn = module.load_function("find_max_distance")
+        let find_max_fn = module
+            .load_function("find_max_distance")
             .context("Failed to get find_max_distance kernel")?;
-        let normalize_fn = module.load_function("normalize_distances")
+        let normalize_fn = module
+            .load_function("normalize_distances")
             .context("Failed to get normalize_distances kernel")?;
 
         // Prepare coupling matrix data (split real/imag)
@@ -149,7 +172,7 @@ impl GpuTspSolver {
         launch_args1.arg(&gpu_coupling_imag);
         launch_args1.arg(&gpu_distances);
         let n_u32 = n as u32;
-            launch_args1.arg(&n_u32);
+        launch_args1.arg(&n_u32);
 
         unsafe {
             launch_args1.launch(cfg)?;
@@ -171,7 +194,7 @@ impl GpuTspSolver {
         launch_args2.arg(&gpu_distances);
         launch_args2.arg(&gpu_partial_maxs);
         let n_u32 = n as u32;
-            launch_args2.arg(&n_u32);
+        launch_args2.arg(&n_u32);
 
         unsafe {
             launch_args2.launch(cfg_max)?;
@@ -188,7 +211,7 @@ impl GpuTspSolver {
         launch_args3.arg(&gpu_distances);
         launch_args3.arg(&max_distance);
         let n_u32 = n as u32;
-            launch_args3.arg(&n_u32);
+        launch_args3.arg(&n_u32);
 
         unsafe {
             launch_args3.launch(cfg)?;
@@ -264,7 +287,10 @@ impl GpuTspSolver {
 
     /// Optimize tour using GPU-accelerated 2-opt
     pub fn optimize_2opt_gpu(&mut self, max_iterations: usize) -> Result<()> {
-        println!("🔄 Running GPU 2-opt optimization (max {} iterations)...", max_iterations);
+        println!(
+            "🔄 Running GPU 2-opt optimization (max {} iterations)...",
+            max_iterations
+        );
 
         let n = self.n_cities;
         let total_swaps = n * (n - 3) / 2;
@@ -284,9 +310,13 @@ impl GpuTspSolver {
         let gpu_distances = stream.memcpy_stod(&distances_flat)?;
 
         // Get kernel functions once before loop
-        let evaluate_fn = self.module.load_function("evaluate_2opt_swaps")
+        let evaluate_fn = self
+            .module
+            .load_function("evaluate_2opt_swaps")
             .context("Failed to get evaluate_2opt_swaps kernel")?;
-        let find_min_fn = self.module.load_function("find_min_delta")
+        let find_min_fn = self
+            .module
+            .load_function("find_min_delta")
             .context("Failed to get find_min_delta kernel")?;
 
         let mut improved = true;
@@ -335,7 +365,9 @@ impl GpuTspSolver {
             let cfg_min = LaunchConfig {
                 grid_dim: (num_blocks as u32, 1, 1),
                 block_dim: (threads as u32, 1, 1),
-                shared_mem_bytes: (threads * (std::mem::size_of::<f32>() + std::mem::size_of::<u32>())) as u32,
+                shared_mem_bytes: (threads
+                    * (std::mem::size_of::<f32>() + std::mem::size_of::<u32>()))
+                    as u32,
             };
 
             let mut launch_args2 = stream.launch_builder(&find_min_fn);
@@ -385,15 +417,20 @@ impl GpuTspSolver {
                 improvements += 1;
 
                 if iteration % 10 == 0 {
-                    println!("  Iteration {}: tour length = {:.2} (improved by {:.4})",
-                             iteration, self.tour_length, -best_delta);
+                    println!(
+                        "  Iteration {}: tour length = {:.2} (improved by {:.4})",
+                        iteration, self.tour_length, -best_delta
+                    );
                 }
             }
 
             iteration += 1;
         }
 
-        println!("  ✓ Optimization complete: {} iterations, {} improvements", iteration, improvements);
+        println!(
+            "  ✓ Optimization complete: {} iterations, {} improvements",
+            iteration, improvements
+        );
         println!("  ✓ Final tour length: {:.2}", self.tour_length);
 
         Ok(())
