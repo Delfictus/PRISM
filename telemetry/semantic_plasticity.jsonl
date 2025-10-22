@@ -1,0 +1,6 @@
+{"component":"semantic_plasticity","timestamp_ms":1751356000000,"source":"telemetry:orchestrator","payload":{"concept_id":"concept://coloring","embedding":[0.20,0.48,0.32,0.41],"notes":"baseline snapshot"}}
+{"component":"semantic_plasticity","timestamp_ms":1751359600000,"source":"telemetry:orchestrator","payload":{"concept_id":"concept://coloring","embedding":[0.24,0.51,0.30,0.44],"notes":"post-coherence adjustment"}}
+{"component":"semantic_plasticity","timestamp_ms":1751356005000,"source":"telemetry:ontology","payload":{"concept_id":"concept://ontology","embedding":[0.12,0.11,0.13,0.10],"notes":"bridge alignment"}}
+{"component":"semantic_plasticity","timestamp_ms":1751359610000,"source":"telemetry:ontology","payload":{"concept_id":"concept://ontology","embedding":[0.15,0.10,0.15,0.11],"notes":"alignment refresh"}}
+{"component":"semantic_plasticity","timestamp_ms":1751360000000,"source":"telemetry:explainability","payload":{"concept_id":"concept://explainer","embedding":[0.34,0.26,0.37,0.23],"notes":"attention rollout"}}
+{"component":"semantic_plasticity","timestamp_ms":1751363600000,"source":"telemetry:explainability","payload":{"concept_id":"concept://explainer","embedding":[0.39,0.21,0.41,0.19],"notes":"drift remediation"}}

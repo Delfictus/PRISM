@@ -16,7 +16,8 @@
 6. Obtain sign-off from governance lead and SRE.
 
 ## Knowledge Evolution (Phase M4)
-- Generate semantic plasticity explainability report: `python3 PRISM-AI-UNIFIED-VAULT/03-AUTOMATION/master_executor.py --use-sample-metrics --skip-build --skip-tests --skip-benchmarks`
+- Extract telemetry into a representation dataset: `python3 PRISM-AI-UNIFIED-VAULT/meta/representation/pipelines/extract_telemetry.py --input telemetry/semantic_plasticity.jsonl --output PRISM-AI-UNIFIED-VAULT/meta/representation/dataset.json`
+- Generate semantic plasticity explainability report: `python3 PRISM-AI-UNIFIED-VAULT/03-AUTOMATION/master_executor.py --skip-build --skip-tests --skip-benchmarks --strict`
 - Review `artifacts/mec/M4/explainability_report.md` for drift status of ontology adapters.
 - Confirm `tests/meta/semantic_plasticity.rs` passes locally before promoting Phase M4 changes.
 - Ensure `scripts/compliance_validator.py --strict` reports `plasticity:*` checks as `PASS`.

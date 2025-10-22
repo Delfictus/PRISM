@@ -1,6 +1,116 @@
 {
-  "adapter_id": "semantic_plasticity",
+  "adapter_id": "semantic_plasticity_m4",
   "dimension": 4,
-  "concepts": [],
-  "observations": []
+  "concepts": [
+    {
+      "id": "concept://coloring",
+      "description": "Telemetry-derived concept concept://coloring",
+      "attributes": {},
+      "related": [],
+      "embedding": [
+        0.2,
+        0.48,
+        0.32,
+        0.41
+      ]
+    },
+    {
+      "id": "concept://explainer",
+      "description": "Telemetry-derived concept concept://explainer",
+      "attributes": {},
+      "related": [],
+      "embedding": [
+        0.34,
+        0.26,
+        0.37,
+        0.23
+      ]
+    },
+    {
+      "id": "concept://ontology",
+      "description": "Telemetry-derived concept concept://ontology",
+      "attributes": {},
+      "related": [],
+      "embedding": [
+        0.12,
+        0.11,
+        0.13,
+        0.1
+      ]
+    }
+  ],
+  "observations": [
+    {
+      "concept_id": "concept://coloring",
+      "embedding": [
+        0.2,
+        0.48,
+        0.32,
+        0.41
+      ],
+      "timestamp_ms": 1751356000000,
+      "source": "telemetry:orchestrator",
+      "notes": "baseline snapshot"
+    },
+    {
+      "concept_id": "concept://coloring",
+      "embedding": [
+        0.24,
+        0.51,
+        0.3,
+        0.44
+      ],
+      "timestamp_ms": 1751359600000,
+      "source": "telemetry:orchestrator",
+      "notes": "post-coherence adjustment"
+    },
+    {
+      "concept_id": "concept://ontology",
+      "embedding": [
+        0.12,
+        0.11,
+        0.13,
+        0.1
+      ],
+      "timestamp_ms": 1751356005000,
+      "source": "telemetry:ontology",
+      "notes": "bridge alignment"
+    },
+    {
+      "concept_id": "concept://ontology",
+      "embedding": [
+        0.15,
+        0.1,
+        0.15,
+        0.11
+      ],
+      "timestamp_ms": 1751359610000,
+      "source": "telemetry:ontology",
+      "notes": "alignment refresh"
+    },
+    {
+      "concept_id": "concept://explainer",
+      "embedding": [
+        0.34,
+        0.26,
+        0.37,
+        0.23
+      ],
+      "timestamp_ms": 1751360000000,
+      "source": "telemetry:explainability",
+      "notes": "attention rollout"
+    },
+    {
+      "concept_id": "concept://explainer",
+      "embedding": [
+        0.39,
+        0.21,
+        0.41,
+        0.19
+      ],
+      "timestamp_ms": 1751363600000,
+      "source": "telemetry:explainability",
+      "notes": "drift remediation"
+    }
+  ]
 }

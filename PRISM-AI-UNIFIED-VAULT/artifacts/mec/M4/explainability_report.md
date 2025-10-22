@@ -9,20 +9,20 @@
 ## Concept Metrics
 | Concept | Status | Cosine | Magnitude Ratio | ΔL2 | Observations | Anchor |
 |---------|--------|--------|-----------------|-----|-------------|--------|
-| `concept://coloring` | stable | 0.998 | 1.042 | 0.062 | 2 | ec4758c503d8bb9938c480da2543b4ecfd5506b7b12793a8d957a67fc356fcd5 |
-| `concept://explainer` | stable | 0.981 | 1.058 | 0.127 | 2 | 9725269d97c719dd95d9665d1640aa4477a03d2874e07da322def6a7c7061215 |
-| `concept://ontology` | stable | 0.995 | 1.168 | 0.047 | 2 | 5a5d894981c2f9a97434b9773553dcfad2d95cd5d4bb98410ae955994901bc37 |
+| `concept://coloring` | stable | 0.998 | 1.054 | 0.062 | 2 | 20e711be932f9bf35aecc9175fb992491c85a3ddb13d3f5a8f52bcae2466e004 |
+| `concept://explainer` | stable | 0.990 | 1.036 | 0.091 | 2 | 2cf74ada6bb575866cd0da12bd8d2b34a52fe19cb6b10a03442d27e501cd45f5 |
+| `concept://ontology` | stable | 0.994 | 1.121 | 0.039 | 2 | 724496f913624e8df44d6628878f5c22618e6aaadcb1ec4dee12a0411388e6ef |
 
 ## Recent Adaptation Events
-- `concept://coloring` @ 1750356000000 → status: stable, cosine=1.000, magnitude_ratio=1.000, ΔL2=0.000
+- `concept://coloring` @ 1751356000000 → status: stable, cosine=1.000, magnitude_ratio=1.000, ΔL2=0.000
+  - notes: baseline alignment maintained | baseline snapshot | source=telemetry:orchestrator
+- `concept://ontology` @ 1751356005000 → status: stable, cosine=1.000, magnitude_ratio=1.000, ΔL2=0.000
+  - notes: baseline alignment maintained | bridge alignment | source=telemetry:ontology
+- `concept://coloring` @ 1751359600000 → status: stable, cosine=0.998, magnitude_ratio=1.054, ΔL2=0.062
   - notes: baseline alignment maintained | post-coherence adjustment | source=telemetry:orchestrator
-- `concept://ontology` @ 1750356005000 → status: stable, cosine=1.000, magnitude_ratio=1.000, ΔL2=0.000
-  - notes: baseline alignment maintained | bridge alignment refresh | source=telemetry:ontology
-- `concept://explainer` @ 1750356010000 → status: stable, cosine=1.000, magnitude_ratio=1.000, ΔL2=0.000
+- `concept://ontology` @ 1751359610000 → status: stable, cosine=0.994, magnitude_ratio=1.121, ΔL2=0.039
+  - notes: baseline alignment maintained | alignment refresh | source=telemetry:ontology
+- `concept://explainer` @ 1751360000000 → status: stable, cosine=1.000, magnitude_ratio=1.000, ΔL2=0.000
   - notes: baseline alignment maintained | attention rollout | source=telemetry:explainability
-- `concept://coloring` @ 1750359600000 → status: stable, cosine=0.998, magnitude_ratio=1.042, ΔL2=0.062
-  - notes: baseline alignment maintained | sparse-to-dense reconciliation | source=telemetry:orchestrator
-- `concept://ontology` @ 1750359610000 → status: stable, cosine=0.995, magnitude_ratio=1.168, ΔL2=0.047
-  - notes: baseline alignment maintained | semantic drift mitigation | source=telemetry:ontology
-- `concept://explainer` @ 1750360000000 → status: stable, cosine=0.981, magnitude_ratio=1.058, ΔL2=0.127
+- `concept://explainer` @ 1751363600000 → status: stable, cosine=0.990, magnitude_ratio=1.036, ΔL2=0.091
   - notes: baseline alignment maintained | drift remediation | source=telemetry:explainability

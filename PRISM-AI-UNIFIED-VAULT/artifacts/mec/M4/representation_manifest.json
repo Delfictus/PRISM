@@ -5,50 +5,50 @@
   "concepts": [
     {
       "concept_id": "concept://coloring",
-      "anchor_hash": "ec4758c503d8bb9938c480da2543b4ecfd5506b7b12793a8d957a67fc356fcd5",
+      "anchor_hash": "20e711be932f9bf35aecc9175fb992491c85a3ddb13d3f5a8f52bcae2466e004",
       "observation_count": 2,
-      "last_updated_ms": 1750359600000,
+      "last_updated_ms": 1751359600000,
       "drift_status": "stable",
-      "cosine_similarity": 0.9975517052766248,
-      "magnitude_ratio": 1.041759365812561,
-      "delta_l2": 0.06159342497377461,
+      "cosine_similarity": 0.9980695335062548,
+      "magnitude_ratio": 1.054355605230694,
+      "delta_l2": 0.061644140029689785,
       "prototype": [
-        0.218125,
-        0.483125,
-        0.32125,
-        0.425625
+        0.21,
+        0.4875,
+        0.315,
+        0.4175
       ]
     },
     {
       "concept_id": "concept://explainer",
-      "anchor_hash": "9725269d97c719dd95d9665d1640aa4477a03d2874e07da322def6a7c7061215",
+      "anchor_hash": "2cf74ada6bb575866cd0da12bd8d2b34a52fe19cb6b10a03442d27e501cd45f5",
       "observation_count": 2,
-      "last_updated_ms": 1750360000000,
+      "last_updated_ms": 1751363600000,
       "drift_status": "stable",
-      "cosine_similarity": 0.9810469324542019,
-      "magnitude_ratio": 1.0584440519947373,
-      "delta_l2": 0.12668859459319928,
+      "cosine_similarity": 0.9900189679057468,
+      "magnitude_ratio": 1.0360783971496628,
+      "delta_l2": 0.09055385138137416,
       "prototype": [
-        0.35,
-        0.25,
-        0.38625,
-        0.20625
+        0.3525,
+        0.2475,
+        0.38,
+        0.22
       ]
     },
     {
       "concept_id": "concept://ontology",
-      "anchor_hash": "5a5d894981c2f9a97434b9773553dcfad2d95cd5d4bb98410ae955994901bc37",
+      "anchor_hash": "724496f913624e8df44d6628878f5c22618e6aaadcb1ec4dee12a0411388e6ef",
       "observation_count": 2,
-      "last_updated_ms": 1750359610000,
+      "last_updated_ms": 1751359610000,
       "drift_status": "stable",
-      "cosine_similarity": 0.9952761398007964,
-      "magnitude_ratio": 1.1683676423748481,
-      "delta_l2": 0.046703854230673504,
+      "cosine_similarity": 0.9939970079703261,
+      "magnitude_ratio": 1.12096133167746,
+      "delta_l2": 0.03872983346207416,
       "prototype": [
-        0.13375,
-        0.10375,
-        0.14125,
-        0.106875
+        0.1275,
+        0.1075,
+        0.135,
+        0.1025
       ]
     }
   ]
