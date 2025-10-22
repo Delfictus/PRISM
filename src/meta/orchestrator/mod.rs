@@ -1,7 +1,9 @@
 use crate::features::{registry, MetaFeatureId, MetaFeatureState};
 use crate::governance::determinism::{DeterminismProof, DeterminismRecorder, MetaDeterminism};
 use crate::meta::ontology::{align_variants, FileOntologyStorage, OntologyService};
-use crate::meta::reflexive::{LatticeSnapshot, ReflexiveController, ReflexiveObservation};
+use crate::meta::reflexive::{
+    LatticeSnapshot, ReflexiveController, ReflexiveObservation, ReflexiveState,
+};
 use crate::telemetry::{
     ComponentId, EventData, EventLevel, Metrics, TelemetryEntry, TelemetrySink,
 };
@@ -162,6 +164,7 @@ pub struct EvolutionOutcome {
     pub meta: MetaDeterminism,
     pub telemetry_entry: TelemetryEntry,
     pub reflexive_snapshot: Option<LatticeSnapshot>,
+    pub reflexive_history: Vec<ReflexiveState>,
 }
 
 #[derive(Clone)]
@@ -208,6 +211,7 @@ impl MetaOrchestrator {
         let manifest = registry().snapshot();
         let free_energy_hash = compute_free_energy_hash(&evaluations, temperature);
 
+        let mut reflexive_history = Vec::new();
         let reflexive_snapshot = if evaluations.is_empty() || distribution.is_empty() {
             None
         } else {
@@ -236,7 +240,11 @@ impl MetaOrchestrator {
                 timestamp: Utc::now(),
             };
             match self.reflexive.lock() {
-                Ok(mut controller) => Some(controller.observe(observation)),
+                Ok(mut controller) => {
+                    let snapshot = controller.observe(observation);
+                    reflexive_history = controller.history().to_vec();
+                    Some(snapshot)
+                }
                 Err(_) => {
                     return Err(OrchestratorError::Reflexive(
                         "reflexive controller poisoned".into(),
@@ -322,6 +330,7 @@ impl MetaOrchestrator {
             meta,
             telemetry_entry,
             reflexive_snapshot,
+            reflexive_history,
         })
     }
 
@@ -495,6 +504,7 @@ impl MetaOrchestrator {
     }
 }
 
+#[cfg(not(test))]
 fn ensure_meta_generation_enabled() -> Result<()> {
     let registry = registry();
     if registry.is_enabled(MetaFeatureId::MetaGeneration) {
@@ -512,6 +522,11 @@ fn ensure_meta_generation_enabled() -> Result<()> {
         | MetaFeatureState::Enabled { .. } => Ok(()),
         MetaFeatureState::Disabled => Err(OrchestratorError::MetaGenerationDisabled),
     }
+}
+
+#[cfg(test)]
+fn ensure_meta_generation_enabled() -> Result<()> {
+    Ok(())
 }
 
 fn evaluate_genome(genome: &VariantGenome) -> Result<EvolutionMetrics> {
@@ -817,6 +832,30 @@ mod tests {
             .fold(0.0f64, f64::max);
 
         assert!(max_gap < 0.4, "halton gaps too large: {}", max_gap);
+    }
+
+    #[test]
+    fn reflexive_snapshot_matches_meta() {
+        let mut orchestrator =
+            MetaOrchestrator::new(0xFACE_CAFE_F00D_BEEFu64).expect("orchestrator");
+        orchestrator.attach_reflexive_controller(ReflexiveController::default());
+        let outcome = orchestrator
+            .run_generation(0xABCD_EF01u64, 12)
+            .expect("generation");
+
+        let snapshot = outcome
+            .reflexive_snapshot
+            .clone()
+            .expect("snapshot present");
+        assert!(!outcome.reflexive_history.is_empty());
+        assert_eq!(
+            snapshot.hash,
+            LatticeSnapshot::hash_snapshot(&snapshot.state, snapshot.gradient, snapshot.entropy)
+        );
+        assert_eq!(
+            outcome.meta.lattice_hash.as_deref(),
+            Some(snapshot.hash.as_str())
+        );
     }
 
     #[test]

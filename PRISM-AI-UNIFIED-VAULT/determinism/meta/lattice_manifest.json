@@ -1,13 +1,13 @@
 {
   "version": 1,
   "description": "Phase M3 reflexive feedback lattice snapshot manifest.",
-  "hash": "11350d91a0fcae8f1ce3260c91c4264b2e0327f5619bafc509be853041df827c",
+  "hash": "2c03cc88f79310422256def09ada6a962559fb75443ef2d65d80fe37ffacb479",
   "snapshots": [
     {
-      "timestamp": "2025-10-21T18:30:00+00:00",
-      "mode": "strict",
-      "stability": 0.82,
-      "entropy": 0.58
+      "timestamp": "2025-10-22T02:29:37.522392305+00:00",
+      "mode": "explore",
+      "stability": 0.20653452455159993,
+      "entropy": 0.9934553568520672
     }
   ]
 }
