@@ -739,6 +739,35 @@ def evaluate_semantic_plasticity(report: ComplianceReport, base: Path) -> None:
                     )
                 )
 
+                drifted = [
+                    concept.get("concept_id")
+                    for concept in concepts
+                    if concept.get("drift_status") == "drifted"
+                ]
+                warnings = [
+                    concept.get("concept_id")
+                    for concept in concepts
+                    if concept.get("drift_status") == "warning"
+                ]
+                if drifted:
+                    report.add(
+                        Finding(
+                            item="plasticity:drifted_concepts",
+                            status="FAIL",
+                            severity="BLOCKER",
+                            message=f"Semantic plasticity drift exceeded tolerance for: {', '.join(drifted)}",
+                        )
+                    )
+                if warnings:
+                    report.add(
+                        Finding(
+                            item="plasticity:warning_concepts",
+                            status="FAIL",
+                            severity="WARNING",
+                            message=f"Semantic plasticity drift approaching threshold for: {', '.join(warnings)}",
+                        )
+                    )
+
 def evaluate_task_manifest(report: ComplianceReport) -> None:
     if not TASKS_PATH.exists():
         report.add(

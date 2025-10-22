@@ -21,6 +21,7 @@
 - Review `artifacts/mec/M4/explainability_report.md` for drift status of ontology adapters.
 - Confirm `tests/meta/semantic_plasticity.rs` passes locally before promoting Phase M4 changes.
 - Ensure `scripts/compliance_validator.py --strict` reports `plasticity:*` checks as `PASS`.
+- Investigate any `plasticity:warning_concepts` finding (drift approaching threshold) and block promotion if `plasticity:drifted_concepts` is raised.
 
 ## Rollback Plan
 - Use `master_executor.py --rollback M6` to revert to prior Merkle anchor.
