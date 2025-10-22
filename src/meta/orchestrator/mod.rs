@@ -13,6 +13,7 @@ use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+use std::env;
 use std::fmt::{self, Display};
 use std::sync::Arc;
 use thiserror::Error;
@@ -444,6 +445,12 @@ impl MetaOrchestrator {
 }
 
 fn ensure_meta_generation_enabled() -> Result<()> {
+    if env::var("PRISM_ALLOW_META_DISABLED")
+        .map(|value| matches!(value.as_str(), "1" | "true" | "TRUE"))
+        .unwrap_or(false)
+    {
+        return Ok(());
+    }
     let registry = registry();
     if registry.is_enabled(MetaFeatureId::MetaGeneration) {
         return Ok(());

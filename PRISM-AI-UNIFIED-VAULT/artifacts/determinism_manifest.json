@@ -1,6 +1,6 @@
 {
-  "timestamp": "2025-10-21T19:06:51.894207+00:00",
-  "commit_sha": "a6c0f1dfc566ea1813b1f150bcfc9b9a0bcbc209",
+  "timestamp": "2025-10-22T03:08:37.210791+00:00",
+  "commit_sha": "96a6159567dd3599f2558efa428ee7bc01331bc6",
   "feature_flags": [
     "advanced",
     "cuda_graph",
@@ -20,7 +20,7 @@
   "notes": "Placeholder determinism manifest.",
   "reflexive": {
     "mode": "exploration",
-    "lattice_fingerprint": "f139b097ca51ccce8f8008d661e21b350f2ec6aee82c92ef1c7e843514b4d97e",
+    "lattice_fingerprint": "a6c5387f55fc468b587b058a27804a851c88cd07418b06ae23c71b9059a765d4",
     "alerts": []
   }
 }

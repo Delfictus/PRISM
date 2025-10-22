@@ -521,13 +521,39 @@ def evaluate_lattice_snapshot(report: ComplianceReport, path: Path) -> Optional[
             issues = True
 
     alerts = data.get("alerts", [])
-    if any(alert in {"reflexive_disabled", "divergence_cap_exceeded", "entropy_below_floor"} for alert in alerts):
+    blocking_alerts = {"reflexive_disabled", "divergence_cap_exceeded", "entropy_below_floor"}
+    target_alerts = [alert for alert in alerts if str(alert).startswith("target_mode")]
+    streak_alerts = [alert for alert in alerts if str(alert).startswith("strict_streak")]
+
+    if any(alert in blocking_alerts for alert in alerts):
         report.add(
             Finding(
                 item="lattice:alerts",
                 status="FAIL",
                 severity="BLOCKER",
                 message=f"Blocking reflexive alert present: {alerts}",
+            )
+        )
+        issues = True
+
+    if target_alerts:
+        report.add(
+            Finding(
+                item="lattice:alerts",
+                status="FAIL",
+                severity="BLOCKER",
+                message=f"Target mode not achieved after retries: {', '.join(target_alerts)}",
+            )
+        )
+        issues = True
+
+    if streak_alerts:
+        report.add(
+            Finding(
+                item="lattice:alerts",
+                status="FAIL",
+                severity="CRITICAL",
+                message=f"Reflexive controller strict streak detected: {', '.join(streak_alerts)}",
             )
         )
         issues = True
@@ -711,6 +737,28 @@ def evaluate_determinism_manifest(
                     status="FAIL",
                     severity="BLOCKER",
                     message=f"Determinism manifest recorded blocking reflexive alerts: {alerts}",
+                )
+            )
+            issues = True
+
+        if any(str(alert).startswith("target_mode") for alert in alerts):
+            report.add(
+                Finding(
+                    item="determinism:manifest:alerts",
+                    status="FAIL",
+                    severity="BLOCKER",
+                    message=f"Reflexive controller failed to reach configured mode: {alerts}",
+                )
+            )
+            issues = True
+
+        if any(str(alert).startswith("strict_streak") for alert in alerts):
+            report.add(
+                Finding(
+                    item="determinism:manifest:alerts",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message=f"Repeated strict-mode reflexive detections: {alerts}",
                 )
             )
             issues = True

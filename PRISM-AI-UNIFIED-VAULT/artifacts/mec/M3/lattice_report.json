@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-10-21T19:06:51.892250+00:00",
+  "timestamp": "2025-10-22T03:08:37.197704+00:00",
   "mode": "exploration",
   "entropy": 2.117353,
   "divergence": 0.112,
@@ -300,16 +300,5 @@
       -0.054541
     ]
   ],
-  "distribution_weights": [
-    0.18,
-    0.16,
-    0.15,
-    0.12,
-    0.11,
-    0.09,
-    0.08,
-    0.07,
-    0.04
-  ],
-  "fingerprint": "f139b097ca51ccce8f8008d661e21b350f2ec6aee82c92ef1c7e843514b4d97e"
+  "fingerprint": "a6c5387f55fc468b587b058a27804a851c88cd07418b06ae23c71b9059a765d4"
 }

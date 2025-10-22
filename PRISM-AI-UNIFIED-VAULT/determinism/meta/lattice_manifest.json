@@ -1,16 +1,16 @@
 {
   "version": 1,
   "description": "Phase M3 reflexive lattice fingerprints captured for determinism replay.",
-  "hash": "47c21b4a63c7f501b004bd6693d3a765cae86676caa07997fde20d777548f850",
+  "hash": "5e4e1308b6b5b5f9a31775f77620e8920fa95f327c6daf1d34f0906316c4a54b",
   "snapshots": [
     {
       "id": "m3-latest",
       "mode": "exploration",
-      "timestamp": "2025-10-21T19:06:51.892250+00:00",
+      "timestamp": "2025-10-22T03:08:37.197704+00:00",
       "entropy": 2.117353,
       "divergence": 0.112,
       "effective_temperature": 1.34,
-      "fingerprint": "f139b097ca51ccce8f8008d661e21b350f2ec6aee82c92ef1c7e843514b4d97e",
+      "fingerprint": "a6c5387f55fc468b587b058a27804a851c88cd07418b06ae23c71b9059a765d4",
       "alerts": [],
       "source": "artifacts/mec/M3/lattice_report.json"
     }

@@ -430,4 +430,139 @@ mod tests {
         let fingerprint_b = decision_b.snapshot.fingerprint();
         assert_ne!(fingerprint_a, fingerprint_b);
     }
+
+    #[test]
+    fn divergence_exceeds_cap_triggers_strict_mode() {
+        let mut ctrl = ReflexiveController::default();
+        let metrics = vec![
+            ReflexiveMetric {
+                energy: 0.1,
+                chromatic_loss: 0.2,
+                divergence: 0.25,
+                fitness: 0.7,
+            },
+            ReflexiveMetric {
+                energy: 0.15,
+                chromatic_loss: 0.18,
+                divergence: 0.24,
+                fitness: 0.6,
+            },
+        ];
+        let decision = ctrl.evaluate(&metrics, &[0.5, 0.5], 1.1);
+        assert_eq!(decision.snapshot.mode, GovernanceMode::Strict);
+        assert!(
+            decision
+                .snapshot
+                .alerts
+                .iter()
+                .any(|alert| alert.contains("divergence")),
+            "expected divergence alert, got {:?}",
+            decision.snapshot.alerts
+        );
+    }
+
+    #[test]
+    fn low_entropy_distribution_enforces_strict_mode() {
+        let mut ctrl = ReflexiveController::default();
+        let metrics = vec![
+            ReflexiveMetric {
+                energy: 0.05,
+                chromatic_loss: 0.05,
+                divergence: 0.02,
+                fitness: 0.8,
+            },
+            ReflexiveMetric {
+                energy: 0.07,
+                chromatic_loss: 0.04,
+                divergence: 0.02,
+                fitness: 0.7,
+            },
+        ];
+        let decision = ctrl.evaluate(&metrics, &[0.99, 0.01], 1.1);
+        assert_eq!(decision.snapshot.mode, GovernanceMode::Strict);
+        assert!(
+            decision
+                .snapshot
+                .alerts
+                .iter()
+                .any(|alert| alert.contains("entropy")),
+            "expected entropy alert, got {:?}",
+            decision.snapshot.alerts
+        );
+    }
+
+    #[test]
+    fn exploration_requires_entropy_and_low_divergence() {
+        let mut config = ReflexiveConfig::default();
+        config.strict_entropy_floor = 0.5;
+        config.exploration_entropy_floor = 1.0;
+        config.exploration_divergence_cap = 0.2;
+        let mut ctrl = ReflexiveController::new(config);
+
+        let metrics = vec![
+            ReflexiveMetric {
+                energy: 0.1,
+                chromatic_loss: 0.15,
+                divergence: 0.05,
+                fitness: 0.8,
+            },
+            ReflexiveMetric {
+                energy: 0.12,
+                chromatic_loss: 0.12,
+                divergence: 0.04,
+                fitness: 0.78,
+            },
+            ReflexiveMetric {
+                energy: 0.09,
+                chromatic_loss: 0.11,
+                divergence: 0.03,
+                fitness: 0.76,
+            },
+        ];
+
+        let decision = ctrl.evaluate(&metrics, &[0.34, 0.33, 0.33], 1.2);
+        assert_eq!(decision.snapshot.mode, GovernanceMode::Exploration);
+        assert!(
+            decision
+                .distribution
+                .iter()
+                .all(|weight| weight.is_finite() && *weight >= 0.0),
+            "distribution must remain normalized, got {:?}",
+            decision.distribution
+        );
+    }
+
+    #[test]
+    fn recovery_mix_softens_distribution() {
+        let mut config = ReflexiveConfig::default();
+        config.recovery_mix = 0.2;
+        config.strict_divergence_cap = 0.5;
+        config.strict_entropy_floor = 0.1;
+        config.exploration_entropy_floor = 10.0; // force recovery instead of exploration
+        let mut ctrl = ReflexiveController::new(config);
+
+        let metrics = vec![
+            ReflexiveMetric {
+                energy: 0.1,
+                chromatic_loss: 0.2,
+                divergence: 0.05,
+                fitness: 0.9,
+            },
+            ReflexiveMetric {
+                energy: 0.08,
+                chromatic_loss: 0.18,
+                divergence: 0.04,
+                fitness: 0.85,
+            },
+        ];
+
+        let decision = ctrl.evaluate(&metrics, &[0.9, 0.1], 1.0);
+        assert_eq!(decision.snapshot.mode, GovernanceMode::Recovery);
+        let diff = (decision.distribution[0] - decision.distribution[1]).abs();
+        assert!(
+            diff < 0.7,
+            "recovery mix should soften distribution gap, diff {diff}, distribution {:?}",
+            decision.distribution
+        );
+    }
 }

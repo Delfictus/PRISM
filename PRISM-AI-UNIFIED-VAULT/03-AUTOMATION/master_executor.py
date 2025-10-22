@@ -20,7 +20,7 @@ import sys
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 
 # Resolve vault and repository roots
@@ -48,6 +48,7 @@ AUDIT_DIR = VAULT_ROOT / "audit"
 MEC_DIR = ARTIFACT_DIR / "mec"
 M3_DIR = MEC_DIR / "M3"
 LATTICE_MANIFEST_PATH = VAULT_ROOT / "determinism" / "meta" / "lattice_manifest.json"
+REFLEXIVE_HISTORY_PATH = M3_DIR / "reflexive_history.json"
 
 
 def write_json(path: Path, payload: Dict[str, object]) -> None:
@@ -60,14 +61,21 @@ def write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def run_command(cmd: Sequence[str], cwd: Optional[Path] = None) -> subprocess.CompletedProcess[str]:
+def run_command(
+    cmd: Sequence[str],
+    cwd: Optional[Path] = None,
+    env_overrides: Optional[Dict[str, str]] = None,
+) -> subprocess.CompletedProcess[str]:
     """Run a shell command and capture output."""
+    env = os.environ.copy()
+    if env_overrides:
+        env.update(env_overrides)
     result = subprocess.run(
         list(cmd),
         cwd=str(cwd) if cwd else None,
         capture_output=True,
         text=True,
-        env=os.environ.copy(),
+        env=env,
     )
     return result
 
@@ -211,7 +219,11 @@ def create_advanced_manifest(
             "mixed_precision_policy": use_sample_metrics,
         },
         "reflexive": {
-            "mode": "exploration" if use_sample_metrics else "strict",
+            "mode": (
+                lattice_snapshot.get("mode")
+                if lattice_snapshot and lattice_snapshot.get("mode")
+                else ("exploration" if use_sample_metrics else "strict")
+            ),
             "entropy": lattice_snapshot.get("entropy") if lattice_snapshot else None,
             "divergence": lattice_snapshot.get("divergence") if lattice_snapshot else None,
             "lattice_fingerprint": fingerprint,
@@ -319,9 +331,17 @@ def create_determinism_manifest(
         "status": "stable" if use_sample_metrics else "unknown",
         "notes": "Placeholder determinism manifest." if use_sample_metrics else "Populate with replay results.",
         "reflexive": {
-            "mode": "exploration" if use_sample_metrics else "strict",
+            "mode": (
+                lattice_snapshot.get("mode")
+                if lattice_snapshot and lattice_snapshot.get("mode")
+                else ("exploration" if use_sample_metrics else "strict")
+            ),
             "lattice_fingerprint": lattice_snapshot.get("fingerprint") if lattice_snapshot else None,
-            "alerts": [] if use_sample_metrics else ["reflexive_disabled"],
+            "alerts": (
+                lattice_snapshot.get("alerts", [])
+                if lattice_snapshot
+                else ([] if use_sample_metrics else ["reflexive_disabled"])
+            ),
         },
     }
 
@@ -331,101 +351,145 @@ def ensure_directories() -> None:
         path.mkdir(parents=True, exist_ok=True)
 
 
-def distribute_weights() -> List[float]:
-    base = [0.18, 0.16, 0.15, 0.12, 0.11, 0.09, 0.08, 0.07, 0.04]
-    remainder = max(0.0, 1.0 - sum(base))
-    if remainder > 0:
-        base.append(round(remainder, 6))
-    return base
+def format_lattice_payload(
+    snapshot: Dict[str, object],
+    distribution: Optional[Sequence[float]] = None,
+    temperature: Optional[float] = None,
+) -> Dict[str, object]:
+    payload = dict(snapshot)
+    if distribution is not None:
+        weights = list(distribution)
+        payload["distribution"] = weights
+        payload["distribution_weights"] = weights
+    if temperature is not None:
+        payload["temperature"] = temperature
+    payload["fingerprint"] = hashlib.sha256(
+        json.dumps(payload, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    return payload
 
 
-def shannon_entropy(weights: Sequence[float]) -> float:
-    total = sum(weights)
-    if total == 0:
-        return 0.0
-    entropy = 0.0
-    for weight in weights:
-        if weight <= 0.0:
-            continue
-        p = weight / total
-        entropy -= p * math.log(p)
-    return entropy
-
-
-def build_lattice(edge: int, weights: Sequence[float]) -> List[List[float]]:
-    lattice = []
-    for y in range(edge):
-        row = []
-        for x in range(edge):
-            angle = (x + 1) * 0.42 + (y + 1) * 0.17
-            value = 0.18 * math.sin(angle) - 0.05 * math.cos(angle * 0.6)
-            value += 0.03 * math.sin((x + y + 2) * 0.11)
-            row.append(round(value, 6))
-        lattice.append(row)
-    return lattice
-
-
-def create_lattice_snapshot(use_sample_metrics: bool) -> Dict[str, object]:
-    base = {
+def fallback_lattice_snapshot(use_sample_metrics: bool) -> Dict[str, object]:
+    edge = 16
+    snapshot = {
         "timestamp": timestamp(),
-        "mode": "exploration" if use_sample_metrics else "strict",
-        "entropy": None,
-        "divergence": None,
-        "energy_mean": None,
-        "energy_variance": None,
-        "energy_trend": None,
-        "exploration_ratio": None,
-        "effective_temperature": None,
-        "lattice_edge": 16,
-        "alerts": [],  # Populated below
+        "mode": "strict",
+        "entropy": 0.0,
+        "divergence": 0.0,
+        "energy_mean": 0.0,
+        "energy_variance": 0.0,
+        "energy_trend": 0.0,
+        "exploration_ratio": 0.0,
+        "effective_temperature": 1.0,
+        "lattice_edge": edge,
+        "alerts": ["reflexive_disabled"],
+        "lattice": [[0.0 for _ in range(edge)] for _ in range(edge)],
     }
 
-    if not use_sample_metrics:
-        base.update(
+    if use_sample_metrics:
+        weights = [0.18, 0.16, 0.15, 0.12, 0.11, 0.09, 0.08, 0.07, 0.04]
+        entropy = 0.0
+        total = sum(weights)
+        for weight in weights:
+            p = weight / total
+            entropy -= p * math.log(p)
+        lattice = []
+        for y in range(edge):
+            row = []
+            for x in range(edge):
+                angle = (x + 1) * 0.42 + (y + 1) * 0.17
+                value = 0.18 * math.sin(angle) - 0.05 * math.cos(angle * 0.6)
+                value += 0.03 * math.sin((x + y + 2) * 0.11)
+                row.append(round(value, 6))
+            lattice.append(row)
+        snapshot.update(
             {
-                "entropy": 0.0,
-                "divergence": 0.0,
-                "energy_mean": 0.0,
-                "energy_variance": 0.0,
-                "energy_trend": 0.0,
-                "exploration_ratio": 0.0,
-                "effective_temperature": 1.0,
-                "alerts": ["reflexive_disabled"],
-                "lattice": [[0.0 for _ in range(base["lattice_edge"])] for _ in range(base["lattice_edge"])],
+                "mode": "exploration",
+                "entropy": round(entropy, 6),
+                "divergence": 0.112,
+                "energy_mean": -0.438,
+                "energy_variance": 0.021,
+                "energy_trend": -0.014,
+                "exploration_ratio": round(sum(w for w in weights if w >= 0.1), 6),
+                "effective_temperature": 1.34,
+                "alerts": [],
+                "lattice": lattice,
             }
         )
-        payload = dict(base)
-        payload["fingerprint"] = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
-        return payload
 
-    weights = distribute_weights()
-    entropy = shannon_entropy(weights)
-    divergence = 0.112
-    energy_mean = -0.438
-    energy_variance = 0.021
-    energy_trend = -0.014
-    exploration_ratio = sum(w for w in weights if w >= 0.1)
-    effective_temperature = 1.34
-    lattice = build_lattice(base["lattice_edge"], weights)
+    return format_lattice_payload(snapshot)
 
-    base.update(
-        {
-            "entropy": round(entropy, 6),
-            "divergence": divergence,
-            "energy_mean": energy_mean,
-            "energy_variance": energy_variance,
-            "energy_trend": energy_trend,
-            "exploration_ratio": round(exploration_ratio, 6),
-            "effective_temperature": effective_temperature,
-            "alerts": [],
-            "lattice": lattice,
-        }
-    )
-    base["distribution_weights"] = weights
 
-    payload = dict(base)
-    payload["fingerprint"] = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
-    return payload
+def capture_lattice_snapshot(
+    use_sample_metrics: bool,
+    controller_seed: int,
+    base_seed: int,
+    population: int,
+    target_mode: Optional[str],
+    max_attempts: int,
+) -> Dict[str, object]:
+    attempts = max(1, max_attempts)
+    attempt_seed = controller_seed & 0xFFFFFFFFFFFFFFFF
+    attempt_base_seed = base_seed & 0xFFFFFFFFFFFFFFFF
+    attempt_population = max(8, population)
+    target = target_mode.lower() if target_mode else None
+    fallback_snapshot: Optional[Dict[str, object]] = None
+
+    for attempt in range(attempts):
+        cmd = [
+            "cargo",
+            "run",
+            "--quiet",
+            "--bin",
+            "meta_reflexive_snapshot",
+            "--",
+            "--controller-seed",
+            f"0x{attempt_seed:016x}",
+            "--seed",
+            f"0x{attempt_base_seed:016x}",
+            "--population",
+            str(attempt_population),
+            "--stdout",
+        ]
+
+        result = run_command(cmd, cwd=REPO_ROOT, env_overrides={"PRISM_ALLOW_META_DISABLED": "1"})
+        if result.returncode != 0:
+            print("⚠️ Unable to capture live reflexive snapshot; falling back to synthetic data.")
+            if result.stderr:
+                print(result.stderr.strip())
+            return fallback_lattice_snapshot(use_sample_metrics)
+
+        try:
+            payload = json.loads(result.stdout)
+            snapshot = payload.get("snapshot")
+            if not isinstance(snapshot, dict):
+                raise ValueError("snapshot missing from meta_reflexive_snapshot output")
+            distribution = payload.get("distribution")
+            temperature = payload.get("temperature")
+            final_snapshot = format_lattice_payload(snapshot, distribution, temperature)
+            fallback_snapshot = final_snapshot
+
+            mode = str(final_snapshot.get("mode", "")).lower()
+            if not target or mode == target:
+                return final_snapshot
+        except Exception as exc:  # noqa: BLE001
+            print(f"⚠️ Failed to parse reflexive snapshot output: {exc}")
+            return fallback_lattice_snapshot(use_sample_metrics)
+
+        # Adjust seeds and population for the next attempt.
+        attempt_seed = (attempt_seed ^ (0x9E3779B97F4A7C15 + attempt)) & 0xFFFFFFFFFFFFFFFF
+        attempt_base_seed = (attempt_base_seed + 0x517cc1b727220a95 + attempt) & 0xFFFFFFFFFFFFFFFF
+        attempt_population = min(attempt_population + max(8, attempt_population // 2), 512)
+
+    if fallback_snapshot is None:
+        return fallback_lattice_snapshot(use_sample_metrics)
+
+    if target:
+        if use_sample_metrics:
+            return fallback_lattice_snapshot(use_sample_metrics)
+        alerts = fallback_snapshot.setdefault("alerts", [])
+        alerts.append(f"target_mode:{target}:actual:{fallback_snapshot.get('mode')}")
+    return fallback_snapshot
 
 
 def update_lattice_manifest(snapshot: Dict[str, object]) -> None:
@@ -459,6 +523,48 @@ def update_lattice_manifest(snapshot: Dict[str, object]) -> None:
     write_json(LATTICE_MANIFEST_PATH, manifest)
 
 
+def load_reflexive_history() -> List[Dict[str, object]]:
+    if not REFLEXIVE_HISTORY_PATH.exists():
+        return []
+    try:
+        data = json.loads(REFLEXIVE_HISTORY_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+
+    if isinstance(data, dict):
+        entries = data.get("entries", [])
+    elif isinstance(data, list):
+        entries = data
+    else:
+        entries = []
+
+    return [entry for entry in entries if isinstance(entry, dict)]
+
+
+def persist_reflexive_history(entries: Sequence[Dict[str, object]]) -> None:
+    payload = {"entries": list(entries)}
+    write_json(REFLEXIVE_HISTORY_PATH, payload)
+
+
+def compute_next_strict_streak(entries: Sequence[Dict[str, object]], mode: Optional[str]) -> int:
+    if str(mode).lower() != "strict":
+        return 0
+    streak = 1
+    for entry in reversed(entries):
+        if str(entry.get("mode", "")).lower() == "strict":
+            streak += 1
+        else:
+            break
+    return streak
+
+
+def parse_int(value: str) -> int:
+    try:
+        return int(value, 0)
+    except ValueError as exc:  # noqa: B904
+        raise argparse.ArgumentTypeError(f"Invalid integer value: {value}") from exc
+
+
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run PRISM-AI advanced governance pipeline.")
     parser.add_argument("--strict", action="store_true", help="Fail on non-compliant findings.")
@@ -469,6 +575,42 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--use-sample-metrics", action="store_true", help="Populate artifacts with sample passing metrics.")
     parser.add_argument("--output", type=Path, help="Optional path for execution summary JSON.")
     parser.add_argument("--profile", choices=["advanced", "baseline"], default="advanced", help="Execution profile (default: advanced).")
+    parser.add_argument(
+        "--reflexive-controller-seed",
+        type=parse_int,
+        default=0xDEADBEEFDEADBEEF,
+        help="Seed for the reflexive controller RNG (hex or decimal).",
+    )
+    parser.add_argument(
+        "--reflexive-base-seed",
+        type=parse_int,
+        default=0xC0FFEE,
+        help="Base seed for meta generation (hex or decimal).",
+    )
+    parser.add_argument(
+        "--reflexive-population",
+        type=int,
+        default=32,
+        help="Initial population size for meta variants (default: 32).",
+    )
+    parser.add_argument(
+        "--reflexive-target-mode",
+        choices=["auto", "exploration", "recovery", "strict"],
+        default="auto",
+        help="Desired reflexive mode; auto selects exploration for sample metrics.",
+    )
+    parser.add_argument(
+        "--reflexive-max-attempts",
+        type=int,
+        default=4,
+        help="Maximum attempts to achieve the target reflexive mode (default: 4).",
+    )
+    parser.add_argument(
+        "--reflexive-alert-threshold",
+        type=int,
+        default=3,
+        help="Consecutive strict-mode streak threshold before emitting alerts (default: 3).",
+    )
     return parser.parse_args(argv)
 
 
@@ -516,6 +658,15 @@ class ExecutionSummary:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
     ensure_directories()
+
+    target_mode = args.reflexive_target_mode.lower()
+    if target_mode == "auto":
+        target_mode = "exploration" if args.use_sample_metrics else None
+    alert_threshold = max(0, args.reflexive_alert_threshold)
+    controller_seed = args.reflexive_controller_seed
+    base_seed = args.reflexive_base_seed
+    population = max(8, args.reflexive_population)
+    max_attempts = max(1, args.reflexive_max_attempts)
 
     summary = ExecutionSummary(
         timestamp=timestamp(),
@@ -581,7 +732,37 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return result.returncode
 
     # Generate artifacts
-    lattice_snapshot = create_lattice_snapshot(args.use_sample_metrics)
+    lattice_snapshot = capture_lattice_snapshot(
+        args.use_sample_metrics,
+        controller_seed,
+        base_seed,
+        population,
+        target_mode,
+        max_attempts,
+    )
+
+    history_entries = load_reflexive_history()
+    strict_streak = compute_next_strict_streak(history_entries, lattice_snapshot.get("mode"))
+    if (
+        alert_threshold
+        and str(lattice_snapshot.get("mode", "")).lower() == "strict"
+        and strict_streak >= alert_threshold
+    ):
+        lattice_snapshot.setdefault("alerts", []).append(f"strict_streak:{strict_streak}")
+
+    history_entries.append(
+        {
+            "timestamp": lattice_snapshot.get("timestamp"),
+            "mode": lattice_snapshot.get("mode"),
+            "entropy": lattice_snapshot.get("entropy"),
+            "divergence": lattice_snapshot.get("divergence"),
+            "alerts": lattice_snapshot.get("alerts", []),
+        }
+    )
+    if len(history_entries) > 10:
+        history_entries = history_entries[-10:]
+    persist_reflexive_history(history_entries)
+
     write_json(M3_DIR / "lattice_report.json", lattice_snapshot)
     update_lattice_manifest(lattice_snapshot)
     write_json(ARTIFACT_DIR / "advanced_manifest.json", create_advanced_manifest(args.use_sample_metrics, lattice_snapshot))
@@ -606,6 +787,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "path_decision": str(VAULT_ROOT / "path_decision.json"),
         "feasibility": str(VAULT_ROOT / "feasibility.log"),
         "lattice_report": str(M3_DIR / "lattice_report.json"),
+        "reflexive_history": str(REFLEXIVE_HISTORY_PATH),
     }
 
     # Run compliance validator

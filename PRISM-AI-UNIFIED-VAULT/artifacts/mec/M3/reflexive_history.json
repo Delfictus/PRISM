@@ -1,0 +1,11 @@
+{
+  "entries": [
+    {
+      "timestamp": "2025-10-22T03:08:37.197704+00:00",
+      "mode": "exploration",
+      "entropy": 2.117353,
+      "divergence": 0.112,
+      "alerts": []
+    }
+  ]
+}
