@@ -1,0 +1,58 @@
+{
+  "policy_hash": "federation-policy-hash",
+  "epoch": 1,
+  "timestamp": "2025-10-22T01:13:51.770689+00:00",
+  "participants": [
+    {
+      "fingerprint": "node-A",
+      "software_version": "1.0.0",
+      "capabilities": [
+        "mec",
+        "consensus",
+        "ledger"
+      ],
+      "stake_weight": 1.0
+    },
+    {
+      "fingerprint": "node-B",
+      "software_version": "1.0.0",
+      "capabilities": [
+        "mec",
+        "consensus"
+      ],
+      "stake_weight": 0.8
+    },
+    {
+      "fingerprint": "node-C",
+      "software_version": "1.0.0",
+      "capabilities": [
+        "mec"
+      ],
+      "stake_weight": 0.6
+    }
+  ],
+  "consensus": {
+    "passed": true,
+    "votes_for": 3,
+    "votes_against": 0,
+    "quorum": 2,
+    "aggregated_hash": "5c70d559dbf4b9bf19078136f6f10e1c7b0055a0018e1eef8254d145ad6b3410"
+  },
+  "alignments": [
+    {
+      "node": "node-A",
+      "update_hash": "b1c5e63804a2c40e3d6328b2163ddb450170191865b3f7d2d3043f0eb4a7e5c8",
+      "aligned_hash": "b25c680365f713ed4ed9f9e082d8339a523582aa837cd54263cdf9d1506f33af"
+    },
+    {
+      "node": "node-B",
+      "update_hash": "2e31d5637be2caa894a1a6a80280cb9983252366b6a00b1c7fccde59381bdcbc",
+      "aligned_hash": "f1b9959e5e537dd8c0fd7ca86b06471e838880af728defb0944fd13de410d76d"
+    },
+    {
+      "node": "node-C",
+      "update_hash": "0eec91676fc36126ce3df8a34c40068fe0defd5dbf7ada961ccb7b6361688d57",
+      "aligned_hash": "2f63b8258ad39d72d6c49c0c5a352a3c7f312bfb466cc45ea7b73bf531ab5bbf"
+    }
+  ]
+}

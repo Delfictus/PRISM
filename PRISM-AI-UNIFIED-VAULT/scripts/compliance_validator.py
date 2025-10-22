@@ -69,6 +69,7 @@ ARTIFACT_PATHS: Dict[str, Path] = {
     "determinism_manifest": Path("artifacts/determinism_manifest.json"),
     "explainability_report": Path("artifacts/mec/M4/explainability_report.md"),
     "representation_manifest": Path("artifacts/mec/M4/representation_manifest.json"),
+    "federated_plan": Path("artifacts/mec/M5/federated_plan.json"),
 }
 
 CRITICAL_ARTIFACTS = {
@@ -80,6 +81,7 @@ CRITICAL_ARTIFACTS = {
     "determinism_manifest",
     "representation_manifest",
     "explainability_report",
+    "federated_plan",
 }
 
 META_REGISTRY_PATH = Path("meta/meta_flags.json")
@@ -563,6 +565,93 @@ def evaluate_semantic_plasticity(report: ComplianceReport, base: Path) -> None:
             )
         )
 
+
+def evaluate_federated_plan(report: ComplianceReport, base: Path) -> None:
+    plan_path = base / ARTIFACT_PATHS["federated_plan"]
+    plan = load_json(plan_path)
+    if plan is None:
+        report.add(
+            Finding(
+                item="federation:plan",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Federated plan missing.",
+            )
+        )
+        return
+
+    participants = plan.get("participants", [])
+    consensus = plan.get("consensus", {})
+    alignments = plan.get("alignments", [])
+
+    if not participants:
+        report.add(
+            Finding(
+                item="federation:participants",
+                status="FAIL",
+                severity="CRITICAL",
+                message="Federated plan contains no participants.",
+            )
+        )
+    else:
+        report.add(
+            Finding(
+                item="federation:participants",
+                status="PASS",
+                severity="INFO",
+                message=f"Federated plan includes {len(participants)} participants.",
+            )
+        )
+
+    if consensus.get("passed") is True and consensus.get("aggregated_hash"):
+        report.add(
+            Finding(
+                item="federation:consensus",
+                status="PASS",
+                severity="INFO",
+                message="Federated consensus passed with aggregated hash present.",
+            )
+        )
+    else:
+        report.add(
+            Finding(
+                item="federation:consensus",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Federated consensus did not pass or missing aggregated hash.",
+            )
+        )
+
+    if not alignments:
+        report.add(
+            Finding(
+                item="federation:alignments",
+                status="FAIL",
+                severity="CRITICAL",
+                message="Federated plan missing alignment proofs.",
+            )
+        )
+    else:
+        invalid = [entry for entry in alignments if not entry.get("aligned_hash")]
+        if invalid:
+            report.add(
+                Finding(
+                    item="federation:alignments",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message="One or more alignment proofs missing hashes.",
+                )
+            )
+        else:
+            report.add(
+                Finding(
+                    item="federation:alignments",
+                    status="PASS",
+                    severity="INFO",
+                    message="Federated alignment proofs present.",
+                )
+            )
+
     adapter_path = base / "src/meta/plasticity/adapters.rs"
     if not adapter_path.exists():
         report.add(
@@ -949,6 +1038,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     evaluate_advanced_manifest(report, base / ARTIFACT_PATHS["advanced_manifest"])
     evaluate_meta_contract(report, base)
     evaluate_semantic_plasticity(report, base)
+    evaluate_federated_plan(report, base)
 
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

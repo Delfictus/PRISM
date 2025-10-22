@@ -59,3 +59,73 @@ fn federated_meta_cycle(nodes: &mut Vec<Node>, global: &mut MetaState) {
   - Node alignment proofs (hash comparison between updates and ledger).
   - ZK proof validity for each federated commit.
   - Sign-off recorded in `META-GOVERNANCE-LOG.md` with action `FEDERATED_APPLY`.
+
+## Federation Protocol Blueprint
+
+### Identity & Authentication
+
+- Every node possesses a `NodeFingerprint` (`ed25519` public key) anchored in the governance ledger.
+- Joining handshake:
+  1. Node sends `FederationHello { node_fingerprint, software_version, supported_capabilities }`.
+  2. Coordinator responds with `FederationAccept { session_id, epoch, policy_hash }` signed by governance keys.
+  3. Node signs the session and publishes the signature to the ledger (`ledger_block_id` referenced in payloads).
+- Mutual TLS (QUIC) channel established after the signed handshake; transport metadata recorded for audit.
+
+### Synchronization Flow
+
+```text
+┌─────────────┐        ┌────────────┐
+│  Local MEC  │        │ Coordinator│
+└─────┬───────┘        └────┬───────┘
+      │ Local cycle complete │
+      │─────────────────────►│
+      │   MetaUpdate         │
+      │  (signed + hash)     │
+      │                      │
+      │                      │ Align, validate, dedupe
+      │                      │ Aggregate w/ PBFT voting
+      │◄─────────────────────│
+      │   AggregatedUpdate   │
+      │ (applied + persisted)│
+```
+
+- Each `MetaUpdate` carries:
+  - `federated_epoch`
+  - `node_fingerprint`
+  - `update_hash`
+  - `ledger_block_id`
+  - `payload` (compressed genome delta)
+- Coordinator (or distributed PBFT set) verifies:
+  - Hash match with ledger record.
+  - Epoch monotonicity.
+  - Capability compatibility.
+
+### Failure Handling
+
+- **Divergent update:** node moved to quarantine; require manual review entry in `META-GOVERNANCE-LOG.md` (`FEDERATED_QUARANTINE`).
+- **Network partition:** nodes continue local cycles, caching updates; upon reconnection `dynamic_node_alignment` reorders by ledger epoch, discarding conflicting hashes.
+- **Ledger mismatch:** immediate halt and rollback to last `meta_M5.merk` anchor.
+
+## Implementation Roadmap
+
+1. **Protocol crate integration** (`src/meta/federated/mod.rs`)
+   - Define `FederationConfig`, `FederatedNode`, `FederatedUpdate`, and aggregator utilities.
+   - Provide simulation harness (`FederationSimulator`) emitting signed synthetic runs.
+2. **Simulation artifact** (`artifacts/mec/M5/federated_plan.json`)
+   - Master executor generates sample plan (or live results) with:
+     - participating nodes
+     - epochs and alignment hashes
+     - consensus decisions (PBFT votes)
+3. **Compliance extensions**
+   - Add `artifact:federated_plan` check.
+   - Verify manifest values (`consensus_passed == true`, `alignment_proofs` present).
+   - Ensure governance log contains `FEDERATED_APPLY`.
+4. **Runbook & governance**
+   - Document how to trigger `run_representation_gate.sh` analogue for federation (future script).
+   - Outline rollback steps (`meta_M5` Merkle anchors, node quarantine procedure).
+
+## Open Questions
+
+- PBFT node count vs. expected federation size?
+- Requirements for zero-knowledge proofs of node compliance (circuit size, verification cost).
+- Remote attestation targets (TEE vs. software attestation) for high-assurance environments.
