@@ -427,31 +427,31 @@
           "id": "M4-01",
           "title": "Create representation adapters for ontology evolution",
           "source": "src/meta/plasticity/adapters.rs",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "M4-02",
           "title": "Implement semantic drift detection and regression tests",
           "source": "tests/meta/semantic_plasticity.rs",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "M4-03",
           "title": "Generate explainability reports for meta decisions",
           "source": "artifacts/mec/M4/explainability_report.md",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "M4-04",
           "title": "Extend compliance validator with representation gate",
           "source": "scripts/compliance_validator.py",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "M4-05",
           "title": "Document knowledge evolution runbooks",
           "source": "docs/runbooks/meta_rollout.md",
-          "status": "in_progress"
+          "status": "done"
         }
       ]
     },
