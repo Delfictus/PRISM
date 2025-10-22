@@ -26,6 +26,9 @@
 - Re-validate federated signatures post-rollback (`federated_sim --verify-summary … --verify-ledger …`).
 - Document actions in `META-GOVERNANCE-LOG.md` with `ROLLBACK` entry.
 
+## Housekeeping
+- After verification, remove transient build outputs (`deps/`, `libonnxruntime*`, `libprism_ai*`, `comprehensive_gpu_benchmark`) to keep the repository clean, then rerun `run_full_check.sh` so regenerated artifacts remain under version control only when needed.
+
 ## Contacts
 - Meta Evolution Lead
 - Governance Engineering
