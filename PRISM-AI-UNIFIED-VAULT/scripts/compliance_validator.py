@@ -448,19 +448,19 @@ def compute_summary_digest(roots: Sequence[str]) -> str:
     return level[0]
 
 
-def sign_digest(digest: str) -> str:
+def sign_digest_hmac(digest: str) -> str:
     mac = hmac.new(FEDERATION_HMAC_KEY, digest.encode("utf-8"), hashlib.sha256)
     return base64.b64encode(mac.digest()).decode("ascii")
 
 
-def verify_signature(digest: str, signature: str) -> bool:
-    expected = sign_digest(digest)
+def validate_signature(digest: str, signature: str) -> bool:
+    expected = sign_digest_hmac(digest)
     return hmac.compare_digest(expected, signature)
 
 
-def verify_summary_signature(roots: Sequence[str], signature: str) -> bool:
+def validate_summary_signature(roots: Sequence[str], signature: str) -> bool:
     digest = compute_summary_digest(roots)
-    return verify_signature(digest, signature)
+    return validate_signature(digest, signature)
 
 
 def evaluate_meta_contract(report: ComplianceReport, base: Path) -> None:
@@ -672,7 +672,7 @@ def evaluate_federated_artifacts(report: ComplianceReport, base: Path) -> None:
             merkle_str = str(merkle_value)
             declared_merkle[epoch_value] = merkle_str
             merkle_roots.append(merkle_str)
-            if signature_value is None or str(signature_value) != merkle_str:
+            if signature_value is None or not validate_signature(merkle_str, str(signature_value)):
                 report.add(
                     Finding(
                         item="federation:summary:signature",
@@ -693,7 +693,7 @@ def evaluate_federated_artifacts(report: ComplianceReport, base: Path) -> None:
                     message="Summary signature missing or invalid.",
                 )
             )
-        elif not verify_summary_signature(merkle_roots, declared_summary_sig):
+        elif not validate_summary_signature(merkle_roots, declared_summary_sig):
             report.add(
                 Finding(
                     item="federation:summary:signature",
@@ -876,7 +876,7 @@ def evaluate_federated_artifacts(report: ComplianceReport, base: Path) -> None:
                             continue
                         merkle = entry.get('ledger_merkle')
                         signature = entry.get('signature')
-                        if merkle is None or signature is None or not verify_signature(str(merkle), str(signature)):
+                        if merkle is None or signature is None or not validate_signature(str(merkle), str(signature)):
                             report.add(
                                 Finding(
                                     item=f'federation:scenario:{label}:epoch_signature',
@@ -892,7 +892,7 @@ def evaluate_federated_artifacts(report: ComplianceReport, base: Path) -> None:
 
                 if scenario_roots:
                     declared_sig = summary_data.get('summary_signature')
-                    if not isinstance(declared_sig, str) or not verify_summary_signature(scenario_roots, declared_sig):
+                    if not isinstance(declared_sig, str) or not validate_summary_signature(scenario_roots, declared_sig):
                         report.add(
                             Finding(
                                 item=f'federation:scenario:{label}:summary_signature',

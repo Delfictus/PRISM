@@ -32,7 +32,7 @@
       "epoch": 10,
       "ledger_merkle": "382368a8c03c46ff",
       "quorum_reached": true,
-      "signature": "382368a8c03c46ff"
+      "signature": "ccqN7RPxdrIQFM1Edc6rcRHctGlN5KFGfb9+LgYbVhU="
     },
     {
       "aggregated_delta": 49,
@@ -65,7 +65,7 @@
       "epoch": 11,
       "ledger_merkle": "437e530ceeb07ecf",
       "quorum_reached": true,
-      "signature": "437e530ceeb07ecf"
+      "signature": "JRfERgrHU2qo4JGh4oOC07wk+Pli3IrirxulJnMQ/8A="
     },
     {
       "aggregated_delta": 45,
@@ -98,7 +98,7 @@
       "epoch": 12,
       "ledger_merkle": "77f057c81aaf7e63",
       "quorum_reached": true,
-      "signature": "77f057c81aaf7e63"
+      "signature": "8ARP2n7z8mjiKJu4x48SE51BWWtdrUOufxlUZXApifI="
     },
     {
       "aggregated_delta": 41,
@@ -131,7 +131,7 @@
       "epoch": 13,
       "ledger_merkle": "6552713bbe58a3cf",
       "quorum_reached": true,
-      "signature": "6552713bbe58a3cf"
+      "signature": "Nf1n+B4vbDTahfIMl72Zg5hrsjRzqLEcO8ZEaajVQxI="
     },
     {
       "aggregated_delta": 37,
@@ -164,11 +164,11 @@
       "epoch": 14,
       "ledger_merkle": "04641504680561f1",
       "quorum_reached": true,
-      "signature": "04641504680561f1"
+      "signature": "R9v2jfsEwQ0Utieo/elJMoko5W+4cOe5ah2nNtg8O9U="
     }
   ],
-  "generated_at": "2025-10-21T20:18:44.308500616+00:00",
+  "generated_at": "2025-10-22T00:49:44.566373765+00:00",
   "label": "edge_failover",
   "scenario": "edge-failover",
-  "summary_signature": "14ae0cea7be59561"
+  "summary_signature": "Z8S6DJfoMMhE6hITdRvgebKO7IBKsozVUgAjS4eOX30="
 }

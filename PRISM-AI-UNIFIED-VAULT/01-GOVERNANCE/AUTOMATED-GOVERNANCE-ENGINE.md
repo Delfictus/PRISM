@@ -1023,7 +1023,20 @@ pub fn validate_block(block: &CognitiveBlock, vk: &VerifyingKey) -> Result<()> {
   - **Distribute** signed checkpoints back to nodes.
 - Any node emitting unsanctioned updates is quarantined (ViolationResponseSystem triggers `handle_blocker`).
 
-### **9.4 Audit & User Verifiability**
+### **9.4 Federated Signature Enforcement**
+- Every federated simulation must emit HMAC-SHA256 signatures over:
+  - The per-epoch ledger Merkle root.
+  - The scenario summary digest (ordered list of Merkle roots).
+- Signing key: deterministic federation seed (`PRISM-FEDERATED-HMAC-KEY-123456`).
+- Verification path:
+  - `scripts/compliance_validator.py` recomputes digests from ledger files and validates signatures for baseline + labeled scenarios.
+  - `cargo run --bin federated_sim -- --verify-summary <summary.json> --verify-ledger <ledger_dir>` is provided for manual audit and CI hooks.
+- Governance policy:
+  1. Missing or invalid signatures escalate to `ViolationResponseSystem::handle_blocker`.
+  2. Scenarios without matching summaries/ledgers block promotion until regenerated.
+  3. Summary digests are appended to the governance log alongside the cognitive ledger block ID.
+
+### **9.5 Audit & User Verifiability**
 - Users and regulators can request inclusion proofs via `scripts/ledger_audit.py --thought <hash>`.
 - Governance dashboard must show:
   - Ledger height, latest block hash.

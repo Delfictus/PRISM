@@ -5,11 +5,10 @@
 //! custom scenarios so engineers can model different node topologies while
 //! keeping the artifacts deterministic.
 
-use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use clap::Parser;
 use prism_ai::meta::federated::{
@@ -81,7 +80,7 @@ struct ScenarioConfig {
     nodes: Vec<ScenarioNode>,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<()> {
     let args = Args::parse();
 
     if let Some(summary) = args.verify_summary.as_ref() {
@@ -214,10 +213,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn load_interface(
     scenario_path: Option<&Path>,
-) -> Result<(FederatedInterface, Option<String>), Box<dyn Error>> {
+) -> Result<(FederatedInterface, Option<String>)> {
     if let Some(path) = scenario_path {
-        let bytes = fs::read(path)?;
-        let config: ScenarioConfig = serde_json::from_slice(&bytes)?;
+        let bytes = fs::read(path)
+            .with_context(|| format!("Failed to read scenario: {}", path.display()))?;
+        let config: ScenarioConfig = serde_json::from_slice(&bytes)
+            .with_context(|| format!("Failed to parse scenario JSON: {}", path.display()))?;
         let federation_config = FederationConfig {
             quorum: config.quorum.unwrap_or(2),
             max_ledger_drift: config.max_ledger_drift.unwrap_or(2),
@@ -225,12 +226,12 @@ fn load_interface(
         };
 
         if config.nodes.is_empty() {
-            return Err("Scenario must define at least one node".into());
+            return Err(anyhow!("Scenario must define at least one node"));
         }
         let mut profiles = Vec::with_capacity(config.nodes.len());
         for node in config.nodes {
             let role = parse_role(&node.role).ok_or_else(|| {
-                format!(
+                anyhow!(
                     "Invalid node role '{}' (expected 'core' or 'edge')",
                     node.role
                 )
@@ -245,8 +246,10 @@ fn load_interface(
     }
 }
 
-fn verify_mode(summary_path: &Path, ledger_dir: &Path, expected_label: Option<&str>) -> Result<(), Box<dyn Error>> {
-    let summary_data: serde_json::Value = serde_json::from_str(&fs::read_to_string(summary_path)?)
+fn verify_mode(summary_path: &Path, ledger_dir: &Path, expected_label: Option<&str>) -> Result<()> {
+    let summary_text = fs::read_to_string(summary_path)
+        .with_context(|| format!("Failed to read summary: {}", summary_path.display()))?;
+    let summary_data: serde_json::Value = serde_json::from_str(&summary_text)
         .with_context(|| format!("Failed to parse summary JSON: {}", summary_path.display()))?;
 
     let label = summary_data
@@ -288,7 +291,9 @@ fn verify_mode(summary_path: &Path, ledger_dir: &Path, expected_label: Option<&s
             ledger_dir.join(label).join(format!("epoch_{:03}.json", epoch))
         };
 
-        let ledger: serde_json::Value = serde_json::from_str(&fs::read_to_string(&ledger_path)?)
+        let ledger_text = fs::read_to_string(&ledger_path)
+            .with_context(|| format!("Failed to read ledger: {}", ledger_path.display()))?;
+        let ledger: serde_json::Value = serde_json::from_str(&ledger_text)
             .with_context(|| format!("Failed to parse ledger JSON: {}", ledger_path.display()))?;
         let ledger_entries = ledger
             .get("entries")
@@ -342,41 +347,6 @@ fn verify_mode(summary_path: &Path, ledger_dir: &Path, expected_label: Option<&s
     Ok(())
 }
 
-fn fnv1a64(value: &str) -> u64 {
-    const OFFSET: u64 = 0xcbf29ce484222325;
-    const PRIME: u64 = 0x100000001b3;
-    let mut hash = OFFSET;
-    for byte in value.as_bytes() {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(PRIME);
-    }
-    hash
-}
-
-fn compute_summary_signature(roots: &[String]) -> String {
-    if roots.is_empty() {
-        return format!("{:016x}", fnv1a64("summary-empty"));
-    }
-    let mut level: Vec<String> = roots
-        .iter()
-        .map(|r| format!("{:016x}", fnv1a64(r)))
-        .collect();
-    level.sort();
-    while level.len() > 1 {
-        let mut next = Vec::with_capacity((level.len() + 1) / 2);
-        for chunk in level.chunks(2) {
-            let combined = if chunk.len() == 2 {
-                format!("{}{}", chunk[0], chunk[1])
-            } else {
-                format!("{}{}", chunk[0], chunk[0])
-            };
-            next.push(format!("{:016x}", fnv1a64(&combined)));
-        }
-        level = next;
-    }
-    level[0].clone()
-}
-
 fn parse_role(value: &str) -> Option<NodeRole> {
     match value.to_ascii_lowercase().as_str() {
         "core" | "core_validator" | "validator" => Some(NodeRole::CoreValidator),
@@ -385,7 +355,7 @@ fn parse_role(value: &str) -> Option<NodeRole> {
     }
 }
 
-fn remove_dir_contents(path: &Path) -> Result<(), Box<dyn Error>> {
+fn remove_dir_contents(path: &Path) -> Result<()> {
     if !path.exists() {
         return Ok(());
     }

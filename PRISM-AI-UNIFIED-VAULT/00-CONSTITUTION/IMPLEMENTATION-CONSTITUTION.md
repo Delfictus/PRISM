@@ -673,6 +673,7 @@ impl EnforcementEngine {
 2. **Determinism Checkpoints**: Each phase emits `determinism/meta_<phase>.json`. Hash mismatch blocks merge.
 3. **Telemetry Coverage**: `TelemetryExpectations::from_env()` must assert presence of all phase-specific stages.
 4. **Governance Sign-off**: `PRISM-AI-UNIFIED-VAULT/01-GOVERNANCE/META-GOVERNANCE-LOG.md` must receive a signed entry.
+5. **Federated Signatures** (Phase M5+): `artifacts/mec/M5/simulations/epoch_summary*.json` and corresponding `ledger/` entries must carry HMAC-SHA256 signatures. Validation path is `scripts/compliance_validator.py --strict` or `cargo run --bin federated_sim -- --verify-summary … --verify-ledger …`.
 
 ### **Section 12.3: Automation Contracts**
 ```bash

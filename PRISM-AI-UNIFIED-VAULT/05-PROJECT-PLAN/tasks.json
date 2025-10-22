@@ -482,13 +482,13 @@
           "id": "M5-04",
           "title": "Extend compliance gates for federated modes",
           "source": "01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "M5-05",
           "title": "Update runbooks with cross-site governance controls",
           "source": "docs/runbooks/meta_rollout.md",
-          "status": "pending"
+          "status": "in_progress"
         }
       ]
     },
