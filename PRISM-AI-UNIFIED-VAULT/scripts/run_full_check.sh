@@ -59,7 +59,10 @@ python3 "${ROOT}/scripts/compliance_validator.py" --strict
 step "Executing governed master pipeline (sample metrics + federated sim)"
 python3 "${ROOT}/03-AUTOMATION/master_executor.py" --strict --use-sample-metrics --skip-build --skip-tests --skip-benchmarks
 
+verify_federated_signatures
+
+step "Pruning transient build artifacts"
+"${ROOT}/scripts/prune_build_artifacts.sh"
+
 echo
 echo "✅ Full compliance suite completed"
-
-verify_federated_signatures

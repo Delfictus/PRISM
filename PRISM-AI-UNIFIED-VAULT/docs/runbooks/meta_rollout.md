@@ -27,7 +27,7 @@
 - Document actions in `META-GOVERNANCE-LOG.md` with `ROLLBACK` entry.
 
 ## Housekeeping
-- After verification, remove transient build outputs (`deps/`, `libonnxruntime*`, `libprism_ai*`, `comprehensive_gpu_benchmark`) to keep the repository clean, then rerun `run_full_check.sh` so regenerated artifacts remain under version control only when needed.
+- After verification, transient build outputs (`deps/`, `libonnxruntime*`, `libprism_ai*`, `comprehensive_gpu_benchmark`) are pruned automatically by `scripts/prune_build_artifacts.sh`, which runs at the end of `scripts/run_full_check.sh` and `scripts/reset_context.sh`. For ad-hoc verification flows, call the script manually so regenerated artifacts remain under version control only when necessary.
 
 ## Contacts
 - Meta Evolution Lead

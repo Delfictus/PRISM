@@ -120,6 +120,11 @@ verify_federated_signatures() {
   done
 }
 
+prune_build_artifacts() {
+  echo ":: Pruning transient build artifacts"
+  "${ROOT}/scripts/prune_build_artifacts.sh"
+}
+
 show_git_status() {
   echo ":: Git status"
   git -C "${REPO}" status -sb
@@ -132,6 +137,7 @@ meta_snapshot
 compliance_run
 master_executor
 verify_federated_signatures
+prune_build_artifacts
 show_git_status
 
 echo "✅ Context refresh complete"
