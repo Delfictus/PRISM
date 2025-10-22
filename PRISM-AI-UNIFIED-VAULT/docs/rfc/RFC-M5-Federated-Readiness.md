@@ -129,3 +129,10 @@ fn federated_meta_cycle(nodes: &mut Vec<Node>, global: &mut MetaState) {
 - PBFT node count vs. expected federation size?
 - Requirements for zero-knowledge proofs of node compliance (circuit size, verification cost).
 - Remote attestation targets (TEE vs. software attestation) for high-assurance environments.
+
+## Future Integration Roadmap
+
+1. Replace the in-process simulator with the production transport layer (Zenoh/MQTT over QUIC) and PBFT validator nodes.
+2. Stream live ledger confirmations into the compliance validator to cross-check external governance services.
+3. Instrument tracing and metrics for latency, vote distribution, and node health prior to enabling hybrid deployments.
+4. Coordinate with the infrastructure team to provision secure enclaves (TEE) for high-assurance federation participants.

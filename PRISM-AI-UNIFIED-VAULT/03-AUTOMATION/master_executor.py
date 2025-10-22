@@ -60,6 +60,8 @@ EXPLAINABILITY_REPORT_PATH = M4_DIR / "explainability_report.md"
 REPRESENTATION_MANIFEST_PATH = M4_DIR / "representation_manifest.json"
 REPRESENTATION_DATASET_PATH = VAULT_ROOT / "meta" / "representation" / "dataset.json"
 FEDERATED_PLAN_PATH = M5_DIR / "federated_plan.json"
+FEDERATED_DATASET_PATH = VAULT_ROOT / "meta" / "federated" / "dataset.json"
+MERKLE_M5_PATH = VAULT_ROOT / "artifacts" / "merkle" / "meta_M5.merk"
 WORKTREE_NAME = REPO_ROOT.name
 
 DEFAULT_ADAPTATION_RATE = 0.25
@@ -272,6 +274,15 @@ def load_representation_dataset(path: Path) -> Optional[Dict[str, object]]:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise ValueError(f"Invalid representation dataset JSON: {path}") from exc
+
+
+def load_federated_dataset(path: Path) -> Optional[Dict[str, object]]:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid federation dataset JSON: {path}") from exc
 
 
 def canonical_anchor_hash(concept: Dict[str, object]) -> str:
@@ -590,36 +601,77 @@ def aggregate_federated_hash(aligned: List[Tuple[str, float]]) -> str:
 
 
 def generate_federated_plan(use_sample_metrics: bool) -> Dict[str, object]:
-    nodes = sample_federated_nodes()
-    epoch = 1
+    dataset = load_federated_dataset(FEDERATED_DATASET_PATH)
+    if dataset is not None:
+        epoch = int(dataset.get("epoch", 0))
+        policy_hash = str(dataset.get("policy_hash") or "federation-policy-hash")
+        nodes = dataset.get("nodes", [])
+        updates = dataset.get("updates", [])
+        if epoch <= 0 or not nodes or not updates:
+            raise ValueError(
+                f"Federation dataset malformed: epoch={epoch}, nodes={len(nodes)}, updates={len(updates)}"
+            )
+        node_weights = {
+            str(node.get("fingerprint")): float(node.get("stake_weight", 1.0))
+            for node in nodes
+        }
+    else:
+        if not use_sample_metrics:
+            raise FileNotFoundError(
+                f"Federation dataset missing: {FEDERATED_DATASET_PATH}. "
+                "Provide telemetry-derived dataset or run with --use-sample-metrics."
+            )
+        epoch = 1
+        policy_hash = "federation-policy-hash"
+        nodes = sample_federated_nodes()
+        updates = [
+            {
+                "node": node["fingerprint"],
+                "epoch": epoch,
+                "update_hash": deterministic_hash(f"{node['fingerprint']}-{epoch}"),
+                "ledger_block_id": deterministic_hash(f"ledger-{node['fingerprint']}-{epoch}"),
+                "payload_hash": deterministic_hash(f"payload-{node['fingerprint']}-{epoch}"),
+                "stake_weight": node["stake_weight"],
+                "timestamp_ms": None,
+            }
+            for node in nodes
+        ]
+        node_weights = {node["fingerprint"]: node["stake_weight"] for node in nodes}
+
     alignments: List[Dict[str, object]] = []
     weighted_inputs: List[Tuple[str, float]] = []
-    for node in nodes:
-        seed = f"{node['fingerprint']}-{epoch}"
-        update_hash = deterministic_hash(seed)
-        ledger_block_id = deterministic_hash(f"ledger-{seed}")
-        payload_hash = deterministic_hash(f"payload-{seed}")
+    for update in updates:
+        node_id = str(update.get("node"))
+        if node_id not in node_weights:
+            continue
+        update_hash = str(update.get("update_hash"))
+        ledger_block_id = str(update.get("ledger_block_id"))
+        payload_hash = str(update.get("payload_hash"))
         aligned_hash = align_federated_hash(update_hash, ledger_block_id, payload_hash)
         alignments.append(
             {
-                "node": node["fingerprint"],
+                "node": node_id,
                 "update_hash": update_hash,
                 "aligned_hash": aligned_hash,
             }
         )
-        weighted_inputs.append((aligned_hash, float(node["stake_weight"])))
+        weight = float(update.get("stake_weight", node_weights[node_id]))
+        weighted_inputs.append((aligned_hash, weight))
 
+    votes_for = len(weighted_inputs)
+    votes_against = max(0, len(nodes) - votes_for)
+    quorum = max(2, len(nodes) - 1)
     aggregated_hash = aggregate_federated_hash(weighted_inputs)
     plan = {
-        "policy_hash": "federation-policy-hash",
+        "policy_hash": policy_hash,
         "epoch": epoch,
         "timestamp": timestamp(),
         "participants": nodes,
         "consensus": {
-            "passed": True,
-            "votes_for": len(nodes),
-            "votes_against": 0,
-            "quorum": max(2, len(nodes) - 1),
+            "passed": votes_for >= quorum,
+            "votes_for": votes_for,
+            "votes_against": votes_against,
+            "quorum": quorum,
             "aggregated_hash": aggregated_hash,
         },
         "alignments": alignments,
@@ -994,7 +1046,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     (REPORT_DIR / "graph_exec.bin").write_bytes(b"GRAPH_EXEC_PLACEHOLDER" if args.use_sample_metrics else b"")
     write_json(ARTIFACT_DIR / "determinism_manifest.json", create_determinism_manifest(args.use_sample_metrics))
     generate_semantic_plasticity_artifacts(args.use_sample_metrics)
-    write_json(FEDERATED_PLAN_PATH, generate_federated_plan(args.use_sample_metrics))
+    federated_plan = generate_federated_plan(args.use_sample_metrics)
+    write_json(FEDERATED_PLAN_PATH, federated_plan)
+    write_text(MERKLE_M5_PATH, federated_plan["consensus"]["aggregated_hash"] + "\n")
 
     summary.artifacts = {
         "advanced_manifest": str(ARTIFACT_DIR / "advanced_manifest.json"),
@@ -1008,6 +1062,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "explainability_report": str(EXPLAINABILITY_REPORT_PATH),
         "representation_manifest": str(REPRESENTATION_MANIFEST_PATH),
         "federated_plan": str(FEDERATED_PLAN_PATH),
+        "federated_merkle": str(MERKLE_M5_PATH),
         "device_caps": str(VAULT_ROOT / "device_caps.json"),
         "path_decision": str(VAULT_ROOT / "path_decision.json"),
         "feasibility": str(VAULT_ROOT / "feasibility.log"),

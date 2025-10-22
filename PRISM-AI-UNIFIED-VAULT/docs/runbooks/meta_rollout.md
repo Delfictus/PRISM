@@ -30,6 +30,11 @@
 - Restore previous determinism manifests from `artifacts/mec/M5`.
 - Document actions in `META-GOVERNANCE-LOG.md` with `ROLLBACK` entry.
 
+## Federation Node Quarantine & Recovery
+- Quarantine a divergent node by logging `FEDERATED_QUARANTINE` in `META-GOVERNANCE-LOG.md` and halting its session.
+- Reconcile the node's ledger against `artifacts/merkle/meta_M5.merk`; if hashes mismatch, regenerate from the anchor and replay updates.
+- Once aligned, run `master_executor.py --skip-build --skip-tests --skip-benchmarks --strict --use-sample-metrics` to regenerate the federated plan and confirm compliance.
+
 ## Contacts
 - Meta Evolution Lead
 - Governance Engineering

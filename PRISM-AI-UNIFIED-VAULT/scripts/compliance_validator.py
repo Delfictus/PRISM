@@ -652,6 +652,79 @@ def evaluate_federated_plan(report: ComplianceReport, base: Path) -> None:
                 )
             )
 
+    anchor_path = base / "artifacts/merkle/meta_M5.merk"
+    if not anchor_path.exists():
+        report.add(
+            Finding(
+                item="federation:merkle_anchor",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Federation Merkle anchor meta_M5.merk missing.",
+            )
+        )
+        anchor_hash = None
+    else:
+        anchor_hash = anchor_path.read_text(encoding="utf-8").strip()
+        aggregated = consensus.get("aggregated_hash")
+        if not aggregated or not anchor_hash:
+            report.add(
+                Finding(
+                    item="federation:merkle_anchor",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message="Aggregated consensus hash missing for Merkle validation.",
+                )
+            )
+        elif aggregated != anchor_hash:
+            report.add(
+                Finding(
+                    item="federation:merkle_anchor",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message="Federation Merkle anchor does not match aggregated hash.",
+                )
+            )
+        else:
+            report.add(
+                Finding(
+                    item="federation:merkle_anchor",
+                    status="PASS",
+                    severity="INFO",
+                    message="Federation Merkle anchor matches aggregated hash.",
+                )
+            )
+
+    log_path = base / "01-GOVERNANCE" / "META-GOVERNANCE-LOG.md"
+    if anchor_hash and log_path.exists():
+        log_text = log_path.read_text(encoding="utf-8")
+        if f"| M5 | FEDERATED_APPLY | {anchor_hash}" in log_text:
+            report.add(
+                Finding(
+                    item="federation:governance_log",
+                    status="PASS",
+                    severity="INFO",
+                    message="Governance log records FEDERATED_APPLY for M5.",
+                )
+            )
+        else:
+            report.add(
+                Finding(
+                    item="federation:governance_log",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message="Governance log missing FEDERATED_APPLY entry for M5.",
+                )
+            )
+    elif anchor_hash:
+        report.add(
+            Finding(
+                item="federation:governance_log",
+                status="FAIL",
+                severity="CRITICAL",
+                message="META-GOVERNANCE-LOG.md not found for federation validation.",
+            )
+        )
+
     adapter_path = base / "src/meta/plasticity/adapters.rs"
     if not adapter_path.exists():
         report.add(
