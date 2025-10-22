@@ -204,6 +204,50 @@ impl ComplianceGate for OntologyApprovalGate {
     }
 }
 
+pub struct ReflexiveFeedbackGate;
+
+impl ComplianceGate for ReflexiveFeedbackGate {
+    fn validate(&self, change: &CodeChange) -> Result<()> {
+        let manifest = change.read_json("PRISM-AI-UNIFIED-VAULT/artifacts/determinism_manifest.json")?;
+        let lattice = manifest
+            .get("lattice")
+            .ok_or_else(|| anyhow!("Determinism manifest missing lattice block"))?;
+
+        let lattice_hash = lattice
+            .get("hash")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| anyhow!("Lattice hash not declared"))?;
+        if lattice_hash.len() != 64 {
+            bail!("Lattice hash must be 64 hex characters");
+        }
+
+        let mode = lattice
+            .get("mode")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| anyhow!("Reflexive mode missing"))?;
+        if !matches!(mode, "strict" | "explore" | "recovery") {
+            bail!("Unsupported reflexive mode: {mode}");
+        }
+
+        let report_path = Path::new("PRISM-AI-UNIFIED-VAULT/artifacts/mec/M3/lattice_report.json");
+        if !report_path.exists() {
+            bail!("Lattice report missing: {}", report_path.display());
+        }
+
+        let report = change.read_json(report_path)?;
+        let report_hash = report
+            .get("snapshot")
+            .and_then(|value| value.get("hash"))
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| anyhow!("Lattice report missing snapshot.hash"))?;
+        if report_hash != lattice_hash {
+            bail!("Lattice hash mismatch between determinism manifest and report");
+        }
+
+        Ok(())
+    }
+}
+
 pub struct PerformanceGate;
 
 impl PerformanceGate {

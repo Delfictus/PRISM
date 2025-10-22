@@ -7,7 +7,8 @@
     "seeds",
     "hashes",
     "artifacts",
-    "ontology"
+    "ontology",
+    "lattice"
   ],
   "properties": {
     "build": {
@@ -41,6 +42,24 @@
         "manifest_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "alignment_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "coverage": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      }
+    },
+    "lattice": {
+      "type": "object",
+      "required": ["hash", "mode"],
+      "properties": {
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "mode": { "type": "string", "enum": ["strict", "explore", "recovery"] },
+        "stability": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "entropy": {
           "type": "number",
           "minimum": 0.0,
           "maximum": 1.0

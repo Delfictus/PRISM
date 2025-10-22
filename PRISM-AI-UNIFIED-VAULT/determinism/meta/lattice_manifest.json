@@ -1,6 +1,13 @@
 {
-  "version": 0,
-  "description": "Placeholder for free-energy lattice manifest. Populated in Phase M3.",
-  "hash": null,
-  "snapshots": []
+  "version": 1,
+  "description": "Phase M3 reflexive feedback lattice snapshot manifest.",
+  "hash": "11350d91a0fcae8f1ce3260c91c4264b2e0327f5619bafc509be853041df827c",
+  "snapshots": [
+    {
+      "timestamp": "2025-10-21T18:30:00+00:00",
+      "mode": "strict",
+      "stability": 0.82,
+      "entropy": 0.58
+    }
+  ]
 }

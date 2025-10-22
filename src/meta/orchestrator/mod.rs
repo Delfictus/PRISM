@@ -1,6 +1,7 @@
 use crate::features::{registry, MetaFeatureId, MetaFeatureState};
 use crate::governance::determinism::{DeterminismProof, DeterminismRecorder, MetaDeterminism};
 use crate::meta::ontology::{align_variants, FileOntologyStorage, OntologyService};
+use crate::meta::reflexive::{LatticeSnapshot, ReflexiveController, ReflexiveObservation};
 use crate::telemetry::{
     ComponentId, EventData, EventLevel, Metrics, TelemetryEntry, TelemetrySink,
 };
@@ -12,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fmt::{self, Display};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 const HALTON_PRIMES: [u64; 8] = [2, 3, 5, 7, 11, 13, 17, 19];
@@ -67,6 +68,8 @@ pub enum OrchestratorError {
     MissingParameter(String),
     #[error("determinism recorder error: {0}")]
     Recorder(String),
+    #[error("reflexive controller error: {0}")]
+    Reflexive(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -158,29 +161,36 @@ pub struct EvolutionOutcome {
     pub determinism_proof: DeterminismProof,
     pub meta: MetaDeterminism,
     pub telemetry_entry: TelemetryEntry,
+    pub reflexive_snapshot: Option<LatticeSnapshot>,
 }
 
 #[derive(Clone)]
 pub struct MetaOrchestrator {
-    rng: Arc<std::sync::Mutex<StdRng>>,
+    rng: Arc<Mutex<StdRng>>,
     schedule_dimension: usize,
     telemetry: TelemetrySink,
     ontology_service: Option<OntologyService<FileOntologyStorage>>,
+    reflexive: Arc<Mutex<ReflexiveController>>,
 }
 
 impl MetaOrchestrator {
     pub fn new(seed: u64) -> Result<Self> {
         ensure_meta_generation_enabled()?;
         Ok(Self {
-            rng: Arc::new(std::sync::Mutex::new(StdRng::seed_from_u64(seed))),
+            rng: Arc::new(Mutex::new(StdRng::seed_from_u64(seed))),
             schedule_dimension: 5,
             telemetry: TelemetrySink::new("meta_orchestrator"),
             ontology_service: None,
+            reflexive: Arc::new(Mutex::new(ReflexiveController::default())),
         })
     }
 
     pub fn attach_ontology_service(&mut self, service: OntologyService<FileOntologyStorage>) {
         self.ontology_service = Some(service);
+    }
+
+    pub fn attach_reflexive_controller(&mut self, controller: ReflexiveController) {
+        self.reflexive = Arc::new(Mutex::new(controller));
     }
 
     pub fn run_generation(&self, base_seed: u64, population: usize) -> Result<EvolutionOutcome> {
@@ -197,6 +207,44 @@ impl MetaOrchestrator {
         let best = &evaluations[best_index];
         let manifest = registry().snapshot();
         let free_energy_hash = compute_free_energy_hash(&evaluations, temperature);
+
+        let reflexive_snapshot = if evaluations.is_empty() || distribution.is_empty() {
+            None
+        } else {
+            let mean_energy = evaluations
+                .iter()
+                .map(|eval| eval.metrics.energy)
+                .sum::<f64>()
+                / evaluations.len() as f64;
+            let mean_divergence = evaluations
+                .iter()
+                .map(|eval| eval.metrics.divergence)
+                .sum::<f64>()
+                / evaluations.len() as f64;
+            let entropy = normalized_entropy(&distribution);
+            let exploration = entropy;
+            let exploitation = (1.0 - entropy).clamp(0.0, 1.0);
+            let free_energy = mean_energy - temperature * entropy;
+            let confidence = (1.0 - mean_divergence.tanh()).clamp(0.0, 1.0);
+            let observation = ReflexiveObservation {
+                free_energy,
+                exploration,
+                exploitation,
+                divergence: mean_divergence,
+                confidence,
+                temperature,
+                timestamp: Utc::now(),
+            };
+            match self.reflexive.lock() {
+                Ok(mut controller) => Some(controller.observe(observation)),
+                Err(_) => {
+                    return Err(OrchestratorError::Reflexive(
+                        "reflexive controller poisoned".into(),
+                    ))
+                }
+            }
+        };
+
         let (ontology_hash, alignment_hash, alignment_coverage) =
             if let Some(service) = &self.ontology_service {
                 match align_variants(service, &[best.genome.clone()]) {
@@ -221,6 +269,17 @@ impl MetaOrchestrator {
                 (None, None, None)
             };
 
+        let lattice_hash = reflexive_snapshot
+            .as_ref()
+            .map(|snapshot| snapshot.hash.clone());
+        let reflexive_mode = reflexive_snapshot
+            .as_ref()
+            .map(|snapshot| snapshot.state.mode.as_str().to_string());
+        let lattice_stability = reflexive_snapshot
+            .as_ref()
+            .map(|snapshot| snapshot.stability);
+        let lattice_entropy = reflexive_snapshot.as_ref().map(|snapshot| snapshot.entropy);
+
         let meta = MetaDeterminism {
             meta_genome_hash: best.genome.hash.clone(),
             meta_merkle_root: manifest.merkle_root.clone(),
@@ -228,6 +287,10 @@ impl MetaOrchestrator {
             ontology_alignment_hash: alignment_hash,
             ontology_alignment_coverage: alignment_coverage,
             free_energy_hash: Some(free_energy_hash.clone()),
+            lattice_hash,
+            reflexive_mode,
+            lattice_stability,
+            lattice_entropy,
         };
 
         let mut recorder = DeterminismRecorder::new(plan.base_seed);
@@ -258,6 +321,7 @@ impl MetaOrchestrator {
             determinism_proof: proof,
             meta,
             telemetry_entry,
+            reflexive_snapshot,
         })
     }
 
@@ -604,6 +668,27 @@ fn compute_free_energy_hash(evals: &[VariantEvaluation], temperature: f64) -> St
         hasher.update(eval.metrics.divergence.to_le_bytes());
     }
     hex::encode(hasher.finalize())
+}
+
+fn normalized_entropy(probs: &[f64]) -> f64 {
+    if probs.is_empty() {
+        return 0.0;
+    }
+    let total = probs.iter().sum::<f64>();
+    if total <= f64::EPSILON {
+        return 0.0;
+    }
+    let normalized: Vec<f64> = probs.iter().map(|p| (p / total).max(0.0)).collect();
+    if normalized.len() <= 1 {
+        return 0.0;
+    }
+    let entropy = shannon_entropy(&normalized);
+    let max_entropy = (normalized.len() as f64).ln();
+    if max_entropy <= f64::EPSILON {
+        0.0
+    } else {
+        (entropy / max_entropy).clamp(0.0, 1.0)
+    }
 }
 
 fn shannon_entropy(probs: &[f64]) -> f64 {

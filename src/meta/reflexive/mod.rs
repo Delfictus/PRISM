@@ -1,10 +1,9 @@
-//! Reflexive feedback controller and free-energy lattice snapshots (Phase M3).
+//! Reflexive feedback controller and free-energy lattice snapshots.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-/// Operating mode for the reflexive controller.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ReflexiveMode {
@@ -71,7 +70,7 @@ impl LatticeSnapshot {
                 .unwrap_or_default()
                 .to_le_bytes(),
         );
-        hasher.update((entropy.clamp(0.0, 1.0)).to_le_bytes());
+        hasher.update(entropy.clamp(0.0, 1.0).to_le_bytes());
         for value in gradient {
             hasher.update(value.to_le_bytes());
         }
@@ -168,7 +167,11 @@ impl ReflexiveController {
         (1.0 - self.smoothing) * previous + self.smoothing * current
     }
 
-    fn select_mode(&self, obs: &ReflexiveObservation, prev: Option<&ReflexiveState>) -> ReflexiveMode {
+    fn select_mode(
+        &self,
+        obs: &ReflexiveObservation,
+        prev: Option<&ReflexiveState>,
+    ) -> ReflexiveMode {
         if obs.exploration > 0.65 {
             ReflexiveMode::Explore
         } else if let Some(prev_state) = prev {

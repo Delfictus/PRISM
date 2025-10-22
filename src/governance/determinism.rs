@@ -52,6 +52,10 @@ pub struct MetaDeterminism {
     pub ontology_alignment_hash: Option<String>,
     pub ontology_alignment_coverage: Option<f64>,
     pub free_energy_hash: Option<String>,
+    pub lattice_hash: Option<String>,
+    pub reflexive_mode: Option<String>,
+    pub lattice_stability: Option<f64>,
+    pub lattice_entropy: Option<f64>,
 }
 
 impl EnvironmentFingerprint {

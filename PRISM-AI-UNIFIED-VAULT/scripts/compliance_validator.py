@@ -65,6 +65,7 @@ ARTIFACT_PATHS: Dict[str, Path] = {
     "device_caps": Path("device_caps.json"),
     "path_decision": Path("path_decision.json"),
     "feasibility": Path("feasibility.log"),
+    "lattice_report": Path("artifacts/mec/M3/lattice_report.json"),
     "graph_capture": Path("reports/graph_capture.json"),
     "graph_exec": Path("reports/graph_exec.bin"),
     "determinism_manifest": Path("artifacts/determinism_manifest.json"),
@@ -78,6 +79,7 @@ CRITICAL_ARTIFACTS = {
     "graph_capture",
     "graph_exec",
     "determinism_manifest",
+    "lattice_report",
     "ontology_snapshot",
 }
 
@@ -93,6 +95,7 @@ REQUIRED_META_FLAGS = {
 }
 
 HEX_64 = re.compile(r"^[0-9a-f]{64}$")
+REFLEXIVE_MODES = {"strict", "explore", "recovery"}
 
 
 @dataclass
@@ -496,6 +499,124 @@ def evaluate_ontology_contract(
                 )
             )
 
+
+def evaluate_lattice_contract(
+    report: ComplianceReport,
+    manifest_path: Path,
+    snapshot_path: Path,
+) -> None:
+    manifest = load_json(manifest_path)
+    if manifest is None:
+        return
+
+    lattice = manifest.get("lattice")
+    if not isinstance(lattice, dict):
+        report.add(
+            Finding(
+                item="lattice:manifest",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Determinism manifest missing lattice block.",
+            )
+        )
+        return
+
+    lattice_hash = lattice.get("hash")
+    mode = lattice.get("mode")
+    stability = lattice.get("stability")
+    entropy = lattice.get("entropy")
+
+    if not isinstance(lattice_hash, str) or not HEX_64.match(lattice_hash):
+        report.add(
+            Finding(
+                item="lattice:hash",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Lattice hash must be a 64 character hex string.",
+            )
+        )
+
+    if not isinstance(mode, str) or mode not in REFLEXIVE_MODES:
+        report.add(
+            Finding(
+                item="lattice:mode",
+                status="FAIL",
+                severity="CRITICAL",
+                message="Reflexive mode must be one of strict/explore/recovery.",
+            )
+        )
+
+    if stability is not None:
+        try:
+            stability_value = float(stability)
+        except (TypeError, ValueError):
+            report.add(
+                Finding(
+                    item="lattice:stability",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message="Lattice stability must be numeric.",
+                )
+            )
+        else:
+            if not 0.0 <= stability_value <= 1.0:
+                report.add(
+                    Finding(
+                        item="lattice:stability",
+                        status="FAIL",
+                        severity="CRITICAL",
+                        message="Lattice stability must be within [0, 1].",
+                    )
+                )
+
+    if entropy is not None:
+        try:
+            float(entropy)
+        except (TypeError, ValueError):
+            report.add(
+                Finding(
+                    item="lattice:entropy",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message="Lattice entropy must be numeric.",
+                )
+            )
+
+    snapshot = load_json(snapshot_path)
+    if snapshot is None:
+        report.add(
+            Finding(
+                item="lattice:report",
+                status="FAIL",
+                severity="BLOCKER",
+                message=f"Lattice report missing: {snapshot_path}",
+            )
+        )
+        return
+
+    snapshot_info = snapshot.get("snapshot", {})
+    snapshot_hash = snapshot_info.get("hash")
+    snapshot_mode = snapshot_info.get("state", {}).get("mode")
+    if isinstance(lattice_hash, str) and snapshot_hash != lattice_hash:
+        report.add(
+            Finding(
+                item="lattice:hash_consistency",
+                status="FAIL",
+                severity="BLOCKER",
+                message="Lattice hash mismatch between determinism manifest and report.",
+            )
+        )
+
+    if isinstance(mode, str) and snapshot_mode is not None and snapshot_mode != mode:
+        report.add(
+            Finding(
+                item="lattice:mode_consistency",
+                status="FAIL",
+                severity="CRITICAL",
+                message="Reflexive mode mismatch between determinism manifest and report.",
+            )
+        )
+
 def compute_meta_merkle(records: Sequence[Dict[str, object]]) -> str:
     if not records:
         return hashlib.sha256(b"meta-empty").hexdigest()
@@ -820,6 +941,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         report,
         base / ARTIFACT_PATHS["determinism_manifest"],
         base / ARTIFACT_PATHS["ontology_snapshot"],
+    )
+    evaluate_lattice_contract(
+        report,
+        base / ARTIFACT_PATHS["determinism_manifest"],
+        base / ARTIFACT_PATHS["lattice_report"],
     )
     evaluate_advanced_manifest(report, base / ARTIFACT_PATHS["advanced_manifest"])
     evaluate_meta_contract(report, base)

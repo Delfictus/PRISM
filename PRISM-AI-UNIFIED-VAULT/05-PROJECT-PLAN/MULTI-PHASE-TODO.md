@@ -125,11 +125,11 @@ Exit criteria: Orchestrator runs deterministically with audit artifacts, CI phas
 
 | # | Task | Source | Status |
 |---|------|--------|--------|
-| M2.1 | Stand up ontology service API and storage | `src/meta/ontology/mod.rs` | ☐ pending |
-| M2.2 | Implement alignment pipeline between variants and ontology | `src/meta/ontology/alignment.rs` | ☐ pending |
-| M2.3 | Extend determinism manifest with ontology hashes | `determinism/meta/manifest_schema.json` | ☐ pending |
-| M2.4 | Add governance gate for ontology approval workflow | `01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md` | ☐ pending |
-| M2.5 | Publish ontology snapshot artifact and audit trail | `artifacts/mec/M2/ontology_snapshot.json` | ☐ pending |
+| M2.1 | Stand up ontology service API and storage | `src/meta/ontology/mod.rs` | ☑ done |
+| M2.2 | Implement alignment pipeline between variants and ontology | `src/meta/ontology/alignment.rs` | ☑ done |
+| M2.3 | Extend determinism manifest with ontology hashes | `determinism/meta/manifest_schema.json` | ☑ done |
+| M2.4 | Add governance gate for ontology approval workflow | `01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md` | ☑ done |
+| M2.5 | Publish ontology snapshot artifact and audit trail | `artifacts/mec/M2/ontology_snapshot.json` | ☑ done |
 
 Exit criteria: Ontology service live, manifests extended, governance approvals enforced.
 
@@ -139,11 +139,11 @@ Exit criteria: Ontology service live, manifests extended, governance approvals e
 
 | # | Task | Source | Status |
 |---|------|--------|--------|
-| M3.1 | Implement meta state model and reflexive controller | `src/meta/reflexive/mod.rs` | ☐ pending |
-| M3.2 | Instrument free-energy lattice snapshot telemetry | `artifacts/mec/M3/lattice_report.json` | ☐ pending |
-| M3.3 | Enforce governance guardrails for exploration vs strict modes | `01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md` | ☐ pending |
-| M3.4 | Integrate lattice metrics into determinism manifest | `determinism/meta/lattice_manifest.json` | ☐ pending |
-| M3.5 | Update CI lattice pipeline and compliance validator | `scripts/compliance_validator.py` | ☐ pending |
+| M3.1 | Implement meta state model and reflexive controller | `src/meta/reflexive/mod.rs` | ☑ done |
+| M3.2 | Instrument free-energy lattice snapshot telemetry | `artifacts/mec/M3/lattice_report.json` | ☑ done |
+| M3.3 | Enforce governance guardrails for exploration vs strict modes | `01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md` | ☑ done |
+| M3.4 | Integrate lattice metrics into determinism manifest | `determinism/meta/lattice_manifest.json` | ☑ done |
+| M3.5 | Update CI lattice pipeline and compliance validator | `scripts/compliance_validator.py` | ☑ done |
 
 Exit criteria: Reflex control loop operational with telemetry and governance gating.
 

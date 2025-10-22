@@ -390,31 +390,31 @@
           "id": "M3-01",
           "title": "Implement meta state model and reflexive controller",
           "source": "src/meta/reflexive/mod.rs",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M3-02",
           "title": "Instrument free-energy lattice snapshot telemetry",
           "source": "artifacts/mec/M3/lattice_report.json",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M3-03",
           "title": "Enforce governance guardrails for exploration vs strict modes",
           "source": "01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M3-04",
           "title": "Integrate lattice metrics into determinism manifest",
           "source": "determinism/meta/lattice_manifest.json",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "M3-05",
           "title": "Update CI lattice pipeline and compliance validator",
           "source": "scripts/compliance_validator.py",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
