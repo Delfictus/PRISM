@@ -9,7 +9,9 @@ inspecting documentation, governance manifests, and execution artifacts.
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
+import hmac
 import json
 import sys
 from dataclasses import dataclass, asdict, field
@@ -97,6 +99,7 @@ FEDERATION_PLAN_PATH = Path("artifacts/mec/M5/federated_plan.md")
 FEDERATION_SUMMARY_PATH = Path("artifacts/mec/M5/simulations/epoch_summary.json")
 FEDERATION_LEDGER_DIR = Path("artifacts/mec/M5/ledger")
 FEDERATION_SCENARIO_DIR = Path("artifacts/mec/M5/scenarios")
+FEDERATION_HMAC_KEY = b"PRISM-FEDERATED-HMAC-KEY-123456"
 
 
 @dataclass
@@ -430,7 +433,7 @@ def compute_ledger_merkle(entries: Sequence[Dict[str, object]]) -> str:
     return level[0]
 
 
-def compute_summary_signature(roots: Sequence[str]) -> str:
+def compute_summary_digest(roots: Sequence[str]) -> str:
     if not roots:
         return f"{fnv1a64('summary-empty'):016x}"
 
@@ -443,6 +446,21 @@ def compute_summary_signature(roots: Sequence[str]) -> str:
             next_level.append(f"{fnv1a64(left + right):016x}")
         level = next_level
     return level[0]
+
+
+def sign_digest(digest: str) -> str:
+    mac = hmac.new(FEDERATION_HMAC_KEY, digest.encode("utf-8"), hashlib.sha256)
+    return base64.b64encode(mac.digest()).decode("ascii")
+
+
+def verify_signature(digest: str, signature: str) -> bool:
+    expected = sign_digest(digest)
+    return hmac.compare_digest(expected, signature)
+
+
+def verify_summary_signature(roots: Sequence[str], signature: str) -> bool:
+    digest = compute_summary_digest(roots)
+    return verify_signature(digest, signature)
 
 
 def evaluate_meta_contract(report: ComplianceReport, base: Path) -> None:
@@ -666,14 +684,22 @@ def evaluate_federated_artifacts(report: ComplianceReport, base: Path) -> None:
 
     if merkle_roots:
         declared_summary_sig = summary.get("summary_signature")
-        expected_summary_sig = compute_summary_signature(merkle_roots)
-        if declared_summary_sig != expected_summary_sig:
+        if not isinstance(declared_summary_sig, str):
             report.add(
                 Finding(
                     item="federation:summary:signature",
                     status="FAIL",
                     severity="CRITICAL",
-                    message=f"Summary signature mismatch (declared {declared_summary_sig}, expected {expected_summary_sig}).",
+                    message="Summary signature missing or invalid.",
+                )
+            )
+        elif not verify_summary_signature(merkle_roots, declared_summary_sig):
+            report.add(
+                Finding(
+                    item="federation:summary:signature",
+                    status="FAIL",
+                    severity="CRITICAL",
+                    message="Summary signature mismatch.",
                 )
             )
         else:
@@ -850,7 +876,7 @@ def evaluate_federated_artifacts(report: ComplianceReport, base: Path) -> None:
                             continue
                         merkle = entry.get('ledger_merkle')
                         signature = entry.get('signature')
-                        if merkle is None or signature is None or str(signature) != str(merkle):
+                        if merkle is None or signature is None or not verify_signature(str(merkle), str(signature)):
                             report.add(
                                 Finding(
                                     item=f'federation:scenario:{label}:epoch_signature',
@@ -866,17 +892,13 @@ def evaluate_federated_artifacts(report: ComplianceReport, base: Path) -> None:
 
                 if scenario_roots:
                     declared_sig = summary_data.get('summary_signature')
-                    expected_sig = compute_summary_signature(scenario_roots)
-                    if declared_sig != expected_sig:
+                    if not isinstance(declared_sig, str) or not verify_summary_signature(scenario_roots, declared_sig):
                         report.add(
                             Finding(
                                 item=f'federation:scenario:{label}:summary_signature',
                                 status='FAIL',
                                 severity='CRITICAL',
-                                message=(
-                                    f'Scenario {label} summary signature mismatch '
-                                    f'(declared {declared_sig}, expected {expected_sig}).'
-                                ),
+                                message=f'Scenario {label} summary signature mismatch.',
                             )
                         )
                         summary_ok = False

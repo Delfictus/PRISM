@@ -10,6 +10,10 @@
 
 use std::fmt;
 
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
+
 /// Configuration parameters that govern a federated epoch.
 #[derive(Clone, Debug)]
 pub struct FederationConfig {
@@ -200,7 +204,8 @@ impl FederatedInterface {
         ledger_entries.sort_by(|a, b| a.node_id.cmp(&b.node_id));
 
         let aggregated_delta = updates.iter().map(|u| u.delta_score).sum::<i64>();
-        let signature = compute_ledger_merkle(&ledger_entries);
+        let merkle_root = compute_ledger_merkle(&ledger_entries);
+        let signature = sign_digest(&merkle_root);
         let quorum_reached = self
             .nodes
             .iter()
@@ -261,6 +266,75 @@ fn stable_hash(input: &str) -> String {
         hash = hash.wrapping_mul(FNV_PRIME);
     }
     format!("{hash:016x}")
+}
+
+type HmacSha256 = Hmac<Sha256>;
+
+const FEDERATION_KEY: &[u8] = b"PRISM-FEDERATED-HMAC-KEY-123456";
+
+fn fnv1a64(value: &str) -> u64 {
+    const OFFSET: u64 = 0xcbf29ce484222325;
+    const PRIME: u64 = 0x100000001b3;
+    let mut hash = OFFSET;
+    for byte in value.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(PRIME);
+    }
+    hash
+}
+
+pub fn sign_digest(message: &str) -> String {
+    let mut mac = HmacSha256::new_from_slice(FEDERATION_KEY).expect("valid key");
+    mac.update(message.as_bytes());
+    let bytes = mac.finalize().into_bytes();
+    STANDARD.encode(bytes)
+}
+
+pub fn verify_signature(message: &str, signature_b64: &str) -> bool {
+    if let Ok(signature_bytes) = STANDARD.decode(signature_b64) {
+        if let Ok(mut mac) = HmacSha256::new_from_slice(FEDERATION_KEY) {
+            mac.update(message.as_bytes());
+            return mac.verify_slice(&signature_bytes).is_ok();
+        }
+    }
+    false
+}
+
+pub fn compute_summary_digest(roots: &[String]) -> String {
+    if roots.is_empty() {
+        return format!("{:016x}", fnv1a64("summary-empty"));
+    }
+
+    let mut level: Vec<String> = roots
+        .iter()
+        .map(|root| format!("{:016x}", fnv1a64(root)))
+        .collect();
+    level.sort();
+
+    while level.len() > 1 {
+        let mut next_level = Vec::with_capacity((level.len() + 1) / 2);
+        for chunk in level.chunks(2) {
+            let combined = if chunk.len() == 2 {
+                format!("{}{}", chunk[0], chunk[1])
+            } else {
+                format!("{}{}", chunk[0], chunk[0])
+            };
+            next_level.push(format!("{:016x}", fnv1a64(&combined)));
+        }
+        level = next_level;
+    }
+
+    level[0].clone()
+}
+
+pub fn sign_summary_digest(roots: &[String]) -> String {
+    let digest = compute_summary_digest(roots);
+    sign_digest(&digest)
+}
+
+pub fn verify_summary_signature(roots: &[String], signature_b64: &str) -> bool {
+    let digest = compute_summary_digest(roots);
+    verify_signature(&digest, signature_b64)
 }
 
 /// Compute a deterministic Merkle-style hash for ledger entries.
@@ -352,5 +426,23 @@ mod tests {
         shuffled.reverse();
         let root_b = compute_ledger_merkle(&shuffled);
         assert_eq!(root_a, root_b);
+    }
+
+    #[test]
+    fn signature_round_trip() {
+        let digest = "deadbeef";
+        let signature = sign_digest(digest);
+        assert!(verify_signature(digest, &signature));
+        assert!(!verify_signature("cafebabe", &signature));
+    }
+
+    #[test]
+    fn summary_signature_round_trip() {
+        let roots = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string()];
+        let signature = sign_summary_digest(&roots);
+        assert!(verify_summary_signature(&roots, &signature));
+        let mut altered = roots.clone();
+        altered.push("ddd".to_string());
+        assert!(!verify_summary_signature(&altered, &signature));
     }
 }

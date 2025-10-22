@@ -9,9 +9,13 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use anyhow::{anyhow, Context};
 use chrono::Utc;
 use clap::Parser;
-use prism_ai::meta::federated::{FederatedInterface, FederationConfig, NodeProfile, NodeRole};
+use prism_ai::meta::federated::{
+    compute_ledger_merkle, sign_summary_digest, verify_signature, verify_summary_signature,
+    FederatedInterface, FederationConfig, LedgerEntry, NodeProfile, NodeRole,
+};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -42,6 +46,18 @@ struct Args {
     /// Optional label used to namespace outputs (defaults to scenario name).
     #[arg(long, value_name = "LABEL")]
     label: Option<String>,
+
+    /// Verify mode: summary JSON to validate.
+    #[arg(long, value_name = "PATH", requires = "verify_ledger", conflicts_with_all = ["scenario", "epochs", "clean", "output_dir", "label"])]
+    verify_summary: Option<PathBuf>,
+
+    /// Verify mode: ledger directory containing epoch_XXX.json files.
+    #[arg(long, value_name = "PATH", requires = "verify_summary", conflicts_with_all = ["scenario", "epochs", "clean", "output_dir", "label"])]
+    verify_ledger: Option<PathBuf>,
+
+    /// Expected label when running in verify mode.
+    #[arg(long, value_name = "LABEL", conflicts_with_all = ["scenario", "epochs", "clean", "output_dir", "label"])]
+    expect_label: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -67,6 +83,18 @@ struct ScenarioConfig {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
+
+    if let Some(summary) = args.verify_summary.as_ref() {
+        let ledger = args
+            .verify_ledger
+            .as_ref()
+            .ok_or_else(|| anyhow!("--verify-ledger is required when --verify-summary is used"))?;
+        let expected_label = args.expect_label.as_deref();
+        verify_mode(summary, ledger, expected_label)?;
+        println!("✅ Federated artifacts verified for {}", summary.display());
+        return Ok(());
+    }
+
     let base_dir = args
         .output_dir
         .unwrap_or_else(|| PathBuf::from(DEFAULT_OUTPUT_DIR));
@@ -99,14 +127,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut epoch_docs = Vec::with_capacity(reports.len());
     let mut merkle_roots = Vec::with_capacity(reports.len());
     for report in &reports {
-        let merkle = report.signature.clone();
+        let merkle = compute_ledger_merkle(&report.ledger_entries);
+        if !verify_signature(&merkle, &report.signature) {
+            return Err(anyhow!(
+                "Ledger signature verification failed for epoch {}",
+                report.epoch
+            ));
+        }
         merkle_roots.push(merkle.clone());
         epoch_docs.push(json!({
             "epoch": report.epoch,
             "quorum_reached": report.quorum_reached,
             "aggregated_delta": report.aggregated_delta,
             "ledger_merkle": merkle,
-            "signature": merkle,
+            "signature": report.signature,
             "aligned_updates": report
                 .aligned_updates
                 .iter()
@@ -122,7 +156,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }));
     }
 
-    let summary_signature = compute_summary_signature(&merkle_roots);
+    let summary_signature = sign_summary_digest(&merkle_roots);
 
     let summary = json!({
         "generated_at": Utc::now().to_rfc3339(),
@@ -148,10 +182,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
         fs::create_dir_all(&target_dir)?;
         let ledger_path = target_dir.join(format!("epoch_{:03}.json", report.epoch));
-        let merkle_root = report.signature.clone();
+        let merkle_root = compute_ledger_merkle(&report.ledger_entries);
+        if !verify_signature(&merkle_root, &report.signature) {
+            return Err(anyhow!(
+                "Ledger signature verification failed for epoch {}",
+                report.epoch
+            ));
+        }
         let ledger_doc = json!({
             "epoch": report.epoch,
-            "signature": merkle_root,
+            "signature": report.signature,
             "merkle_root": merkle_root,
             "entries": report.ledger_entries.iter().map(|entry| {
                 json!({
@@ -203,6 +243,103 @@ fn load_interface(
     } else {
         Ok((FederatedInterface::placeholder(), None))
     }
+}
+
+fn verify_mode(summary_path: &Path, ledger_dir: &Path, expected_label: Option<&str>) -> Result<(), Box<dyn Error>> {
+    let summary_data: serde_json::Value = serde_json::from_str(&fs::read_to_string(summary_path)?)
+        .with_context(|| format!("Failed to parse summary JSON: {}", summary_path.display()))?;
+
+    let label = summary_data
+        .get("label")
+        .and_then(|v| v.as_str())
+        .unwrap_or("default");
+    if let Some(expected) = expected_label {
+        if label != expected {
+            return Err(anyhow!(
+                "Summary label mismatch: expected '{}', found '{}'",
+                expected, label
+            ));
+        }
+    }
+
+    let epochs = summary_data
+        .get("epochs")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| anyhow!("Summary missing 'epochs' array"))?;
+
+    let mut roots: Vec<String> = Vec::with_capacity(epochs.len());
+    for entry in epochs {
+        let epoch = entry
+            .get("epoch")
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| anyhow!("Epoch entry missing 'epoch'"))?;
+        let merkle = entry
+            .get("ledger_merkle")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Epoch {} missing 'ledger_merkle'", epoch))?;
+        let signature = entry
+            .get("signature")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Epoch {} missing 'signature'", epoch))?;
+
+        let ledger_path = if label == "default" {
+            ledger_dir.join(format!("epoch_{:03}.json", epoch))
+        } else {
+            ledger_dir.join(label).join(format!("epoch_{:03}.json", epoch))
+        };
+
+        let ledger: serde_json::Value = serde_json::from_str(&fs::read_to_string(&ledger_path)?)
+            .with_context(|| format!("Failed to parse ledger JSON: {}", ledger_path.display()))?;
+        let ledger_entries = ledger
+            .get("entries")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| anyhow!("Ledger {} missing 'entries' array", ledger_path.display()))?;
+
+        let mut entries = Vec::with_capacity(ledger_entries.len());
+        for item in ledger_entries {
+            let node_id = item
+                .get("node_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow!("Ledger entry missing 'node_id'"))?;
+            let anchor = item
+                .get("anchor_hash")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow!("Ledger entry missing 'anchor_hash'"))?;
+            entries.push(LedgerEntry {
+                epoch,
+                node_id: node_id.to_string(),
+                anchor_hash: anchor.to_string(),
+            });
+        }
+
+        let recomputed = compute_ledger_merkle(&entries);
+        if recomputed != merkle {
+            return Err(anyhow!(
+                "Ledger merkle mismatch for epoch {}: summary {}, computed {}",
+                epoch, merkle, recomputed
+            ));
+        }
+
+        if !verify_signature(&merkle, signature) {
+            return Err(anyhow!(
+                "Signature verification failed for epoch {}",
+                epoch
+            ));
+        }
+
+        roots.push(merkle.to_string());
+    }
+
+    let declared_summary_sig = summary_data
+        .get("summary_signature")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("Summary missing 'summary_signature'"))?;
+
+    if !verify_summary_signature(&roots, declared_summary_sig) {
+        return Err(anyhow!("Summary signature verification failed"));
+    }
+
+    Ok(())
 }
 
 fn fnv1a64(value: &str) -> u64 {
