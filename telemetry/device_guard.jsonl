@@ -1,0 +1,8 @@
+{"component":"dense_path_guard","event":{"PreFlightCheck":{"available_memory_mb":64000,"edges":50,"graph_size":100,"required_memory_mb":0,"tensor_cores_available":true}},"timestamp_us":1761366642725820}
+{"component":"dense_path_guard","event":{"PathDecision":{"check_duration_us":153,"decision":{"Sparse":{"fallback":"Csr","reason":"Graph too sparse (0.50% density)"}}}},"timestamp_us":1761366642725973}
+{"component":"dense_path_guard","event":{"PreFlightCheck":{"available_memory_mb":64000,"edges":3,"graph_size":3,"required_memory_mb":0,"tensor_cores_available":true}},"timestamp_us":1761366642727833}
+{"component":"dense_path_guard","event":{"PathDecision":{"check_duration_us":64,"decision":{"Dense":{"estimated_speedup":1.0240000486373901,"use_tensor_cores":true}}}},"timestamp_us":1761366642727897}
+{"component":"dense_path_guard","event":{"PreFlightCheck":{"available_memory_mb":64000,"edges":1,"graph_size":2,"required_memory_mb":0,"tensor_cores_available":true}},"timestamp_us":1761366642803765}
+{"component":"dense_path_guard","event":{"PathDecision":{"check_duration_us":75,"decision":{"Dense":{"estimated_speedup":1.0,"use_tensor_cores":true}}}},"timestamp_us":1761366642803840}
+{"component":"dense_path_guard","event":{"PreFlightCheck":{"available_memory_mb":64000,"edges":5,"graph_size":5,"required_memory_mb":0,"tensor_cores_available":true}},"timestamp_us":1761368618328205}
+{"component":"dense_path_guard","event":{"PathDecision":{"check_duration_us":172,"decision":{"Dense":{"estimated_speedup":1.0,"use_tensor_cores":true}}}},"timestamp_us":1761368618328373}

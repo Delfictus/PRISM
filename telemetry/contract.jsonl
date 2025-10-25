@@ -1,0 +1,1 @@
+{"id":"f684c705-f460-48b3-a560-1a44035b3e98","timestamp_us":1761366642727202,"component":{"Custom":"meta_feature_registry"},"level":"Info","event":{"type":"Custom","payload":{"actor":"tester","feature":"meta_generation","state":{"actor":"tester","mode":"shadow","planned_activation":null},"updated_at":"2025-10-25T04:30:42.726475063+00:00"}},"correlation_id":null,"metrics":null}

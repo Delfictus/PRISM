@@ -8,7 +8,8 @@ license = "MIT"
 build = "build.rs"
 
 [features]
-default = ["cuda"]
+# Make CPU-only the default so the project builds anywhere.
+default = []
 cuda = ["dep:bindgen"]
 mlir = []
 protein_folding = []
@@ -50,7 +51,7 @@ num-complex = "0.4"
 sha2 = "0.10"
 hex = "0.4"
 bincode = "1.3"
-reqwest = { version = "0.11", features = ["blocking", "json"] }
+reqwest = { version = "0.11", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 dashmap = "6.0"
 parking_lot = "0.12"
 toml = "0.8"
@@ -100,6 +101,14 @@ required-features = ["cuda", "examples"]
 name = "generate_training_data"
 path = "examples/generate_training_data.rs"
 required-features = ["examples"]
+
+[[example]]
+name = "demo_cpu"
+path = "examples/demo_cpu.rs"
+
+#[patch.crates-io]
+# Pin `home` to a pre-Edition-2024 release compatible with Cargo 1.82
+#home = "=0.5.11"
 
 [profile.release]
 opt-level = 3
