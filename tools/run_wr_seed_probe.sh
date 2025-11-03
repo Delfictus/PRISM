@@ -49,14 +49,20 @@ echo ""
 # Function to parse colors from output
 parse_colors() {
     local log_file="$1"
-    # Look for patterns like "FINAL RESULT: 95 colors" or "Best: 95 colors"
-    local colors=$(grep -E "(FINAL RESULT|Best|BEST COLORING).*[0-9]+ colors" "$log_file" 2>/dev/null | \
+
+    # ONLY look for "FINAL RESULT: colors=X" format (unambiguous)
+    local colors=$(grep "^FINAL RESULT: colors=" "$log_file" 2>/dev/null | \
+                   grep -oE 'colors=[0-9]+' | \
                    grep -oE '[0-9]+' | head -1)
+
+    # Fallback: look for JSON telemetry
     if [ -z "$colors" ]; then
-        # Fallback: look for "colors = X" pattern
-        colors=$(grep -E "colors\s*=\s*[0-9]+" "$log_file" 2>/dev/null | \
-                 grep -oE '[0-9]+' | tail -1)
+        colors=$(grep '"event":"final_result"' "$log_file" 2>/dev/null | \
+                 grep -oE '"colors":[0-9]+' | \
+                 grep -oE '[0-9]+' | head -1)
     fi
+
+    # If still empty, return sentinel (don't guess!)
     echo "${colors:-999}"
 }
 

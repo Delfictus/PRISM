@@ -343,6 +343,8 @@ impl QuantumColoringSolver {
         for retry in 0..MAX_RETRIES {
             println!("[QUANTUM-COLORING][DIAGNOSTICS] Attempt {}/{}: Trying {} colors",
                      retry + 1, MAX_RETRIES, current_target);
+            println!("{{\"event\":\"quantum_retry\",\"attempt\":{},\"max_attempts\":{},\"target_colors\":{}}}",
+                     retry + 1, MAX_RETRIES, current_target);
 
             match self.phase_guided_initial_solution(
                 graph,
@@ -357,10 +359,14 @@ impl QuantumColoringSolver {
                     }
                     println!("[QUANTUM-COLORING][DIAGNOSTICS] ✅ Success: {} colors, {} conflicts, quality {:.3}",
                              solution.chromatic_number, solution.conflicts, solution.quality_score);
+                    println!("{{\"event\":\"quantum_success\",\"attempt\":{},\"colors\":{},\"conflicts\":{}}}",
+                             retry + 1, solution.chromatic_number, solution.conflicts);
                     return Ok((solution, current_target));
                 }
                 Err(e) => {
                     println!("[QUANTUM-COLORING][DIAGNOSTICS] ❌ Failed: {:?}", e);
+                    println!("{{\"event\":\"quantum_failed\",\"attempt\":{},\"error\":\"{}\"}}",
+                             retry + 1, e);
                     // Increase target by 20%
                     let new_target = ((current_target as f64 * 1.2).ceil() as usize).min(max_colors);
                     if new_target == current_target {
