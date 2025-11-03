@@ -112,6 +112,18 @@ impl Default for ThermoConfig {
 pub struct QuantumConfig {
     pub iterations: usize,
     pub target_chromatic: usize,
+
+    /// Number of retries for initial solution generation before giving up
+    #[serde(default = "default_quantum_retries")]
+    pub failure_retries: usize,
+
+    /// Fall back to DSATUR if quantum fails
+    #[serde(default = "default_true")]
+    pub fallback_on_failure: bool,
+}
+
+fn default_quantum_retries() -> usize {
+    2
 }
 
 impl Default for QuantumConfig {
@@ -119,6 +131,38 @@ impl Default for QuantumConfig {
         Self {
             iterations: 20,
             target_chromatic: 83,
+            failure_retries: 2,
+            fallback_on_failure: true,
+        }
+    }
+}
+
+/// GPU Coloring Configuration
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GpuColoringConfig {
+    /// Force sparse kernel regardless of density
+    #[serde(default = "default_false")]
+    pub prefer_sparse: bool,
+
+    /// Density threshold for sparse/dense selection
+    #[serde(default = "default_sparse_threshold")]
+    pub sparse_density_threshold: f64,
+
+    /// Mask width for color bitsets (64 or 128)
+    #[serde(default = "default_mask_width")]
+    pub mask_width: u32,
+}
+
+fn default_sparse_threshold() -> f64 { 0.40 }
+fn default_mask_width() -> u32 { 64 }
+fn default_false() -> bool { false }
+
+impl Default for GpuColoringConfig {
+    fn default() -> Self {
+        Self {
+            prefer_sparse: false,
+            sparse_density_threshold: 0.40,
+            mask_width: 64,
         }
     }
 }
@@ -325,6 +369,10 @@ pub struct WorldRecordConfig {
     #[serde(default)]
     pub geodesic: GeodesicConfig,
 
+    /// GPU coloring configuration
+    #[serde(default)]
+    pub gpu_coloring: GpuColoringConfig,
+
     /// CPU configuration
     #[serde(default)]
     pub cpu: CpuConfig,
@@ -355,6 +403,7 @@ impl Default for WorldRecordConfig {
             adp: AdpConfig::default(),
             orchestrator: OrchestratorConfig::default(),
             geodesic: GeodesicConfig::default(),
+            gpu_coloring: GpuColoringConfig::default(),
             cpu: CpuConfig::default(),
         }
     }
@@ -832,19 +881,26 @@ impl QuantumClassicalHybrid {
             // Construct PhaseField from current best coloring and Kuramoto state
             let phase_field = self.construct_phase_field(graph, &best, kuramoto_state, None)?;
 
-            // Phase 1: Quantum QUBO solve
+            // Phase 1: Quantum QUBO solve with error handling and fallback
             println!("[QUANTUM-CLASSICAL]   Phase 1: Quantum QUBO...");
-            let quantum_result = self.quantum_solver.find_coloring(
+            match self.quantum_solver.find_coloring(
                 graph,
                 &phase_field,
                 kuramoto_state,
                 best.chromatic_number,
-            )?;
-
-            if quantum_result.chromatic_number < best.chromatic_number && quantum_result.conflicts == 0 {
-                println!("[QUANTUM-CLASSICAL]   🎯 Quantum improved: {} → {} colors",
-                         best.chromatic_number, quantum_result.chromatic_number);
-                best = quantum_result.clone();
+            ) {
+                Ok(quantum_result) => {
+                    if quantum_result.chromatic_number < best.chromatic_number && quantum_result.conflicts == 0 {
+                        println!("[QUANTUM-CLASSICAL]   🎯 Quantum improved: {} → {} colors",
+                                 best.chromatic_number, quantum_result.chromatic_number);
+                        best = quantum_result.clone();
+                    }
+                }
+                Err(e) => {
+                    println!("[QUANTUM-CLASSICAL]   ⚠️  Quantum solver failed: {:?}", e);
+                    println!("[QUANTUM-CLASSICAL]   ℹ️  Falling back to DSATUR-only refinement");
+                    // Don't abort - continue with classical solver below
+                }
             }
 
             // Phase 2: Classical refinement
@@ -1357,20 +1413,27 @@ impl WorldRecordPipeline {
 
                 // Use ADP-tuned quantum iteration count
                 println!("[PHASE 3] 🧠 ADP-tuned quantum iterations: {}", self.adp_quantum_iterations);
-                let qc_solution = qc_hybrid.solve_with_feedback(
+                match qc_hybrid.solve_with_feedback(
                     graph,
                     &self.best_solution,
                     initial_kuramoto,
                     self.adp_quantum_iterations,  // ADP-tuned iterations
-                )?;
-
-                if qc_solution.conflicts == 0 && qc_solution.chromatic_number < self.best_solution.chromatic_number {
-                    println!("[PHASE 3] 🎯 Quantum-Classical breakthrough: {} → {} colors",
-                             self.best_solution.chromatic_number, qc_solution.chromatic_number);
-                    self.best_solution = qc_solution.clone();
+                ) {
+                    Ok(qc_solution) => {
+                        if qc_solution.conflicts == 0 && qc_solution.chromatic_number < self.best_solution.chromatic_number {
+                            println!("[PHASE 3] 🎯 Quantum-Classical breakthrough: {} → {} colors",
+                                     self.best_solution.chromatic_number, qc_solution.chromatic_number);
+                            self.best_solution = qc_solution.clone();
+                        }
+                        self.history.push(qc_solution.clone());
+                        self.ensemble.add_solution(qc_solution, "Quantum-Classical");
+                    }
+                    Err(e) => {
+                        println!("[PHASE 3] ⚠️  Quantum-Classical phase failed: {:?}", e);
+                        println!("[PHASE 3] ℹ️  Continuing with best solution from previous phases");
+                        // Continue the pipeline - don't abort
+                    }
                 }
-                self.history.push(qc_solution.clone());
-                self.ensemble.add_solution(qc_solution, "Quantum-Classical");
             }
         }
 
