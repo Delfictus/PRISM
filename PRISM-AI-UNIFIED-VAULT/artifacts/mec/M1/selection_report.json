@@ -1,0 +1,4351 @@
+{
+  "plan": {
+    "generated_at": "2025-10-21T05:02:04.254258721Z",
+    "base_seed": 12648430,
+    "genomes": [
+      {
+        "seed": 14031704882470455154,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2248,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.146875,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.832106585108106,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3221,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "8735099614dd1687bf580b68fc658f71d7ec9a15c5da138dcb6327d722100c4e"
+      },
+      {
+        "seed": 9359494799911323196,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2668,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.1634375,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.0318163059827414,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3649,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": false,
+          "use_quantum_bias": false
+        },
+        "hash": "ec92d57f63e4636b92ccdfcff9c8e4751b48f15c47ef43b0dd194b9d9450b450"
+      },
+      {
+        "seed": 1763389816375630698,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 1044,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.0803125,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.1480098039417155,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2518,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "d27b96fa592fd7f1d3fdd4ba3d8e451630cf35d9327cab868b182277683699a7"
+      },
+      {
+        "seed": 12884161044043712894,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.03125,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2094,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.20171875,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.452376919136495,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 4686,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "f0d6b64cad9b7849428e157bfc1d1340e7dcf1993e6698347e3c4532e68df502"
+      },
+      {
+        "seed": 2404834402451617432,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.03125,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2262,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "density_aware",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.11859375,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.7734275946496897,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3555,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": true
+        },
+        "hash": "a94258ef15f17f391d02f87715754d88eb473d55103d1e6db6f4257895b5ee4d"
+      },
+      {
+        "seed": 17958365459090336711,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.03125,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 890,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "density_aware",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.13515625,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.834677789326402,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3983,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": true
+        },
+        "hash": "718622794b80fbbbaba16ecf645914b7676050b0097bd878e113d287beb0c972"
+      },
+      {
+        "seed": 6647029156338904817,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 4.40625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 3074,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.27203125,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.7662494126895735,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2930,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": true
+        },
+        "hash": "0503a580080bba6f2817412653c2504c81966e5d89be7fa1109e8fb927a00067"
+      },
+      {
+        "seed": 15418413439127808019,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.734375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2927,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.280859375,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.6364603302871377,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3089,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": false,
+          "use_quantum_bias": true
+        },
+        "hash": "1aad0524af864737b709a8068c74a606ac197903549b986dfa6d72935bdfd43f"
+      },
+      {
+        "seed": 16878614004549758065,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.734375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 706,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.19773437500000002,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.520088514200255,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 1958,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "9b247c9fc21a388e99c82bb724fcb75f1fb24a8b693592a3384ccd3b60a6269d"
+      },
+      {
+        "seed": 18046947529117126856,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.734375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 1126,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "density_aware",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.21429687500000003,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.2604321911300416,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2386,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "c67d54dece26dfbd3d64948483324e25edbeca6f20639aa5eaecf7d67978836b"
+      },
+      {
+        "seed": 1548327775119000472,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 4.109375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 3310,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.13299005681818182,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.0410856160317787,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 5095,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "d153a477bd3c249adf276f46120aeb451a413bcd12a8924ad47c851224e9f174"
+      },
+      {
+        "seed": 7404889987491769927,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.140625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 552,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.03439630681818182,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.892885924068105,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3423,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": false,
+          "use_quantum_bias": true
+        },
+        "hash": "4e803a2953872d0fb6c24fe5654fb499aeff764801d080f26b4602fe63b884c2"
+      },
+      {
+        "seed": 14839849463137343763,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.515625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2736,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.17127130681818184,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.1949398678772118,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 6132,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": true
+        },
+        "hash": "4140b8c2b223cf2d8756f27f0b862ccbcc3120329918e2332ec0d3375116d847"
+      },
+      {
+        "seed": 11109301849773537800,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.515625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 3156,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.18783380681818182,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.735642612502879,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2799,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "5af47a624d535b68643f9ff0d6179a8434ea486b1c85b3e2c2ffabee7d79b31b"
+      },
+      {
+        "seed": 14438288508899716962,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.515625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 1532,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "density_aware",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.10470880681818182,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.9290148116116785,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 1667,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "bd563eed96478b33473d3f33ba0041764efe155dd7a7cf1848cd6d52f05cdb39"
+      },
+      {
+        "seed": 149679794493799113,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.5859375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2298,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.22224786931818183,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.8910870991331119,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3701,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "e96d9c0b5a86924aeff1ae544089c056e6a588fcb42d348ffddd1e4d18baeca6"
+      },
+      {
+        "seed": 2320230460056054171,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.5859375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2466,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.13912286931818182,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.6591703589622697,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2569,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": false,
+          "use_quantum_bias": false
+        },
+        "hash": "cd5b7762b554c304e8c150a3f33d9a0e7b567004de6436c86a79c290b74ee954"
+      },
+      {
+        "seed": 3762923693000986337,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.5859375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 497,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.15568536931818183,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.6208241046065845,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2998,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "54f6268065bf286a53ada4b7d7d368389e48d6eb2c9fa1ebb56a719d2b6cf039"
+      },
+      {
+        "seed": 8308012555007079831,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.9609375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2681,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "neuromorphic_phase",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.2925603693181818,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.3326275258522622,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 5707,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": false,
+          "use_quantum_bias": false
+        },
+        "hash": "97a111c267b484c4e5ac557c180a1c587e8cc1b26602bf68c8e7f1bf805bb9f8"
+      },
+      {
+        "seed": 6468807033823671211,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 0.9921875,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 1715,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "density_aware",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.19396661931818182,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.0580973655547912,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 4035,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "d48f4da8ef85b530ecf407ac0727c7c9d92a454aab60c104763f66f47b95278c"
+      },
+      {
+        "seed": 2265301712888327095,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.3671875,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2107,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.33084161931818185,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.194365451722406,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2982,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "12a4dc1a104fa5e253d9f822a631fb3ead4865a286f0ff74abd3402a29536325"
+      },
+      {
+        "seed": 8036590483874494711,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.3671875,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2527,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.12922230113636363,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.801128866241137,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3411,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "75d12a2c2ea6eafb89b61f42ced40111ed4462cce01a5720c5eb4709527e1452"
+      },
+      {
+        "seed": 1071532151154515886,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.3671875,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2695,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.046097301136363636,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.806629200566244,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2279,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "1011846ec98b472ff72a61dc48d6cf9590b1b2ad0c9b36d3386ac13b1b6bc97d"
+      },
+      {
+        "seed": 640950321115926582,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 0.6953125,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 756,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.05492542613636364,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.6464360922298655,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2438,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "c25061abe67a1ef17b5cd21b335cf8eec8bdd40b5dc09a0f97e72abdcd71eed0"
+      },
+      {
+        "seed": 10478459281813439836,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.0703125,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2940,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.19180042613636364,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.9477876888786687,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 5146,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": true
+        },
+        "hash": "96dc4ef498507938a3e1d52ba4c55a053fbc48379fcbf1500e6552b41ce27337"
+      },
+      {
+        "seed": 15324546330309778506,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.0703125,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 3360,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.20836292613636367,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.6732384250011703,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 5575,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "ddb2c9e675236b63b6653c75bb69ab3a40c59dabfcc1dc8f801f74b11d78586a"
+      },
+      {
+        "seed": 11600449503156299811,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.0703125,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 939,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.12523792613636364,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.2300410478758508,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 4444,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "479b4a12f7cc88544452e2b8bb4d6f29fc356d4fff06dc752c9bc579a4fe234c"
+      },
+      {
+        "seed": 14767423065505569966,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.4765625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 1989,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.24664417613636364,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.2630092894423615,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2850,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "36e521d1ea59c3002dac4af88def1d531ae88fe4168e94fdf5a46d3257572765"
+      },
+      {
+        "seed": 5058901596510384141,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.4765625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2157,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.16351917613636366,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.038250690793567,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 1719,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": true
+        },
+        "hash": "81413e2e2bf758e53626f809e6ed1b4f598deac277404b2e478d5f2aaf0224c6"
+      },
+      {
+        "seed": 16040540641614091925,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.4765625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 785,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "density_aware",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.18008167613636364,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.0226035448537667,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2148,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "c0da38be798a926fe0b458c68967f1a874a2c7dd24f458be72c7fdedfd20922e"
+      },
+      {
+        "seed": 13392622411300092210,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 4.8515625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2969,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.3169566761363637,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.268170655121525,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 4856,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": true
+        },
+        "hash": "b674c034426332b1a789e11ba027593c8a31ac810a8054eeba0499478e0e1b8d"
+      },
+      {
+        "seed": 7488792040267911688,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.51171875,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2681,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.32385120738636364,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.089824877648272,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 4947,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "05399ccb8d5914961f5adc3f6ce611b712afaf15e9fdf4aa07e176ff59f763d6"
+      }
+    ]
+  },
+  "evaluations": [
+    {
+      "genome": {
+        "seed": 14031704882470455154,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2248,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.146875,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.832106585108106,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3221,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "8735099614dd1687bf580b68fc658f71d7ec9a15c5da138dcb6327d722100c4e"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.525869905206325,
+        "divergence": 0.42223541362536665,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.525869905206325,
+          -0.42223541362536665
+        ],
+        "scalar": 1.1708897382074706
+      }
+    },
+    {
+      "genome": {
+        "seed": 9359494799911323196,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2668,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.1634375,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.0318163059827414,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3649,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": false,
+          "use_quantum_bias": false
+        },
+        "hash": "ec92d57f63e4636b92ccdfcff9c8e4751b48f15c47ef43b0dd194b9d9450b450"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.49061444203191834,
+        "divergence": 0.7377267869724472,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.49061444203191834,
+          -0.7377267869724472
+        ],
+        "scalar": 1.167718997624967
+      }
+    },
+    {
+      "genome": {
+        "seed": 1763389816375630698,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 1044,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.0803125,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.1480098039417155,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2518,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "d27b96fa592fd7f1d3fdd4ba3d8e451630cf35d9327cab868b182277683699a7"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.5884189544619514,
+        "divergence": 0.9199334024716047,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.5884189544619514,
+          -0.9199334024716047
+        ],
+        "scalar": 1.1236435536562719
+      }
+    },
+    {
+      "genome": {
+        "seed": 12884161044043712894,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.03125,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2094,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.20171875,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.452376919136495,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 4686,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "f0d6b64cad9b7849428e157bfc1d1340e7dcf1993e6698347e3c4532e68df502"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.5266532927338763,
+        "divergence": 1.398060858046271,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.5266532927338763,
+          -1.398060858046271
+        ],
+        "scalar": 1.1218184049453257
+      }
+    },
+    {
+      "genome": {
+        "seed": 2404834402451617432,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.03125,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2262,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "density_aware",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.11859375,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.7734275946496897,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3555,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": true
+        },
+        "hash": "a94258ef15f17f391d02f87715754d88eb473d55103d1e6db6f4257895b5ee4d"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.556066121308137,
+        "divergence": 0.24090361515068692,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.556066121308137,
+          -0.24090361515068692
+        ],
+        "scalar": 1.1691611808748066
+      }
+    },
+    {
+      "genome": {
+        "seed": 17958365459090336711,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.03125,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 890,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "density_aware",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.13515625,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.834677789326402,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3983,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": true
+        },
+        "hash": "718622794b80fbbbaba16ecf645914b7676050b0097bd878e113d287beb0c972"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.6275586480463616,
+        "divergence": 0.3325756984391098,
+        "weights": [
+          0.6823160807291667,
+          0.363262939453125,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.6275586480463616,
+          -0.3325756984391098
+        ],
+        "scalar": 1.1200345773678275
+      }
+    },
+    {
+      "genome": {
+        "seed": 6647029156338904817,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 4.40625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 3074,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.27203125,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.7662494126895735,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2930,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": true
+        },
+        "hash": "0503a580080bba6f2817412653c2504c81966e5d89be7fa1109e8fb927a00067"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.4331828754851808,
+        "divergence": 0.8967000777993444,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.4331828754851808,
+          -0.8967000777993444
+        ],
+        "scalar": 1.1803021181240805
+      }
+    },
+    {
+      "genome": {
+        "seed": 15418413439127808019,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.734375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2927,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.280859375,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.6364603302871377,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3089,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": false,
+          "use_quantum_bias": true
+        },
+        "hash": "1aad0524af864737b709a8068c74a606ac197903549b986dfa6d72935bdfd43f"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.5334442821420121,
+        "divergence": 1.8287908207282593,
+        "weights": [
+          0.6884033203125,
+          0.358697509765625,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.5334442821420121,
+          -1.8287908207282593
+        ],
+        "scalar": 1.0940219639855358
+      }
+    },
+    {
+      "genome": {
+        "seed": 16878614004549758065,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.734375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 706,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.19773437500000002,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.520088514200255,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 1958,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "9b247c9fc21a388e99c82bb724fcb75f1fb24a8b693592a3384ccd3b60a6269d"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.6855988913016673,
+        "divergence": 1.4830473921934082,
+        "weights": [
+          0.6430501302083333,
+          0.39271240234375,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.6855988913016673,
+          -1.4830473921934082
+        ],
+        "scalar": 0.9427047031597071
+      }
+    },
+    {
+      "genome": {
+        "seed": 18046947529117126856,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.734375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 1126,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "density_aware",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.21429687500000003,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.2604321911300416,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2386,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "c67d54dece26dfbd3d64948483324e25edbeca6f20639aa5eaecf7d67978836b"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.662472159552927,
+        "divergence": 1.0485544214836326,
+        "weights": [
+          0.653369140625,
+          0.38497314453125,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.662472159552927,
+          -1.0485544214836326
+        ],
+        "scalar": 0.99927656974832
+      }
+    },
+    {
+      "genome": {
+        "seed": 1548327775119000472,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 4.109375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 3310,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.13299005681818182,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.0410856160317787,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 5095,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "d153a477bd3c249adf276f46120aeb451a413bcd12a8924ad47c851224e9f174"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.380699681267807,
+        "divergence": 1.0646284229702547,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.380699681267807,
+          -1.0646284229702547
+        ],
+        "scalar": 1.1906684427982461
+      }
+    },
+    {
+      "genome": {
+        "seed": 7404889987491769927,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.140625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 552,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.03439630681818182,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.892885924068105,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3423,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": false,
+          "use_quantum_bias": true
+        },
+        "hash": "4e803a2953872d0fb6c24fe5654fb499aeff764801d080f26b4602fe63b884c2"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.7485820694691404,
+        "divergence": 0.4416099894983455,
+        "weights": [
+          0.6128824869791667,
+          0.415338134765625,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.7485820694691404,
+          -0.4416099894983455
+        ],
+        "scalar": 0.8927697940311118
+      }
+    },
+    {
+      "genome": {
+        "seed": 14839849463137343763,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.515625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2736,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.17127130681818184,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.1949398678772118,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 6132,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": true
+        },
+        "hash": "4140b8c2b223cf2d8756f27f0b862ccbcc3120329918e2332ec0d3375116d847"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.4064929751808419,
+        "divergence": 1.19135583576926,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.4064929751808419,
+          -1.19135583576926
+        ],
+        "scalar": 1.175110969584386
+      }
+    },
+    {
+      "genome": {
+        "seed": 11109301849773537800,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.515625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 3156,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.18783380681818182,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.735642612502879,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2799,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "5af47a624d535b68643f9ff0d6179a8434ea486b1c85b3e2c2ffabee7d79b31b"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.4221215989608502,
+        "divergence": 2.171236397182016,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.4221215989608502,
+          -2.171236397182016
+        ],
+        "scalar": 1.120529708512395
+      }
+    },
+    {
+      "genome": {
+        "seed": 14438288508899716962,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.515625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 1532,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "density_aware",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.10470880681818182,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.9290148116116785,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 1667,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "bd563eed96478b33473d3f33ba0041764efe155dd7a7cf1848cd6d52f05cdb39"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.5434441399544171,
+        "divergence": 0.7414355103157306,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.5434441399544171,
+          -0.7414355103157306
+        ],
+        "scalar": 1.1486469444505092
+      }
+    },
+    {
+      "genome": {
+        "seed": 149679794493799113,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.5859375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2298,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.22224786931818183,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.8910870991331119,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3701,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "e96d9c0b5a86924aeff1ae544089c056e6a588fcb42d348ffddd1e4d18baeca6"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.5944041167226073,
+        "divergence": 0.45434703161637957,
+        "weights": [
+          0.6732503255208333,
+          0.37006225585937497,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.5944041167226073,
+          -0.45434703161637957
+        ],
+        "scalar": 1.1038167711343803
+      }
+    },
+    {
+      "genome": {
+        "seed": 2320230460056054171,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.5859375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2466,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.13912286931818182,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.6591703589622697,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2569,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": false,
+          "use_quantum_bias": false
+        },
+        "hash": "cd5b7762b554c304e8c150a3f33d9a0e7b567004de6436c86a79c290b74ee954"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.5680409171295566,
+        "divergence": 1.6777043124738256,
+        "weights": [
+          0.6667724609375,
+          0.374920654296875,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.5680409171295566,
+          -1.6777043124738256
+        ],
+        "scalar": 1.0366894339336983
+      }
+    },
+    {
+      "genome": {
+        "seed": 3762923693000986337,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.5859375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 497,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.15568536931818183,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.6208241046065845,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2998,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "54f6268065bf286a53ada4b7d7d368389e48d6eb2c9fa1ebb56a719d2b6cf039"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.6830460201793426,
+        "divergence": 1.6155968821800086,
+        "weights": [
+          0.6382161458333333,
+          0.39633789062499997,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.6830460201793426,
+          -1.6155968821800086
+        ],
+        "scalar": 0.9249354287199845
+      }
+    },
+    {
+      "genome": {
+        "seed": 8308012555007079831,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.9609375,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2681,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "neuromorphic_phase",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.2925603693181818,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.3326275258522622,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 5707,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": false,
+          "use_quantum_bias": false
+        },
+        "hash": "97a111c267b484c4e5ac557c180a1c587e8cc1b26602bf68c8e7f1bf805bb9f8"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.4059846039917605,
+        "divergence": 1.7180187007396839,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.4059846039917605,
+          -1.7180187007396839
+        ],
+        "scalar": 1.1489595690359613
+      }
+    },
+    {
+      "genome": {
+        "seed": 6468807033823671211,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 0.9921875,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 1715,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "density_aware",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.19396661931818182,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.0580973655547912,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 4035,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "d48f4da8ef85b530ecf407ac0727c7c9d92a454aab60c104763f66f47b95278c"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.691534002190583,
+        "divergence": 0.6594248610721585,
+        "weights": [
+          0.6268961588541667,
+          0.404827880859375,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.691534002190583,
+          -0.6594248610721585
+        ],
+        "scalar": 0.9408688300057094
+      }
+    },
+    {
+      "genome": {
+        "seed": 2265301712888327095,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.3671875,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2107,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.33084161931818185,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.194365451722406,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2982,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "12a4dc1a104fa5e253d9f822a631fb3ead4865a286f0ff74abd3402a29536325"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.5056486215348545,
+        "divergence": 1.424621491457787,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.5056486215348545,
+          -1.424621491457787
+        ],
+        "scalar": 1.1279995432284
+      }
+    },
+    {
+      "genome": {
+        "seed": 8036590483874494711,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.3671875,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2527,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.12922230113636363,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.801128866241137,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 3411,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "75d12a2c2ea6eafb89b61f42ced40111ed4462cce01a5720c5eb4709527e1452"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.47345556660683424,
+        "divergence": 0.5182910218138324,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.47345556660683424,
+          -0.5182910218138324
+        ],
+        "scalar": 1.184825083847365
+      }
+    },
+    {
+      "genome": {
+        "seed": 1071532151154515886,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.3671875,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2695,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.046097301136363636,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.806629200566244,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2279,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "1011846ec98b472ff72a61dc48d6cf9590b1b2ad0c9b36d3386ac13b1b6bc97d"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.4767893579485527,
+        "divergence": 0.5852292757598037,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.4767893579485527,
+          -0.5852292757598037
+        ],
+        "scalar": 1.180286340745402
+      }
+    },
+    {
+      "genome": {
+        "seed": 640950321115926582,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 0.6953125,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 756,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.05492542613636364,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.6464360922298655,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2438,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "c25061abe67a1ef17b5cd21b335cf8eec8bdd40b5dc09a0f97e72abdcd71eed0"
+      },
+      "metrics": {
+        "energy": -1.765625,
+        "chromatic_loss": 0.8171355454538287,
+        "divergence": 1.692433204717703,
+        "weights": [
+          0.5784993489583333,
+          0.44112548828125,
+          0.05
+        ],
+        "vector": [
+          1.765625,
+          -0.8171355454538287,
+          -1.692433204717703
+        ],
+        "scalar": 0.5763319362883864
+      }
+    },
+    {
+      "genome": {
+        "seed": 10478459281813439836,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.0703125,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2940,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.19180042613636364,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 0.9477876888786687,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 5146,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": true
+        },
+        "hash": "96dc4ef498507938a3e1d52ba4c55a053fbc48379fcbf1500e6552b41ce27337"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.43767656303951263,
+        "divergence": 0.7177064756913988,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.43767656303951263,
+          -0.7177064756913988
+        ],
+        "scalar": 1.187645304928804
+      }
+    },
+    {
+      "genome": {
+        "seed": 15324546330309778506,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.0703125,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 3360,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.20836292613636367,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.6732384250011703,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 5575,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "ddb2c9e675236b63b6653c75bb69ab3a40c59dabfcc1dc8f801f74b11d78586a"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.3915982676928886,
+        "divergence": 1.9815580052685788,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.3915982676928886,
+          -1.9815580052685788
+        ],
+        "scalar": 1.1409257190363633
+      }
+    },
+    {
+      "genome": {
+        "seed": 11600449503156299811,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 3.0703125,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 939,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.12523792613636364,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.2300410478758508,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 4444,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "479b4a12f7cc88544452e2b8bb4d6f29fc356d4fff06dc752c9bc579a4fe234c"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.5355097156294769,
+        "divergence": 1.1281569961076394,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.5355097156294769,
+          -1.1281569961076394
+        ],
+        "scalar": 1.13214742685708
+      }
+    },
+    {
+      "genome": {
+        "seed": 14767423065505569966,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.4765625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 1989,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "quantum_bias",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.24664417613636364,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.2630092894423615,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2850,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "36e521d1ea59c3002dac4af88def1d531ae88fe4168e94fdf5a46d3257572765"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.5483032048303857,
+        "divergence": 1.1974039772269158,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.5483032048303857,
+          -1.1974039772269158
+        ],
+        "scalar": 1.1241114054117913
+      }
+    },
+    {
+      "genome": {
+        "seed": 5058901596510384141,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.4765625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2157,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.16351917613636366,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.038250690793567,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 1719,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": true
+        },
+        "hash": "81413e2e2bf758e53626f809e6ed1b4f598deac277404b2e478d5f2aaf0224c6"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.5608582116689612,
+        "divergence": 0.7231335457671992,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.5608582116689612,
+          -0.7231335457671992
+        ],
+        "scalar": 1.1433365120399863
+      }
+    },
+    {
+      "genome": {
+        "seed": 16040540641614091925,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 2.4765625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 785,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "density_aware",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.18008167613636364,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.0226035448537667,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 2148,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": true,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "c0da38be798a926fe0b458c68967f1a874a2c7dd24f458be72c7fdedfd20922e"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.6360244920011147,
+        "divergence": 0.7128184475858587,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.6360244920011147,
+          -0.7128184475858587
+        ],
+        "scalar": 1.1169803217303085
+      }
+    },
+    {
+      "genome": {
+        "seed": 13392622411300092210,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 4.8515625,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2969,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.3169566761363637,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.268170655121525,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 4856,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": true
+        },
+        "hash": "b674c034426332b1a789e11ba027593c8a31ac810a8054eeba0499478e0e1b8d"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.3862363631610983,
+        "divergence": 1.906019002062526,
+        "weights": [
+          0.69,
+          0.3575,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.3862363631610983,
+          -1.906019002062526
+        ],
+        "scalar": 1.1466195500667808
+      }
+    },
+    {
+      "genome": {
+        "seed": 7488792040267911688,
+        "parameters": {
+          "annealing.beta": {
+            "continuous": {
+              "value": 1.51171875,
+              "min": 0.25,
+              "max": 5.0
+            }
+          },
+          "ensemble.replicas": {
+            "discrete": {
+              "value": 2681,
+              "min": 64,
+              "max": 4096
+            }
+          },
+          "fusion.strategy": {
+            "categorical": {
+              "value": "thermodynamic",
+              "choices": [
+                "density_aware",
+                "thermodynamic",
+                "quantum_bias",
+                "neuromorphic_phase"
+              ]
+            }
+          },
+          "mutation.strength": {
+            "continuous": {
+              "value": 0.32385120738636364,
+              "min": 0.01,
+              "max": 0.45
+            }
+          },
+          "mutation.temperature": {
+            "continuous": {
+              "value": 1.089824877648272,
+              "min": 0.75,
+              "max": 1.75
+            }
+          },
+          "refinement.iterations": {
+            "discrete": {
+              "value": 4947,
+              "min": 512,
+              "max": 8192
+            }
+          }
+        },
+        "feature_toggles": {
+          "enable_neuromorphic_feedback": false,
+          "tensor_core_prefetch": true,
+          "use_quantum_bias": false
+        },
+        "hash": "05399ccb8d5914961f5adc3f6ce611b712afaf15e9fdf4aa07e176ff59f763d6"
+      },
+      "metrics": {
+        "energy": -2.0,
+        "chromatic_loss": 0.5576294045555632,
+        "divergence": 0.951741476676414,
+        "weights": [
+          0.6846761067708333,
+          0.361492919921875,
+          0.05
+        ],
+        "vector": [
+          2.0,
+          -0.5576294045555632,
+          -0.951741476676414
+        ],
+        "scalar": 1.120186058020759
+      }
+    }
+  ],
+  "distribution": [
+    0.035941802222021695,
+    0.035699215660293486,
+    0.03249184247207851,
+    0.03236542639689538,
+    0.03580935034500099,
+    0.03224234764974309,
+    0.03667167640914535,
+    0.030499827537432942,
+    0.022076776033279844,
+    0.02491217555436537,
+    0.03749268608086715,
+    0.019843399805970476,
+    0.03626731963045043,
+    0.03227646320930509,
+    0.03427421036569959,
+    0.03114462000450791,
+    0.026984587841574616,
+    0.02125459781419235,
+    0.034297103830500185,
+    0.021990378158475446,
+    0.03279555239263857,
+    0.03702765955273966,
+    0.036670440648867236,
+    0.01009458940902065,
+    0.03725137399726942,
+    0.033713609910096046,
+    0.03308739094078491,
+    0.032524326924140375,
+    0.033887654176147634,
+    0.03203269894469521,
+    0.034126114932089016,
+    0.032252781149711515
+  ],
+  "temperature": 0.4320750682109886,
+  "best_index": 10,
+  "determinism_proof": {
+    "master_seed": 12648430,
+    "component_seeds": {
+      "ensemble_generation": 14031704882470455154,
+      "cma": 11260532077783130352,
+      "quantum_pimc": 4955302038280957656,
+      "neuromorphic": 1557487946971659829,
+      "gpu_coloring": 945716460325754659,
+      "thermodynamic": 11979365913534242684,
+      "info_geom": 12550100962110750449
+    },
+    "input_hash": "f9c700da722c5b0ecd982d3609cd49567a5867ec6af1df90d8609c95feb1a739",
+    "output_hash": "5bb36cbfd649f8e01da6db0d4838b9c48a658d796a28c54bba584f03d640287e",
+    "intermediate_hashes": [
+      {
+        "stage": "meta.evaluations",
+        "hash": "564fc39133de74806abf82d619ff50824c7b86ab4832b95894db0d321b61a49d"
+      },
+      {
+        "stage": "meta.distribution",
+        "hash": "8399c7b749b6ca822fe00726d35133de5b64539c0591e5a3cf82e480d0a985e7"
+      }
+    ],
+    "timestamp": "2025-10-21T05:02:05.643253002Z",
+    "environment": {
+      "cuda_version": null,
+      "gpu_model": null,
+      "driver_version": null,
+      "rust_version": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+      "feature_flags": []
+    },
+    "meta": {
+      "meta_genome_hash": "d153a477bd3c249adf276f46120aeb451a413bcd12a8924ad47c851224e9f174",
+      "meta_merkle_root": "82902d178228427cd2891de0aa67697e46afe2d426ca391b0fc63752e2ad534f",
+      "ontology_hash": null,
+      "free_energy_hash": "c96875de504dcd33d8cd64bd8179c63af3e3e36e9d5e3741dddb566ea01fba13"
+    }
+  },
+  "meta": {
+    "meta_genome_hash": "d153a477bd3c249adf276f46120aeb451a413bcd12a8924ad47c851224e9f174",
+    "meta_merkle_root": "82902d178228427cd2891de0aa67697e46afe2d426ca391b0fc63752e2ad534f",
+    "ontology_hash": null,
+    "free_energy_hash": "c96875de504dcd33d8cd64bd8179c63af3e3e36e9d5e3741dddb566ea01fba13"
+  },
+  "telemetry_entry": {
+    "id": "ad893f33-b88c-4e81-bade-e28e92d78989",
+    "timestamp_us": 1761022925675933,
+    "component": "Orchestrator",
+    "level": "Info",
+    "event": {
+      "type": "Custom",
+      "payload": {
+        "meta_variant": {
+          "determinism_manifest": "82902d178228427cd2891de0aa67697e46afe2d426ca391b0fc63752e2ad534f",
+          "distribution_entropy": 3.443053898070925,
+          "flags": [
+            "tensor_core_prefetch"
+          ],
+          "free_energy": {
+            "divergence": 1.0646284229702547,
+            "lattice_norm": -2.0,
+            "mode_confidence": 0.380699681267807
+          },
+          "genome_hash": "d153a477bd3c249adf276f46120aeb451a413bcd12a8924ad47c851224e9f174",
+          "plan": {
+            "base_seed": 12648430,
+            "population": 32
+          },
+          "temperature": 0.4320750682109886
+        }
+      }
+    },
+    "correlation_id": null,
+    "metrics": {
+      "cpu_usage_pct": null,
+      "gpu_usage_pct": null,
+      "memory_mb": null,
+      "gpu_memory_mb": null,
+      "throughput_per_sec": null
+    }
+  }
+}

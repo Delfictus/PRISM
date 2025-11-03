@@ -1,0 +1,17 @@
+=== MEMORY PATTERN ANALYSIS: quantum_evolution.ptx ===
+
+GLOBAL MEMORY OPERATIONS:
+  ld.global: 122
+  st.global: 22
+
+SHARED MEMORY USAGE:
+  .shared declarations: 18
+  ld.shared: 10
+  st.shared: 7
+
+REGISTER FILE USAGE:
+  Register declarations: 0
+
+FUSION LIKELIHOOD SCORE:
+  ✓ High shared memory usage (+2)
+  VERDICT: Likely UNFUSED kernel (score: 2/5)

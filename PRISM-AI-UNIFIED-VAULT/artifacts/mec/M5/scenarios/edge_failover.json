@@ -1,0 +1,12 @@
+{
+  "name": "edge-failover",
+  "quorum": 2,
+  "max_ledger_drift": 3,
+  "epoch_start": 10,
+  "nodes": [
+    { "id": "validator-a", "region": "us-west", "role": "core", "stake": 6 },
+    { "id": "validator-b", "region": "eu-central", "role": "core", "stake": 5 },
+    { "id": "edge-c", "region": "ap-south", "role": "edge", "stake": 3 },
+    { "id": "edge-d", "region": "me-south", "role": "edge", "stake": 2 }
+  ]
+}

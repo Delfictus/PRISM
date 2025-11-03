@@ -1,0 +1,23 @@
+═══════════════════════════════════════════════════════════════
+COMPLETE KERNEL ANALYSIS SUMMARY
+═══════════════════════════════════════════════════════════════
+
+KERNEL COUNTS BY SOURCE:
+  .cu files (CUDA C):        114 kernels
+  .rs files (embedded):      56 kernels
+  PTX files (compiled):      83 kernels
+  Actually loaded in code:   73 kernels
+
+TOTAL KERNEL DEFINITIONS: 170
+
+FILES ANALYZED:
+  .cu files:  18
+  .ptx files: 12
+  .rs files:  8
+
+DETAILED RESULTS:
+  See individual *_counts.txt files for breakdowns
+  See *_names.txt files for complete kernel lists
+  See load_ptx_calls.txt for actual usage
+
+═══════════════════════════════════════════════════════════════

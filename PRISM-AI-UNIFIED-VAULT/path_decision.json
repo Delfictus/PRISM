@@ -1,0 +1,16 @@
+{
+  "timestamp": "2025-10-20T00:39:53.493276+00:00",
+  "strategy": "adaptive",
+  "dense_path": {
+    "enabled": true,
+    "wmma_padding_applied": true,
+    "reason": "sample data"
+  },
+  "sparse_path": {
+    "enabled": true,
+    "persistent_kernel": true,
+    "work_stealing": true
+  },
+  "decision": "sparse_preferred",
+  "notes": "Placeholder decision. Replace with runtime telemetry."
+}

@@ -1,0 +1,13 @@
+{
+  "name": "prism-gpu-tools",
+  "owner": {
+    "name": "prism-ai"
+  },
+  "plugins": [
+    {
+      "name": "prism-policy",
+      "description": "policy/build router (SUB=subcommand)",
+      "source": "./tools/servers/prism-policy.json"
+    }
+  ]
+}

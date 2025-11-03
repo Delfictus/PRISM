@@ -1,0 +1,67 @@
+=== KERNEL SIGNATURES: parallel_coloring.ptx ===
+
+.visible .entry parallel_greedy_coloring_kernel(
+	.param .u64 parallel_greedy_coloring_kernel_param_0,
+	.param .u64 parallel_greedy_coloring_kernel_param_1,
+	.param .u64 parallel_greedy_coloring_kernel_param_2,
+	.param .u64 parallel_greedy_coloring_kernel_param_3,
+	.param .u64 parallel_greedy_coloring_kernel_param_4,
+	.param .u64 parallel_greedy_coloring_kernel_param_5,
+	.param .u64 parallel_greedy_coloring_kernel_param_6,
+	.param .u32 parallel_greedy_coloring_kernel_param_7,
+	.param .u32 parallel_greedy_coloring_kernel_param_8,
+	.param .u32 parallel_greedy_coloring_kernel_param_9,
+	.param .u64 parallel_greedy_coloring_kernel_param_10
+)
+{
+	.local .align 16 .b8 	__local_depot0[304];
+	.reg .b64 	%SP;
+	.reg .b64 	%SPL;
+	.reg .pred 	%p<142>;
+	.reg .b16 	%rs<24>;
+	.reg .b32 	%r<658>;
+	.reg .f64 	%fd<53>;
+	.reg .b64 	%rd<131>;
+
+
+	mov.u64 	%SPL, __local_depot0;
+	ld.param.u64 	%rd41, [parallel_greedy_coloring_kernel_param_0];
+	ld.param.u64 	%rd42, [parallel_greedy_coloring_kernel_param_3];
+	ld.param.u64 	%rd43, [parallel_greedy_coloring_kernel_param_4];
+	ld.param.u32 	%r286, [parallel_greedy_coloring_kernel_param_7];
+	ld.param.u32 	%r288, [parallel_greedy_coloring_kernel_param_8];
+	ld.param.u32 	%r287, [parallel_greedy_coloring_kernel_param_9];
+--
+.visible .entry parallel_sa_kernel(
+	.param .u64 parallel_sa_kernel_param_0,
+	.param .u64 parallel_sa_kernel_param_1,
+	.param .u64 parallel_sa_kernel_param_2,
+	.param .u32 parallel_sa_kernel_param_3,
+	.param .u32 parallel_sa_kernel_param_4,
+	.param .u32 parallel_sa_kernel_param_5,
+	.param .u32 parallel_sa_kernel_param_6,
+	.param .f64 parallel_sa_kernel_param_7,
+	.param .u64 parallel_sa_kernel_param_8
+)
+{
+	.local .align 16 .b8 	__local_depot1[16432];
+	.reg .b64 	%SP;
+	.reg .b64 	%SPL;
+	.reg .pred 	%p<111>;
+	.reg .b16 	%rs<8>;
+	.reg .f32 	%f<3>;
+	.reg .b32 	%r<757>;
+	.reg .f64 	%fd<57>;
+	.reg .b64 	%rd<117>;
+
+
+	mov.u64 	%SPL, __local_depot1;
+	ld.param.u64 	%rd36, [parallel_sa_kernel_param_0];
+	ld.param.u64 	%rd37, [parallel_sa_kernel_param_1];
+	ld.param.u32 	%r301, [parallel_sa_kernel_param_3];
+	ld.param.u32 	%r304, [parallel_sa_kernel_param_4];
+	ld.param.u32 	%r303, [parallel_sa_kernel_param_6];
+	cvta.to.global.u64 	%rd1, %rd36;
+	cvta.to.global.u64 	%rd2, %rd37;
+
+TOTAL KERNELS: 2

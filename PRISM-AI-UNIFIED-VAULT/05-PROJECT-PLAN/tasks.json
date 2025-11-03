@@ -1,0 +1,533 @@
+{
+  "phases": [
+    {
+      "id": "phase0",
+      "name": "Governance Foundations",
+      "description": "Activate A-DoD governance gates, telemetry, and automation scaffolding.",
+      "tasks": [
+        {
+          "id": "P0-01",
+          "title": "Finalize advanced compliance gates",
+          "source": "01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md",
+          "status": "done"
+        },
+        {
+          "id": "P0-02",
+          "title": "Export CUDA Graph & persistent kernel telemetry",
+          "source": "00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md",
+          "status": "done"
+        },
+        {
+          "id": "P0-03",
+          "title": "Deploy master executor + validator toolchain",
+          "source": "03-AUTOMATION/AUTOMATED-EXECUTION.md",
+          "status": "done"
+        },
+        {
+          "id": "P0-04",
+          "title": "Publish determinism manifest & dashboard updates",
+          "source": "00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "phase1",
+      "name": "Sprint 1 · Harden",
+      "description": "Resolve production gaps and high-leverage adjustments.",
+      "tasks": [
+        {
+          "id": "P1-01",
+          "title": "Determinism replay system",
+          "source": "04-ADJUSTMENTS/DETERMINISM-REPLAY.md",
+          "status": "done"
+        },
+        {
+          "id": "P1-02",
+          "title": "Benchmark manifest enforcement",
+          "source": "04-ADJUSTMENTS/BENCHMARK-MANIFEST.md",
+          "status": "done"
+        },
+        {
+          "id": "P1-03",
+          "title": "Device-aware guards & path telemetry",
+          "source": "04-ADJUSTMENTS/DEVICE-AWARE-GUARDS.md",
+          "status": "done"
+        },
+        {
+          "id": "P1-04",
+          "title": "Telemetry contract enforcement",
+          "source": "04-ADJUSTMENTS/TELEMETRY-CONTRACT.md",
+          "status": "done"
+        },
+        {
+          "id": "P1-05",
+          "title": "Sprint gate automation",
+          "source": "04-ADJUSTMENTS/SPRINT-GATES.md",
+          "status": "done"
+        },
+        {
+          "id": "P1-06",
+          "title": "Protein acceptance suite",
+          "source": "04-ADJUSTMENTS/PROTEIN-TESTS.md",
+          "status": "done"
+        },
+        {
+          "id": "P1-07",
+          "title": "WMMA pad-and-scatter safeguard",
+          "source": "04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md",
+          "status": "done"
+        },
+        {
+          "id": "P1-08",
+          "title": "Gate-governance bridge",
+          "source": "04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md",
+          "status": "done"
+        },
+        {
+          "id": "P1-09",
+          "title": "Determinism manifest embedding",
+          "source": "04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md",
+          "status": "done"
+        },
+        {
+          "id": "P1-10",
+          "title": "Protein numerics hardening",
+          "source": "04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md",
+          "status": "done"
+        },
+        {
+          "id": "P1-11",
+          "title": "Telemetry durability enhancements",
+          "source": "04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "phase2",
+      "name": "Sprint 2 · Optimize",
+      "description": "Deliver advanced GPU path performance and stability.",
+      "tasks": [
+        {
+          "id": "P2-01",
+          "title": "Sparse GPU coloring upgrades",
+          "source": "00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md",
+          "status": "pending"
+        },
+        {
+          "id": "P2-02",
+          "title": "WMMA dense path with residual validation",
+          "source": "00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md",
+          "status": "pending"
+        },
+        {
+          "id": "P2-03",
+          "title": "CUDA Graph capture orchestration",
+          "source": "00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md",
+          "status": "pending"
+        },
+        {
+          "id": "P2-04",
+          "title": "Persistent attempts kernel & reduction",
+          "source": "00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md",
+          "status": "pending"
+        },
+        {
+          "id": "P2-05",
+          "title": "SA tempering pipelines",
+          "source": "00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md",
+          "status": "pending"
+        },
+        {
+          "id": "P2-06",
+          "title": "Diffusion label propagation acceptance",
+          "source": "00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md",
+          "status": "pending"
+        },
+        {
+          "id": "P2-07",
+          "title": "Nsight roofline validation",
+          "source": "01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase3",
+      "name": "Sprint 3 · Learn",
+      "description": "Integrate RL/GNN components and adaptive fusion.",
+      "tasks": [
+        {
+          "id": "P3-01",
+          "title": "RL ADP integration with telemetry feedback",
+          "source": "foundation/adp",
+          "status": "pending"
+        },
+        {
+          "id": "P3-02",
+          "title": "GNN-informed ensemble priorities",
+          "source": "src/cma/neural.rs",
+          "status": "pending"
+        },
+        {
+          "id": "P3-03",
+          "title": "Adaptive coherence fusion",
+          "source": "00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md",
+          "status": "pending"
+        },
+        {
+          "id": "P3-04",
+          "title": "Online hyperparameter tuning",
+          "source": "00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md",
+          "status": "pending"
+        },
+        {
+          "id": "P3-05",
+          "title": "Learning uplift validation",
+          "source": "04-ADJUSTMENTS/SPRINT-GATES.md",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase4",
+      "name": "Sprint 4 · Explore",
+      "description": "Pursue world-record DSJC1000.5 performance with advanced coupling.",
+      "tasks": [
+        {
+          "id": "P4-01",
+          "title": "World-record mode enablement",
+          "source": "03-AUTOMATION/AUTOMATED-EXECUTION.md",
+          "status": "pending"
+        },
+        {
+          "id": "P4-02",
+          "title": "Quantum + neuromorphic integration for DSJC1000.5",
+          "source": "02-IMPLEMENTATION/MODULE-INTEGRATION.md",
+          "status": "pending"
+        },
+        {
+          "id": "P4-03",
+          "title": "Distributed ensemble replica exchange telemetry",
+          "source": "00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md",
+          "status": "pending"
+        },
+        {
+          "id": "P4-04",
+          "title": "Protein voxel overlay pipeline",
+          "source": "00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md",
+          "status": "pending"
+        },
+        {
+          "id": "P4-05",
+          "title": "World-record audit package",
+          "source": "01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase5",
+      "name": "Continuous Operations",
+      "description": "Sustain governance, telemetry, and compliance.",
+      "tasks": [
+        {
+          "id": "P5-01",
+          "title": "Continuous governance monitoring",
+          "source": "scripts/continuous_monitor.sh",
+          "status": "pending"
+        },
+        {
+          "id": "P5-02",
+          "title": "Determinism replay rotation",
+          "source": "04-ADJUSTMENTS/DETERMINISM-REPLAY.md",
+          "status": "pending"
+        },
+        {
+          "id": "P5-03",
+          "title": "Benchmark manifest maintenance",
+          "source": "04-ADJUSTMENTS/BENCHMARK-MANIFEST.md",
+          "status": "pending"
+        },
+        {
+          "id": "P5-04",
+          "title": "Telemetry durability audits",
+          "source": "04-ADJUSTMENTS/HIGH-LEVERAGE-IMPROVEMENTS.md",
+          "status": "pending"
+        },
+        {
+          "id": "P5-05",
+          "title": "Protein acceptance CI rotation",
+          "source": "04-ADJUSTMENTS/PROTEIN-TESTS.md",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "M0",
+      "name": "Phase M0 · Meta Foundations",
+      "description": "Lay the groundwork for the Meta Evolution Cycle (MEC) with flags, schemas, and compliance integration.",
+      "tasks": [
+        {
+          "id": "M0-01",
+          "title": "Publish MEC foundation RFC and charter",
+          "source": "docs/rfc/RFC-M0-Meta-Foundations.md",
+          "status": "pending"
+        },
+        {
+          "id": "M0-02",
+          "title": "Define meta feature flags and constitution addendum",
+          "source": "00-CONSTITUTION/IMPLEMENTATION-CONSTITUTION.md",
+          "status": "pending"
+        },
+        {
+          "id": "M0-03",
+          "title": "Finalize telemetry schema v1 with durability expectations",
+          "source": "meta/telemetry/schema_v1.json",
+          "status": "pending"
+        },
+        {
+          "id": "M0-04",
+          "title": "Add orchestrator and ontology service stubs",
+          "source": "src/meta/orchestrator/mod.rs",
+          "status": "pending"
+        },
+        {
+          "id": "M0-05",
+          "title": "Integrate meta CI hook into master executor",
+          "source": "03-AUTOMATION/master_executor.py",
+          "status": "pending"
+        },
+        {
+          "id": "M0-06",
+          "title": "Record governance sign-off and Merkle anchors",
+          "source": "01-GOVERNANCE/META-GOVERNANCE-LOG.md",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "M1",
+      "name": "Phase M1 · Meta Orchestrator MVP",
+      "description": "Deliver deterministic candidate generation, evaluation, and audit artifacts for the orchestrator.",
+      "tasks": [
+        {
+          "id": "M1-01",
+          "title": "Implement meta variant registry and genome scaffold",
+          "source": "src/meta/registry.rs",
+          "status": "pending"
+        },
+        {
+          "id": "M1-02",
+          "title": "Build deterministic evaluation loop and scoring heuristics",
+          "source": "src/meta/orchestrator/mod.rs",
+          "status": "pending"
+        },
+        {
+          "id": "M1-03",
+          "title": "Emit meta determinism manifest and telemetry payloads",
+          "source": "artifacts/mec/M1/selection_report.json",
+          "status": "pending"
+        },
+        {
+          "id": "M1-04",
+          "title": "Wire ci-meta-orchestrator pipeline into governance",
+          "source": "scripts/run_full_check.sh",
+          "status": "pending"
+        },
+        {
+          "id": "M1-05",
+          "title": "Ship meta bootstrap CLI and documentation",
+          "source": "src/bin/meta_bootstrap.rs",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "M2",
+      "name": "Phase M2 · Ontology Integration",
+      "description": "Introduce semantic anchoring, ontology services, and compliance gating for knowledge alignment.",
+      "tasks": [
+        {
+          "id": "M2-01",
+          "title": "Stand up ontology service API and storage",
+          "source": "src/meta/ontology/mod.rs",
+          "status": "pending"
+        },
+        {
+          "id": "M2-02",
+          "title": "Implement alignment pipeline between variants and ontology",
+          "source": "src/meta/ontology/alignment.rs",
+          "status": "pending"
+        },
+        {
+          "id": "M2-03",
+          "title": "Extend determinism manifest with ontology hashes",
+          "source": "determinism/meta/manifest_schema.json",
+          "status": "pending"
+        },
+        {
+          "id": "M2-04",
+          "title": "Add governance gate for ontology approval workflow",
+          "source": "01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md",
+          "status": "pending"
+        },
+        {
+          "id": "M2-05",
+          "title": "Publish ontology snapshot artifact and audit trail",
+          "source": "artifacts/mec/M2/ontology_snapshot.json",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "M3",
+      "name": "Phase M3 · Reflexive Feedback",
+      "description": "Enable reflex control loops, free-energy lattice metrics, and governance awareness of exploration modes.",
+      "tasks": [
+        {
+          "id": "M3-01",
+          "title": "Implement meta state model and reflexive controller",
+          "source": "src/meta/reflexive/mod.rs",
+          "status": "pending"
+        },
+        {
+          "id": "M3-02",
+          "title": "Instrument free-energy lattice snapshot telemetry",
+          "source": "artifacts/mec/M3/lattice_report.json",
+          "status": "pending"
+        },
+        {
+          "id": "M3-03",
+          "title": "Enforce governance guardrails for exploration vs strict modes",
+          "source": "01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md",
+          "status": "pending"
+        },
+        {
+          "id": "M3-04",
+          "title": "Integrate lattice metrics into determinism manifest",
+          "source": "determinism/meta/lattice_manifest.json",
+          "status": "pending"
+        },
+        {
+          "id": "M3-05",
+          "title": "Update CI lattice pipeline and compliance validator",
+          "source": "scripts/compliance_validator.py",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "M4",
+      "name": "Phase M4 · Semantic Plasticity",
+      "description": "Deliver representation learning adapters, semantic drift detection, and explainability outputs.",
+      "tasks": [
+        {
+          "id": "M4-01",
+          "title": "Create representation adapters for ontology evolution",
+          "source": "src/meta/plasticity/adapters.rs",
+          "status": "pending"
+        },
+        {
+          "id": "M4-02",
+          "title": "Implement semantic drift detection and regression tests",
+          "source": "tests/meta/semantic_plasticity.rs",
+          "status": "pending"
+        },
+        {
+          "id": "M4-03",
+          "title": "Generate explainability reports for meta decisions",
+          "source": "artifacts/mec/M4/explainability_report.md",
+          "status": "pending"
+        },
+        {
+          "id": "M4-04",
+          "title": "Extend compliance validator with representation gate",
+          "source": "scripts/compliance_validator.py",
+          "status": "pending"
+        },
+        {
+          "id": "M4-05",
+          "title": "Document knowledge evolution runbooks",
+          "source": "docs/runbooks/meta_rollout.md",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "M5",
+      "name": "Phase M5 · Federated Readiness",
+      "description": "Prepare distributed orchestration, genome sharing, and hybrid deployment protocols.",
+      "tasks": [
+        {
+          "id": "M5-01",
+          "title": "Design genome sharing and federation protocol",
+          "source": "docs/rfc/RFC-M5-Federated-Readiness.md",
+          "status": "in_progress"
+        },
+        {
+          "id": "M5-02",
+          "title": "Implement distributed orchestrator interfaces",
+          "source": "src/meta/federated/mod.rs",
+          "status": "in_progress"
+        },
+        {
+          "id": "M5-03",
+          "title": "Simulate hybrid orchestration scenarios",
+          "source": "artifacts/mec/M5/federated_plan.md",
+          "status": "in_progress"
+        },
+        {
+          "id": "M5-04",
+          "title": "Extend compliance gates for federated modes",
+          "source": "01-GOVERNANCE/AUTOMATED-GOVERNANCE-ENGINE.md",
+          "status": "pending"
+        },
+        {
+          "id": "M5-05",
+          "title": "Update runbooks with cross-site governance controls",
+          "source": "docs/runbooks/meta_rollout.md",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "M6",
+      "name": "Phase M6 · Hardening & Rollout",
+      "description": "Finalize documentation, observability, and production rollout approval for MEC.",
+      "tasks": [
+        {
+          "id": "M6-01",
+          "title": "Produce end-to-end rollout checklist and approvals",
+          "source": "artifacts/mec/M6/rollout_checklist.md",
+          "status": "pending"
+        },
+        {
+          "id": "M6-02",
+          "title": "Build observability dashboards and alarms for MEC",
+          "source": "scripts/governance_dashboard.py",
+          "status": "pending"
+        },
+        {
+          "id": "M6-03",
+          "title": "Harden backup and rollback automation",
+          "source": "03-AUTOMATION/master_executor.py",
+          "status": "pending"
+        },
+        {
+          "id": "M6-04",
+          "title": "Secure production feature flag gating",
+          "source": "meta/meta_flags.json",
+          "status": "pending"
+        },
+        {
+          "id": "M6-05",
+          "title": "Complete governance ratification and audit package",
+          "source": "01-GOVERNANCE/META-GOVERNANCE-LOG.md",
+          "status": "pending"
+        }
+      ]
+    }
+  ]
+}

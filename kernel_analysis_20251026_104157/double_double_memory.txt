@@ -1,0 +1,17 @@
+=== MEMORY PATTERN ANALYSIS: double_double.ptx ===
+
+GLOBAL MEMORY OPERATIONS:
+  ld.global: 16
+  st.global: 8
+
+SHARED MEMORY USAGE:
+  .shared declarations: 5
+  ld.shared: 3
+  st.shared: 2
+
+REGISTER FILE USAGE:
+  Register declarations: 0
+
+FUSION LIKELIHOOD SCORE:
+  ✓ Low global memory traffic (+1)
+  VERDICT: Likely UNFUSED kernel (score: 1/5)

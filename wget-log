@@ -1,0 +1,11 @@
+--2025-10-31 11:59:13--  https://files.rcsb.org/download/2VSM.pdb
+Resolving files.rcsb.org (files.rcsb.org)... 52.84.20.90, 52.84.20.16, 52.84.20.13, ...
+Connecting to files.rcsb.org (files.rcsb.org)|52.84.20.90|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: unspecified [text/plain]
+Saving to: ‘data/nipah/2VSM.pdb’
+
+data/nipah/2VSM.pdb                           [<=>                                                                                 ]       0  --.-KB/s               data/nipah/2VSM.pdb                           [ <=>                                                                                ] 465.75K  --.-KB/s    in 0.02s   
+
+2025-10-31 11:59:13 (26.3 MB/s) - ‘data/nipah/2VSM.pdb’ saved [476928]
+

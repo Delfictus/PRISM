@@ -1,0 +1,227 @@
+=== KERNEL SIGNATURES: ksg_kernels.ptx ===
+
+.visible .entry compute_distances_kernel(
+	.param .u64 compute_distances_kernel_param_0,
+	.param .u64 compute_distances_kernel_param_1,
+	.param .u64 compute_distances_kernel_param_2,
+	.param .u64 compute_distances_kernel_param_3,
+	.param .u32 compute_distances_kernel_param_4,
+	.param .u32 compute_distances_kernel_param_5
+)
+{
+	.reg .pred 	%p<26>;
+	.reg .f32 	%f<129>;
+	.reg .b32 	%r<83>;
+	.reg .b64 	%rd<48>;
+
+
+	ld.param.u64 	%rd15, [compute_distances_kernel_param_0];
+	ld.param.u64 	%rd16, [compute_distances_kernel_param_1];
+	ld.param.u64 	%rd17, [compute_distances_kernel_param_2];
+	ld.param.u64 	%rd18, [compute_distances_kernel_param_3];
+	ld.param.u32 	%r40, [compute_distances_kernel_param_4];
+	ld.param.u32 	%r41, [compute_distances_kernel_param_5];
+	cvta.to.global.u64 	%rd1, %rd16;
+	cvta.to.global.u64 	%rd2, %rd17;
+	cvta.to.global.u64 	%rd3, %rd18;
+	cvta.to.global.u64 	%rd4, %rd15;
+	mov.u32 	%r42, %ntid.x;
+	mov.u32 	%r43, %ctaid.x;
+	mov.u32 	%r44, %tid.x;
+	mad.lo.s32 	%r1, %r43, %r42, %r44;
+	setp.ge.s32 	%p1, %r1, %r40;
+	setp.lt.s32 	%p2, %r40, 1;
+--
+.visible .entry find_kth_distance_kernel(
+	.param .u64 find_kth_distance_kernel_param_0,
+	.param .u64 find_kth_distance_kernel_param_1,
+	.param .u32 find_kth_distance_kernel_param_2,
+	.param .u32 find_kth_distance_kernel_param_3
+)
+{
+	.reg .pred 	%p<33>;
+	.reg .f32 	%f<32>;
+	.reg .b32 	%r<26>;
+	.reg .b64 	%rd<16>;
+
+
+	ld.param.u64 	%rd6, [find_kth_distance_kernel_param_0];
+	ld.param.u64 	%rd5, [find_kth_distance_kernel_param_1];
+	ld.param.u32 	%r12, [find_kth_distance_kernel_param_2];
+	ld.param.u32 	%r13, [find_kth_distance_kernel_param_3];
+	cvta.to.global.u64 	%rd1, %rd6;
+	mov.u32 	%r14, %ntid.x;
+	mov.u32 	%r15, %ctaid.x;
+	mov.u32 	%r16, %tid.x;
+	mad.lo.s32 	%r1, %r15, %r14, %r16;
+	setp.ge.s32 	%p1, %r1, %r12;
+	@%p1 bra 	$L__BB1_14;
+
+	mul.lo.s32 	%r17, %r1, %r12;
+	cvt.s64.s32 	%rd2, %r17;
+	setp.ge.s32 	%p2, %r13, %r12;
+	setp.lt.s32 	%p3, %r13, 1;
+	or.pred  	%p4, %p3, %p2;
+	cvta.to.global.u64 	%rd7, %rd5;
+--
+.visible .entry count_neighbors_y_kernel(
+	.param .u64 count_neighbors_y_kernel_param_0,
+	.param .u64 count_neighbors_y_kernel_param_1,
+	.param .u64 count_neighbors_y_kernel_param_2,
+	.param .u64 count_neighbors_y_kernel_param_3,
+	.param .u32 count_neighbors_y_kernel_param_4,
+	.param .u32 count_neighbors_y_kernel_param_5
+)
+{
+	.reg .pred 	%p<26>;
+	.reg .f32 	%f<70>;
+	.reg .b32 	%r<91>;
+	.reg .b64 	%rd<33>;
+
+
+	ld.param.u64 	%rd14, [count_neighbors_y_kernel_param_0];
+	ld.param.u64 	%rd15, [count_neighbors_y_kernel_param_1];
+	ld.param.u64 	%rd12, [count_neighbors_y_kernel_param_2];
+	ld.param.u64 	%rd13, [count_neighbors_y_kernel_param_3];
+	ld.param.u32 	%r43, [count_neighbors_y_kernel_param_4];
+	ld.param.u32 	%r44, [count_neighbors_y_kernel_param_5];
+	cvta.to.global.u64 	%rd1, %rd15;
+	cvta.to.global.u64 	%rd2, %rd14;
+	mov.u32 	%r45, %ntid.x;
+	mov.u32 	%r46, %ctaid.x;
+	mov.u32 	%r47, %tid.x;
+	mad.lo.s32 	%r1, %r46, %r45, %r47;
+	setp.ge.s32 	%p1, %r1, %r43;
+	@%p1 bra 	$L__BB2_30;
+
+	cvta.to.global.u64 	%rd16, %rd12;
+--
+.visible .entry count_neighbors_xz_kernel(
+	.param .u64 count_neighbors_xz_kernel_param_0,
+	.param .u64 count_neighbors_xz_kernel_param_1,
+	.param .u64 count_neighbors_xz_kernel_param_2,
+	.param .u64 count_neighbors_xz_kernel_param_3,
+	.param .u32 count_neighbors_xz_kernel_param_4,
+	.param .u32 count_neighbors_xz_kernel_param_5
+)
+{
+	.reg .pred 	%p<28>;
+	.reg .f32 	%f<83>;
+	.reg .b32 	%r<81>;
+	.reg .b64 	%rd<32>;
+
+
+	ld.param.u64 	%rd16, [count_neighbors_xz_kernel_param_0];
+	ld.param.u64 	%rd17, [count_neighbors_xz_kernel_param_1];
+	ld.param.u64 	%rd14, [count_neighbors_xz_kernel_param_2];
+	ld.param.u64 	%rd15, [count_neighbors_xz_kernel_param_3];
+	ld.param.u32 	%r35, [count_neighbors_xz_kernel_param_4];
+	ld.param.u32 	%r36, [count_neighbors_xz_kernel_param_5];
+	cvta.to.global.u64 	%rd1, %rd17;
+	cvta.to.global.u64 	%rd2, %rd16;
+	mov.u32 	%r37, %ntid.x;
+	mov.u32 	%r38, %ctaid.x;
+	mov.u32 	%r39, %tid.x;
+	mad.lo.s32 	%r1, %r38, %r37, %r39;
+	setp.ge.s32 	%p1, %r1, %r35;
+	@%p1 bra 	$L__BB3_20;
+
+	cvta.to.global.u64 	%rd18, %rd14;
+--
+.visible .entry count_neighbors_z_kernel(
+	.param .u64 count_neighbors_z_kernel_param_0,
+	.param .u64 count_neighbors_z_kernel_param_1,
+	.param .u64 count_neighbors_z_kernel_param_2,
+	.param .u32 count_neighbors_z_kernel_param_3,
+	.param .u32 count_neighbors_z_kernel_param_4
+)
+{
+	.reg .pred 	%p<28>;
+	.reg .f32 	%f<48>;
+	.reg .b32 	%r<81>;
+	.reg .b64 	%rd<23>;
+
+
+	ld.param.u64 	%rd11, [count_neighbors_z_kernel_param_0];
+	ld.param.u64 	%rd9, [count_neighbors_z_kernel_param_1];
+	ld.param.u64 	%rd10, [count_neighbors_z_kernel_param_2];
+	ld.param.u32 	%r35, [count_neighbors_z_kernel_param_3];
+	ld.param.u32 	%r36, [count_neighbors_z_kernel_param_4];
+	cvta.to.global.u64 	%rd1, %rd11;
+	mov.u32 	%r37, %ntid.x;
+	mov.u32 	%r38, %ctaid.x;
+	mov.u32 	%r39, %tid.x;
+	mad.lo.s32 	%r1, %r38, %r37, %r39;
+	setp.ge.s32 	%p1, %r1, %r35;
+	@%p1 bra 	$L__BB4_20;
+
+	cvta.to.global.u64 	%rd12, %rd9;
+	cvt.s64.s32 	%rd2, %r1;
+	mul.wide.s32 	%rd13, %r1, 4;
+	add.s64 	%rd14, %rd12, %rd13;
+--
+.visible .entry compute_te_kernel(
+	.param .u64 compute_te_kernel_param_0,
+	.param .u64 compute_te_kernel_param_1,
+	.param .u64 compute_te_kernel_param_2,
+	.param .u64 compute_te_kernel_param_3,
+	.param .u32 compute_te_kernel_param_4,
+	.param .u32 compute_te_kernel_param_5
+)
+{
+	.reg .pred 	%p<37>;
+	.reg .f32 	%f<403>;
+	.reg .b32 	%r<45>;
+	.reg .b64 	%rd<16>;
+
+
+	ld.param.u64 	%rd2, [compute_te_kernel_param_0];
+	ld.param.u64 	%rd3, [compute_te_kernel_param_1];
+	ld.param.u64 	%rd4, [compute_te_kernel_param_2];
+	ld.param.u64 	%rd5, [compute_te_kernel_param_3];
+	ld.param.u32 	%r9, [compute_te_kernel_param_4];
+	ld.param.u32 	%r8, [compute_te_kernel_param_5];
+	mov.u32 	%r10, %ctaid.x;
+	mov.u32 	%r11, %ntid.x;
+	mov.u32 	%r12, %tid.x;
+	mad.lo.s32 	%r1, %r10, %r11, %r12;
+	setp.ge.s32 	%p1, %r1, %r9;
+	@%p1 bra 	$L__BB5_46;
+
+	cvta.to.global.u64 	%rd6, %rd2;
+	cvt.s64.s32 	%rd1, %r1;
+	mul.wide.s32 	%rd7, %r1, 4;
+--
+.visible .entry reduce_sum_kernel(
+	.param .u64 reduce_sum_kernel_param_0,
+	.param .u64 reduce_sum_kernel_param_1,
+	.param .u32 reduce_sum_kernel_param_2
+)
+{
+	.reg .pred 	%p<6>;
+	.reg .f32 	%f<10>;
+	.reg .b32 	%r<15>;
+	.reg .b64 	%rd<7>;
+
+
+	ld.param.u64 	%rd1, [reduce_sum_kernel_param_0];
+	ld.param.u64 	%rd2, [reduce_sum_kernel_param_1];
+	ld.param.u32 	%r8, [reduce_sum_kernel_param_2];
+	mov.u32 	%r1, %ntid.x;
+	mov.u32 	%r9, %ctaid.x;
+	mov.u32 	%r2, %tid.x;
+	mad.lo.s32 	%r3, %r9, %r1, %r2;
+	setp.ge.s32 	%p1, %r3, %r8;
+	mov.f32 	%f9, 0f00000000;
+	@%p1 bra 	$L__BB6_2;
+
+	cvta.to.global.u64 	%rd3, %rd1;
+	mul.wide.s32 	%rd4, %r3, 4;
+	add.s64 	%rd5, %rd3, %rd4;
+	ld.global.f32 	%f9, [%rd5];
+
+$L__BB6_2:
+	shl.b32 	%r10, %r2, 2;
+	mov.u32 	%r11, sdata;
+
+TOTAL KERNELS: 7

@@ -1,0 +1,19 @@
+=== MEMORY PATTERN ANALYSIS: neuromorphic_gemv.ptx ===
+
+GLOBAL MEMORY OPERATIONS:
+  ld.global: 24
+  st.global: 5
+
+SHARED MEMORY USAGE:
+  .shared declarations: 0
+0
+  ld.shared: 0
+0
+  st.shared: 0
+0
+
+REGISTER FILE USAGE:
+  Register declarations: 0
+
+FUSION LIKELIHOOD SCORE:
+  VERDICT: Likely UNFUSED kernel (score: 0/5)

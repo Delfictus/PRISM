@@ -1,0 +1,21 @@
+{
+  "timestamp": "2025-10-20T00:39:53.498561+00:00",
+  "commit_sha": "HEAD",
+  "feature_flags": [
+    "advanced",
+    "cuda_graph",
+    "persistent_kernel"
+  ],
+  "device_caps_path": "/home/diddy/Desktop/PRISM-FINNAL-PUSH/PRISM-AI-UNIFIED-VAULT/device_caps.json",
+  "seeds": {
+    "master_seed": 42,
+    "component_seeds": {
+      "ensemble": 4242,
+      "coloring": 4243,
+      "sa_tempering": 4244
+    }
+  },
+  "determinism_hash": "0xdeadbeef",
+  "status": "stable",
+  "notes": "Placeholder determinism manifest."
+}

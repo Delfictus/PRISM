@@ -1,0 +1,16 @@
+=== MEMORY PATTERN ANALYSIS: ksg_kernels.ptx ===
+
+GLOBAL MEMORY OPERATIONS:
+  ld.global: 122
+  st.global: 12
+
+SHARED MEMORY USAGE:
+  .shared declarations: 5
+  ld.shared: 3
+  st.shared: 2
+
+REGISTER FILE USAGE:
+  Register declarations: 0
+
+FUSION LIKELIHOOD SCORE:
+  VERDICT: Likely UNFUSED kernel (score: 0/5)

@@ -1,0 +1,121 @@
+=== KERNEL NAMES FOR device.load_ptx() ===
+
+// active_inference.ptx
+let module = device.load_ptx(ptx, "active_inference", &[
+    "gemv_kernel",
+    "prediction_error_kernel",
+    "belief_update_kernel",
+    "precision_weight_kernel",
+    "kl_divergence_kernel",
+    "accuracy_kernel",
+    "sum_reduction_kernel",
+    "axpby_kernel",
+    "velocity_update_kernel",
+    "hierarchical_project_kernel",
+])?;
+
+// double_double.ptx
+let module = device.load_ptx(ptx, "double_double", &[
+    "_Z12dd_array_addP7dd_realPKS_S2_i",
+    "_Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i",
+    "_Z23dd_deterministic_reduceP7dd_realPKS_i",
+    "_Z18test_dd_arithmeticv",
+])?;
+
+// ksg_kernels.ptx
+let module = device.load_ptx(ptx, "ksg_kernels", &[
+    "compute_distances_kernel",
+    "find_kth_distance_kernel",
+    "count_neighbors_y_kernel",
+    "count_neighbors_xz_kernel",
+    "count_neighbors_z_kernel",
+    "compute_te_kernel",
+    "reduce_sum_kernel",
+])?;
+
+// neuromorphic_gemv.ptx
+let module = device.load_ptx(ptx, "neuromorphic_gemv", &[
+    "matvec_input_kernel",
+    "matvec_reservoir_kernel",
+    "leaky_integration_kernel",
+])?;
+
+// parallel_coloring.ptx
+let module = device.load_ptx(ptx, "parallel_coloring", &[
+    "parallel_greedy_coloring_kernel",
+    "parallel_sa_kernel",
+])?;
+
+// pimc_kernels.ptx
+let module = device.load_ptx(ptx, "pimc_kernels", &[
+    "update_beads_kernel",
+    "init_rand_states_kernel",
+    "compute_path_energy_kernel",
+    "reduce_average_kernel",
+    "compute_spectral_gap_kernel",
+    "project_onto_manifold_kernel",
+])?;
+
+// policy_evaluation.ptx
+let module = device.load_ptx(ptx, "policy_evaluation", &[
+    "_Z23evolve_satellite_kernelPKdPddi",
+    "_Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii",
+    "_Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii",
+    "_Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii",
+    "_Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii",
+    "_Z22init_rng_states_kernelP17curandStateXORWOWyi",
+    "predict_trajectories_kernel",
+    "_Z13matvec_kernelPKdS0_Pdii",
+    "_Z20sum_reduction_kernelPKdPdi",
+])?;
+
+// quantum_evolution.ptx
+let module = device.load_ptx(ptx, "quantum_evolution", &[
+    "_Z12dd_array_addP7dd_realPKS_S2_i",
+    "_Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i",
+    "_Z23dd_deterministic_reduceP7dd_realPKS_i",
+    "_Z18test_dd_arithmeticv",
+    "_Z24apply_diagonal_evolutionP7double2PKdid",
+    "_Z32apply_kinetic_evolution_momentumP7double2PKdidd",
+    "_Z31build_tight_binding_hamiltonianP7double2PKiPKdiid",
+    "_Z23build_ising_hamiltonianP7double2PKdS2_i",
+    "_Z20qpe_phase_extractionP7double2PKS_S2_ii",
+    "_Z21vqe_expectation_valuePdPK7double2S2_i",
+    "_Z10qaoa_layerP7double2PKS_S2_ddi",
+    "_Z17quantum_evolve_ddP10dd_complexPKS_id",
+    "_Z32measure_probability_distributionPdPK7double2i",
+    "_Z15compute_entropyPdPKdi",
+    "_Z15normalize_stateP7double2i",
+    "_Z20create_initial_stateP7double2ii",
+])?;
+
+// quantum_mlir.ptx
+let module = device.load_ptx(ptx, "quantum_mlir", &[
+    "hadamard_gate_kernel",
+    "cnot_gate_kernel",
+    "time_evolution_kernel",
+    "qft_kernel",
+    "vqe_ansatz_kernel",
+    "measurement_kernel",
+])?;
+
+// thermodynamic.ptx
+let module = device.load_ptx(ptx, "thermodynamic", &[
+    "initialize_oscillators_kernel",
+    "compute_coupling_forces_kernel",
+    "evolve_oscillators_kernel",
+    "compute_energy_kernel",
+    "compute_entropy_kernel",
+    "compute_order_parameter_kernel",
+])?;
+
+// transfer_entropy.ptx
+let module = device.load_ptx(ptx, "transfer_entropy", &[
+    "compute_minmax_kernel",
+    "build_histogram_3d_kernel",
+    "build_histogram_2d_kernel",
+    "compute_transfer_entropy_kernel",
+    "build_histogram_1d_kernel",
+    "build_histogram_2d_xp_yp_kernel",
+])?;
+

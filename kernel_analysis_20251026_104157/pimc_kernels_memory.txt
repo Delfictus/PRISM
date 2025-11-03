@@ -1,0 +1,17 @@
+=== MEMORY PATTERN ANALYSIS: pimc_kernels.ptx ===
+
+GLOBAL MEMORY OPERATIONS:
+  ld.global: 181
+  st.global: 21
+
+SHARED MEMORY USAGE:
+  .shared declarations: 43
+  ld.shared: 32
+  st.shared: 11
+
+REGISTER FILE USAGE:
+  Register declarations: 0
+
+FUSION LIKELIHOOD SCORE:
+  ✓ High shared memory usage (+2)
+  VERDICT: Likely UNFUSED kernel (score: 2/5)

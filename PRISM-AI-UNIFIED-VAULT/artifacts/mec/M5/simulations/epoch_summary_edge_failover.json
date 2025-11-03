@@ -1,0 +1,174 @@
+{
+  "epoch_count": 5,
+  "epochs": [
+    {
+      "aggregated_delta": 53,
+      "aligned_updates": [
+        {
+          "anchor_hash": "2b27bad2a4596bd3",
+          "delta_score": 13,
+          "ledger_height": 1,
+          "node_id": "edge-c"
+        },
+        {
+          "anchor_hash": "7ba3bb01175b519b",
+          "delta_score": 9,
+          "ledger_height": 1,
+          "node_id": "edge-d"
+        },
+        {
+          "anchor_hash": "65be93dedb80adf1",
+          "delta_score": 19,
+          "ledger_height": 1,
+          "node_id": "validator-a"
+        },
+        {
+          "anchor_hash": "017363ce8eb4d264",
+          "delta_score": 12,
+          "ledger_height": 1,
+          "node_id": "validator-b"
+        }
+      ],
+      "epoch": 10,
+      "ledger_merkle": "382368a8c03c46ff",
+      "quorum_reached": true,
+      "signature": "382368a8c03c46ff"
+    },
+    {
+      "aggregated_delta": 49,
+      "aligned_updates": [
+        {
+          "anchor_hash": "32986ed2a8379315",
+          "delta_score": 12,
+          "ledger_height": 2,
+          "node_id": "edge-c"
+        },
+        {
+          "anchor_hash": "84c76f011cab0d5d",
+          "delta_score": 8,
+          "ledger_height": 2,
+          "node_id": "edge-d"
+        },
+        {
+          "anchor_hash": "6ec733dee0b97fff",
+          "delta_score": 18,
+          "ledger_height": 2,
+          "node_id": "validator-a"
+        },
+        {
+          "anchor_hash": "fa02b3ce8ad6b1ee",
+          "delta_score": 11,
+          "ledger_height": 2,
+          "node_id": "validator-b"
+        }
+      ],
+      "epoch": 11,
+      "ledger_merkle": "437e530ceeb07ecf",
+      "quorum_reached": true,
+      "signature": "437e530ceeb07ecf"
+    },
+    {
+      "aggregated_delta": 45,
+      "aligned_updates": [
+        {
+          "anchor_hash": "193efad29a09f34b",
+          "delta_score": 11,
+          "ledger_height": 3,
+          "node_id": "edge-c"
+        },
+        {
+          "anchor_hash": "69badb010d0ba2b3",
+          "delta_score": 7,
+          "ledger_height": 3,
+          "node_id": "edge-d"
+        },
+        {
+          "anchor_hash": "77a753dee5d02679",
+          "delta_score": 17,
+          "ledger_height": 3,
+          "node_id": "validator-a"
+        },
+        {
+          "anchor_hash": "f12313ce85c0e4f4",
+          "delta_score": 10,
+          "ledger_height": 3,
+          "node_id": "validator-b"
+        }
+      ],
+      "epoch": 12,
+      "ledger_merkle": "77f057c81aaf7e63",
+      "quorum_reached": true,
+      "signature": "77f057c81aaf7e63"
+    },
+    {
+      "aggregated_delta": 41,
+      "aligned_updates": [
+        {
+          "anchor_hash": "22479ad29f42c559",
+          "delta_score": 10,
+          "ledger_height": 4,
+          "node_id": "edge-c"
+        },
+        {
+          "anchor_hash": "72c39b011244ab21",
+          "delta_score": 6,
+          "ledger_height": 4,
+          "node_id": "edge-d"
+        },
+        {
+          "anchor_hash": "7f17ffdee9ae4023",
+          "delta_score": 16,
+          "ledger_height": 4,
+          "node_id": "validator-a"
+        },
+        {
+          "anchor_hash": "e81a57ce8087e352",
+          "delta_score": 9,
+          "ledger_height": 4,
+          "node_id": "validator-b"
+        }
+      ],
+      "epoch": 13,
+      "ledger_merkle": "6552713bbe58a3cf",
+      "quorum_reached": true,
+      "signature": "6552713bbe58a3cf"
+    },
+    {
+      "aggregated_delta": 37,
+      "aligned_updates": [
+        {
+          "anchor_hash": "073baad28fa4715b",
+          "delta_score": 9,
+          "ledger_height": 5,
+          "node_id": "edge-c"
+        },
+        {
+          "anchor_hash": "596a8b010417b543",
+          "delta_score": 5,
+          "ledger_height": 5,
+          "node_id": "edge-d"
+        },
+        {
+          "anchor_hash": "434f63dec80f8229",
+          "delta_score": 15,
+          "ledger_height": 5,
+          "node_id": "validator-a"
+        },
+        {
+          "anchor_hash": "df043bce7b43b434",
+          "delta_score": 8,
+          "ledger_height": 5,
+          "node_id": "validator-b"
+        }
+      ],
+      "epoch": 14,
+      "ledger_merkle": "04641504680561f1",
+      "quorum_reached": true,
+      "signature": "04641504680561f1"
+    }
+  ],
+  "generated_at": "2025-10-21T20:18:44.308500616+00:00",
+  "label": "edge_failover",
+  "scenario": "edge-failover",
+  "summary_signature": "14ae0cea7be59561"
+}

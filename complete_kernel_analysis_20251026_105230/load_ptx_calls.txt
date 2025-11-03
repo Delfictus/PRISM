@@ -1,0 +1,23 @@
+pub fn load_ptx_module(
+    let module = device.load_ptx(ptx, module_name, kernel_names)
+    load_ptx_module(
+    fn test_load_ptx() -> Result<()> {
+        let module = device.load_ptx(
+    device.load_ptx(ptx, "vector_module", &["vector_add"])?;
+            let _module = device.load_ptx(ptx, "neuromorphic_gemv", &[
+        let module = device.load_ptx(cuda_ptx, "ksg_te", &[
+            .load_ptx(ptx, "tsp_solver", &["compute_distance_matrix", "two_opt_improve"])
+        let module = device.load_ptx(ptx, "k_opt", &["two_opt_improvements", "three_opt_improvements", "four_opt_improvements"])?;
+            .load_ptx(ptx, "chromatic_coloring", &["check_conflicts", "dsatur_coloring"])
+                .load_ptx(ptx, "chromatic_coloring", &["check_conflicts", "dsatur_coloring"])
+        device.load_ptx(
+        let module = device.load_ptx(ptx, "policy_eval", &[
+        let module = device.load_ptx(ptx, "active_inference", &[
+        let module = device.load_ptx(
+        let module = device.load_ptx(
+        let module = device.load_ptx(
+        let module = device.load_ptx(
+        let module = device.load_ptx(cuda_ptx, "pimc", &[
+        let module = device.load_ptx(
+        let module = device.load_ptx(
+        let module = device.load_ptx(

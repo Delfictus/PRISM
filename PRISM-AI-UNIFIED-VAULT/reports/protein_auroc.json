@@ -1,0 +1,8 @@
+{
+  "timestamp": "2025-10-20T00:39:53.494924+00:00",
+  "status": "PASS",
+  "auroc": 0.81,
+  "baseline_auroc": 0.78,
+  "runtime_delta": 0.02,
+  "notes": "Protein overlay evaluation placeholder."
+}

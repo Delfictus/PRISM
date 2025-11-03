@@ -1,0 +1,8 @@
+=== RUST KERNEL SOURCE FILES ===
+
+FILES WITH #[kernel] OR #[cuda] ATTRIBUTES:
+
+FILES USING cuda-std OR cuda_std:
+
+CARGO.TOML FILES WITH NVPTX TARGET:
+

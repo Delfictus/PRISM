@@ -1,0 +1,10 @@
+{
+  "type": "shell",
+  "command": "bash",
+  "args": [
+    "-lc",
+    "tools/mcp_policy_checks.sh ${SUB}"
+  ],
+  "cwd": ".",
+  "description": "router for policy/build checks; pass SUB=subcommand"
+}

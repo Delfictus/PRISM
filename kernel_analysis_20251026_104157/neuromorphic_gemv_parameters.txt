@@ -1,0 +1,40 @@
+=== KERNEL PARAMETERS: neuromorphic_gemv.ptx ===
+
+PARAMETER LAYOUT:
+	.param .u64 matvec_input_kernel_param_0,
+	.param .u64 matvec_input_kernel_param_1,
+	.param .u64 matvec_input_kernel_param_2,
+	.param .f32 matvec_input_kernel_param_3,
+	.param .f32 matvec_input_kernel_param_4,
+	.param .u32 matvec_input_kernel_param_5,
+	.param .u32 matvec_input_kernel_param_6
+	ld.param.u64 	%rd16, [matvec_input_kernel_param_0];
+	ld.param.u64 	%rd17, [matvec_input_kernel_param_1];
+	ld.param.u64 	%rd15, [matvec_input_kernel_param_2];
+	ld.param.f32 	%f9, [matvec_input_kernel_param_3];
+	ld.param.f32 	%f10, [matvec_input_kernel_param_4];
+	ld.param.u32 	%r12, [matvec_input_kernel_param_5];
+	ld.param.u32 	%r11, [matvec_input_kernel_param_6];
+	.param .u64 matvec_reservoir_kernel_param_0,
+	.param .u64 matvec_reservoir_kernel_param_1,
+	.param .u64 matvec_reservoir_kernel_param_2,
+	.param .f32 matvec_reservoir_kernel_param_3,
+	.param .f32 matvec_reservoir_kernel_param_4,
+	.param .u32 matvec_reservoir_kernel_param_5
+	ld.param.u64 	%rd16, [matvec_reservoir_kernel_param_0];
+	ld.param.u64 	%rd17, [matvec_reservoir_kernel_param_1];
+	ld.param.u64 	%rd15, [matvec_reservoir_kernel_param_2];
+	ld.param.f32 	%f9, [matvec_reservoir_kernel_param_3];
+	ld.param.f32 	%f10, [matvec_reservoir_kernel_param_4];
+	ld.param.u32 	%r11, [matvec_reservoir_kernel_param_5];
+	.param .u64 leaky_integration_kernel_param_0,
+	.param .u64 leaky_integration_kernel_param_1,
+	.param .u64 leaky_integration_kernel_param_2,
+	.param .f32 leaky_integration_kernel_param_3,
+	.param .u32 leaky_integration_kernel_param_4
+	ld.param.u64 	%rd1, [leaky_integration_kernel_param_0];
+	ld.param.u64 	%rd2, [leaky_integration_kernel_param_1];
+	ld.param.u64 	%rd3, [leaky_integration_kernel_param_2];
+	ld.param.f32 	%f1, [leaky_integration_kernel_param_3];
+	ld.param.u32 	%r2, [leaky_integration_kernel_param_4];
+

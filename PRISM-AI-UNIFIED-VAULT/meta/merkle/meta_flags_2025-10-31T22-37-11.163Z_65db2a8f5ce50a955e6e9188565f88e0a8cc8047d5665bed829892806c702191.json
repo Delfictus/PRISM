@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "generated_at": "2025-10-31T22:37:11.163888505Z",
+  "merkle_root": "65db2a8f5ce50a955e6e9188565f88e0a8cc8047d5665bed829892806c702191",
+  "records": [
+    {
+      "id": "meta_generation",
+      "state": {
+        "mode": "enabled",
+        "actor": "test_user",
+        "activated_at": "2025-10-31T22:37:11.163472864Z",
+        "justification": "Testing reflexive controller for platform verification"
+      },
+      "updated_at": "2025-10-31T22:37:11.163883283Z",
+      "updated_by": "test_user",
+      "rationale": "Testing reflexive controller for platform verification",
+      "evidence_uri": null
+    },
+    {
+      "id": "ontology_bridge",
+      "state": {
+        "mode": "disabled"
+      },
+      "updated_at": "2025-10-21T02:41:18.933637665Z",
+      "updated_by": "bootstrap",
+      "rationale": "Initial baseline",
+      "evidence_uri": null
+    },
+    {
+      "id": "free_energy_snapshots",
+      "state": {
+        "mode": "disabled"
+      },
+      "updated_at": "2025-10-21T02:41:18.933637665Z",
+      "updated_by": "bootstrap",
+      "rationale": "Initial baseline",
+      "evidence_uri": null
+    },
+    {
+      "id": "semantic_plasticity",
+      "state": {
+        "mode": "disabled"
+      },
+      "updated_at": "2025-10-21T02:41:18.933637665Z",
+      "updated_by": "bootstrap",
+      "rationale": "Initial baseline",
+      "evidence_uri": null
+    },
+    {
+      "id": "federated_meta",
+      "state": {
+        "mode": "disabled"
+      },
+      "updated_at": "2025-10-21T02:41:18.933637665Z",
+      "updated_by": "bootstrap",
+      "rationale": "Initial baseline",
+      "evidence_uri": null
+    },
+    {
+      "id": "meta_prod",
+      "state": {
+        "mode": "disabled"
+      },
+      "updated_at": "2025-10-21T02:41:18.933637665Z",
+      "updated_by": "bootstrap",
+      "rationale": "Initial baseline",
+      "evidence_uri": null
+    }
+  ],
+  "invariant_snapshot": {
+    "enforced": [
+      "meta_generation"
+    ],
+    "generation_entropy": "61ea9d42dbef2f6fbc3a89e5931ac19c0adc484f21dc25e2a7b357c281de314c"
+  }
+}

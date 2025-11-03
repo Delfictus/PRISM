@@ -1,0 +1,1198 @@
+Below is a single, engineering‑grade specification you can drop into your repo as
+MEC_ONTOGENIC_IO_SPEC.md. It is mathematically grounded, algorithmically realistic, and integrates cleanly with the Prism‑AI + MEC stack you already defined.
+MEC_ONTOGENIC_IO_SPEC.md
+
+Ontogenic Sensory I/O & Continuous Situational Awareness for Prism‑AI (MEC Integration)
+
+Status: DESIGN SPEC (impl‑ready)
+Targets: Rust, async, tokio, prost/gRPC, ndarray/tch-rs tensors
+Deployment: CPU/GPU cluster (no quantum/neuromorphic hardware; algorithmic analogues only)
+Security: PQC signatures (Dilithium), Merkle‑DAG audit, DP optional
+Scope: Audio tone, written tone, haptic/keyboard pressure & timing, cursor/mouse dynamics, URL destination class, typos/misspellings, web navigation pace, idle/engagement, passive visual saliency
+0) Design Intent & Assumptions
+
+    Intent: Give Prism a continuous, ontogenic “world substrate” by harvesting ethically permissible I/O from its environment and users; fuse them into a context manifold that conditions the MEC (Meta‑Causality, Contextual Grounding, Reflexive Feedback, Semantic Plasticity).
+
+    No special hardware: All “quantum/neuromorphic” behaviors are software analogues (phase fields, stochastic amplitudes; event‑driven spike emulation).
+
+    Deterministic shell + heuristic core: Feature extraction + logging are deterministic; adaptation is heuristic but replayable from recorded seeds and ledger events.
+
+1) Notation
+
+Let modality set M={audio,text,haptic,cursor,visual,net}M={audio,text,haptic,cursor,visual,net}.
+At time tt:
+
+    Raw stream sm(t)sm​(t), encoder parameters ϕmϕm​, latent zm(t)∈Rdmzm​(t)∈Rdm​.
+
+    Global context state c(t)∈Rdcc(t)∈Rdc​.
+
+    Affective state a(t)∈R3a(t)∈R3 (VAD: valence, arousal, dominance).
+
+    MEC policy parameters ΘΘ (ADP/meta‑policy), semantic params ΨΨ, governance ΓΓ.
+
+2) Generative–Perceptual Model (Predictive Coding, Online)
+2.1 Per‑modality state‑space model
+zm(t)∼N(Amzm(t−1)+Bmc(t−1), Qm)sm(t)∼pm ⁣(s | gm(zm(t)), Rm)
+zm​(t)sm​(t)​∼N(Am​zm​(t−1)+Bm​c(t−1),Qm​)∼pm​(s∣gm​(zm​(t)),Rm​)​
+
+    For audio: pmpm​ Gaussian on mel features;
+    text: categorical/softmax over style tags;
+    haptic/cursor: Gaussian over velocity/pressure/jerk;
+    visual: Gaussian over saliency map coefficients;
+    net: categorical over destination class embeddings.
+
+2.2 Context fusion prior
+c(t)∼N ⁣(∑mUmzm(t−1), Σc)
+c(t)∼N(m∑​Um​zm​(t−1),Σc​)
+2.3 Free energy (online variational bound)
+F(t)=∑mEq[−log⁡pm(sm(t)∣zm(t))]⏟prediction error+KL(q(zm(t)) ∥ p(zm(t)∣c(t)))⏟complexity+λc∥c(t)−c^(t)∥2+λa∥a(t)−a^(t)∥2
+F(t)=m∑​prediction error
+Eq​[−logpm​(sm​(t)∣zm​(t))]​​+complexity
+KL(q(zm​(t))∥p(zm​(t)∣c(t)))​​+λc​∥c(t)−c^(t)∥2+λa​∥a(t)−a^(t)∥2
+
+Online updates (predictive coding descent):
+zm(t)←zm(t)−ηz ∇zmF(t)c(t)←c(t)−ηc ∇cF(t)ϕm←ϕm−ηϕ ∇ϕmF(t)(slow)
+zm​(t)←zm​(t)−ηz​∇zm​​F(t)c(t)←c(t)−ηc​∇c​F(t)ϕm​←ϕm​−ηϕ​∇ϕm​​F(t)(slow)​
+
+Affective mapping (VAD) via regressor h(⋅)h(⋅):
+a(t)=h ⁣(⨁mzm(t)),a^(t)=target/priors
+a(t)=h(m⨁​zm​(t)),a^(t)=target/priors
+3) Temporal Alignment & Cross‑Modal Fusion
+3.1 Alignment operator
+
+Each stream is re‑timed to common lattice ττ using attention‑based alignment:
+αm,τ=softmaxτ(zm(⋅)⊤Wac(τ)),z~m(τ)=∑tαm,τ zm(t)
+αm,τ​=softmaxτ​(zm​(⋅)⊤Wa​c(τ)),z~m​(τ)=t∑​αm,τ​zm​(t)
+3.2 Fusion embedding
+z∗(τ)=LayerNorm(Wf[z~audio,z~text,…])
+z∗​(τ)=LayerNorm(Wf​[z~audio​,z~text​,…])
+3.3 Ontogenic context graph GtGt​
+
+Nodes vi∈{zm(τ),c(τ),a(τ)}vi​∈{zm​(τ),c(τ),a(τ)}; edges weighted by estimated mutual information:
+wij∝MI^(vi,vj)
+wij​∝MI
+(vi​,vj​)
+
+using MINE/contrastive InfoNCE approximations.
+
+Graph regularizer in the energy:
+FG=λG∑(i,j)(MI^(vi,vj)−μˉij)2
+FG​=λG​(i,j)∑​(MI
+(vi​,vj​)−μˉ​ij​)2
+4) Affective & Behavioral Feature Set (deterministic extraction)
+
+    Audio prosody: f0f0​ contour, jitter/shimmer, spectral centroid, roll‑off, MFCCs, intensity, speaking rate.
+
+    Written tone: punctuation entropy, exclamation/caps ratios, politeness hedges, valence lexicon scores, readability diffs.
+
+    Haptic/keyboard: key down pressure, dwell time, flight time, inter‑key variance, dpdtdtdp​, error backspace rate.
+
+    Cursor/mouse: velocity, acceleration, jerk, hesitation pauses, overshoot counts, Fitts‑law residuals.
+
+    Visual (passive): saliency (spectral residual), optical flow magnitude hist, face occupancy ratio (if consented).
+
+    Net/URL: domain class embedding, topic cluster, switching rate, dwell time distribution.
+
+    Typos/misspells: streaming Levenshtein per token, correction lag.
+
+These are normalized into modality latents zmzm​ by encoders gmgm​.
+5) MEC Integration
+5.1 Extended MEC energy
+EMEC+OIOL=Etask⏟Prism task loss+λctx F(t)+λaff ∥a(t)−a⋆∥22+λcoh FG
+EMEC+OIOL​=Prism task loss
+Etask​​​+λctx​F(t)+λaff​∥a(t)−a⋆∥22​+λcoh​FG​​
+5.2 Meta‑policy conditioning
+
+ADP policy becomes context‑aware:
+πΘ(a∣s,c(t),a(t)) ,∇ΘJ=E[∇Θlog⁡πΘ⋅(R−b)]
+πΘ​(a∣s,c(t),a(t)),∇Θ​J=E[∇Θ​logπΘ​⋅(R−b)]
+
+with reward
+R=−EMEC+OIOL−ρ⋅Latency−κ⋅ViolationRisk
+R=−EMEC+OIOL​−ρ⋅Latency−κ⋅ViolationRisk
+5.3 Reflexive feedback coupling
+
+Self‑model S^S^ predicts telemetry given (c,a)(c,a); reflexive loss term:
+Lself=∥T−T^(c,a)∥2+KL(PT∥PT^)
+Lself​=∥T−T^(c,a)∥2+KL(PT​∥PT^​)
+
+feeds into meta‑gradients of ΘΘ and gmgm​.
+6) Online Algorithm (streaming tick)
+
+Inputs: streams sm(t)sm​(t), previous latents zm(t−1)zm​(t−1), c(t−1)c(t−1).
+Outputs: updated zm(t),c(t),a(t)zm​(t),c(t),a(t), MEC policy step, ledger events.
+
+Procedure:
+
+    Acquire & Normalize (deterministic):
+    xm←features(sm(t))xm​←features(sm​(t)).
+
+    Encode: zm(0)←gm(xm;ϕm)zm(0)​←gm​(xm​;ϕm​).
+
+    Align: z~m←Align(zm(0),c(t−1))z~m​←Align(zm(0)​,c(t−1)).
+
+    Fuse: z∗←Fuse({z~m})z∗​←Fuse({z~m​}).
+
+    Infer context/affect (predictive coding): gradient steps on F(t)F(t) for zm,c,azm​,c,a.
+
+    Update MEC:
+
+        Extend energy EMEC+OIOLEMEC+OIOL​
+
+        Policy gradient step on ΘΘ with reward RR.
+
+    Governance: validate invariants; if OK, commit OntogenicContext event to ledger.
+
+    Slow updates: periodic ϕm←ϕm−ηϕ∇ϕmFϕm​←ϕm​−ηϕ​∇ϕm​​F in sandbox; promote if compliant.
+
+7) Rust Integration (key types & traits)
+
+// === Data contracts ===
+#[derive(Clone)]
+pub struct SensorPacket { pub ts: u64, pub bytes: Vec<u8>, pub meta: SensorMeta }
+#[derive(Clone)]
+pub struct FeatureVector { pub ts: u64, pub v: Vec<f32>, pub modality: Modality }
+#[derive(Clone)]
+pub struct Latent { pub ts: u64, pub z: Vec<f32>, pub modality: Modality }
+
+#[derive(Clone, Copy)]
+pub enum Modality { Audio, Text, Haptic, Cursor, Visual, Net }
+
+pub struct ContextState { pub c: Vec<f32>, pub vad: [f32;3] } // V, A, D
+
+// === Probes (deterministic capture) ===
+#[async_trait::async_trait]
+pub trait SensoryProbe: Send + Sync {
+    async fn capture(&self) -> anyhow::Result<SensorPacket>;
+    fn normalize(&self, pkt: &SensorPacket) -> anyhow::Result<FeatureVector>;
+}
+
+// === Encoders (differentiable in principle; wrapped here) ===
+pub trait Encoder {
+    fn encode(&self, fv: &FeatureVector) -> Latent;
+    fn update_slow(&mut self, grad: &[f32]);
+}
+
+// === Alignment & Fusion ===
+pub trait Aligner { fn align(&self, z: &[Latent], ctx: &ContextState) -> Vec<Latent>; }
+pub trait Fuser { fn fuse(&self, zs: &[Latent]) -> Latent; }
+
+// === MEC hooks ===
+pub trait MecEnergy {
+    fn extend_energy(&self, ctx: &ContextState, zs: &[Latent]) -> f64;
+}
+
+pub trait Policy {
+    fn act(&mut self, state: &ContextState) -> Action;
+    fn update(&mut self, reward: f64, grad_clip: f32);
+}
+
+// === Orchestrated tick ===
+pub struct OIOL {
+    probes: Vec<Box<dyn SensoryProbe>>,
+    encoders: Vec<Box<dyn Encoder>>,
+    aligner: Box<dyn Aligner>,
+    fuser: Box<dyn Fuser>,
+    policy: Box<dyn Policy>,
+    ledger: Ledger,
+    ctx: ContextState,
+}
+
+impl OIOL {
+    pub async fn tick(&mut self) -> anyhow::Result<()> {
+        // 1) capture + features
+        let mut feats = Vec::new();
+        for p in self.probes.iter() {
+            let pkt = p.capture().await?;
+            feats.push(p.normalize(&pkt)?);
+        }
+        // 2) encode
+        let mut lats: Vec<Latent> = self.encoders.iter()
+            .zip(feats.iter())
+            .map(|(e, f)| e.encode(f)).collect();
+
+        // 3) align & 4) fuse
+        lats = self.aligner.align(&lats, &self.ctx);
+        let fused = self.fuser.fuse(&lats);
+
+        // 5) predictive coding descent on c, vad (simplified placeholder)
+        self.ctx = predictive_coding_update(&self.ctx, &lats, &fused);
+
+        // 6) MEC reward & policy
+        let energy = mec_energy(&self.ctx, &lats); // E_MEC+OIOL
+        let reward = -energy; // minus-energy convention
+        let _action = self.policy.act(&self.ctx);
+        self.policy.update(reward, 1.0);
+
+        // 7) governance + ledger
+        let evt = OntogenicContextEvent::from(&self.ctx, &lats, energy);
+        self.ledger.commit(evt)?;
+
+        Ok(())
+    }
+}
+
+    Note: Implementations can use ndarray for vectors, and tch-rs if you embed small differentiable models (autoencoders) locally.
+
+8) Concrete Feature Extractors (deterministic examples)
+
+// Audio → mel + prosody
+fn audio_features(wav: &[f32], sr: u32) -> FeatureVector {
+    let mel = mel_spectrogram(wav, sr, 25, 10, 64);
+    let f0 = estimate_pitch(wav, sr);
+    let energy = frame_energy(wav, sr);
+    let mut v = Vec::new(); v.extend(&mel); v.push(f0); v.push(energy);
+    FeatureVector { ts: now(), v, modality: Modality::Audio }
+}
+
+// Written tone
+fn text_tone_features(tokens: &[String]) -> FeatureVector {
+    let caps_ratio = caps_ratio(tokens);
+    let punct_entropy = punctuation_entropy(tokens);
+    let valence = lexicon_valence(tokens);
+    FeatureVector { ts: now(), v: vec![caps_ratio, punct_entropy, valence], modality: Modality::Text }
+}
+
+// Haptic/keyboard stream
+fn haptic_features(pressures: &[f32], times: &[u64]) -> FeatureVector {
+    let dwell_mean = mean_dwell(times);
+    let dpdt = diff(pressures).iter().map(|x| x.abs()).sum::<f32>() / pressures.len() as f32;
+    FeatureVector { ts: now(), v: vec![dwell_mean, dpdt], modality: Modality::Haptic }
+}
+
+// Cursor dynamics
+fn cursor_features(points: &[(f32,f32,u64)]) -> FeatureVector {
+    let (vel, acc, jerk) = kinematics(points);
+    FeatureVector { ts: now(), v: vec![vel, acc, jerk], modality: Modality::Cursor }
+}
+
+// Net/URL destination class (no PII)
+fn net_features(domain_class: &[f32], dwell_ms: f32) -> FeatureVector {
+    let mut v = domain_class.to_vec(); v.push(dwell_ms);
+    FeatureVector { ts: now(), v, modality: Modality::Net }
+}
+
+9) Ledger & Governance Contracts (immutability; no raw PII)
+
+#[derive(serde::Serialize)]
+pub struct OntogenicContextEvent {
+    pub ts: u64,
+    pub ctx_hash: [u8; 32],
+    pub energy: f64,
+    pub modalities: u32, // bitmask
+    pub signature: [u8; 64],
+}
+
+impl OntogenicContextEvent {
+    pub fn from(ctx: &ContextState, lats: &[Latent], energy: f64) -> Self {
+        let ctx_bytes = serialize_ctx(ctx, lats); // aggregated stats only
+        let ctx_hash = blake3::hash(&ctx_bytes).into();
+        let sig = pq_dilithium_sign(&ctx_hash);
+        Self { ts: now(), ctx_hash, energy, modalities: mask(lats), signature: sig }
+    }
+}
+
+pub trait Ledger { fn commit(&mut self, evt: OntogenicContextEvent) -> anyhow::Result<()>; }
+
+Governance invariants (hard):
+
+    No raw keystrokes, audio, or URLs stored—only aggregates/hashes.
+
+    Max sampling rates per modality.
+
+    DP mode available: noise added to aggregates with privacy budget ϵϵ.
+
+    All commits validated by constitutional gates (performance, memory, determinism envelopes).
+
+10) Federated Learning & Privacy
+
+    Local only: Encoders train on‑device; share gradient sketches or hypervector summaries (no raw).
+
+    Secure aggregation: Encrypted deltas; PQC keys.
+
+    Trust weighting: As in FNL spec — nodes with stable integrity get higher weight.
+
+Sketch:
+Δϕm(i)→Encpk(SignHash(Δ)),Φ←WeightedAvg({Δϕ(i)})
+Δϕm(i)​→Encpk​(SignHash(Δ)),Φ←WeightedAvg({Δϕ(i)})
+11) Performance Budgets (guidelines)
+
+    Audio prosody: 10–20 ms frames, 64‑mel bands; <2 ms/frame on CPU; GPU optional.
+
+    Text tone: Per message (<1 ms) excluding tokenizer.
+
+    Haptic/cursor: 125–250 Hz capture; feature windows 100–250 ms; <1 ms/step.
+
+    Visual saliency: 10–30 Hz; resized grayscale; <3–5 ms/frame on GPU.
+
+    Alignment + fusion: micro‑batches every 100 ms; <5 ms per batch.
+
+    End‑to‑end: <50 ms per tick to preserve responsive adaptation envelopes.
+
+12) Evaluation Plan
+
+    Ablations: turn off modalities; measure ΔEMEC+OIOLΔEMEC+OIOL​, task success, latency.
+
+    Predictive accuracy: negative log‑likelihood of sm(t)sm​(t) under pmpm​.
+
+    Affective plausibility: correlation of inferred VAD with user‑labeled checkpoints (opt‑in).
+
+    Policy wins: ADP reward uplift vs. baseline (no OIOL).
+
+    Safety: zero PII leaks, ledger verification rate =100%=100%.
+
+13) Rollout Phases
+
+    P0 (Sandbox): Audio + cursor only; local ledger; DP off; lab users only.
+
+    P1: Add text tone + haptic; governance gates; Merkle‑DAG remote mirror; DP on.
+
+    P2: Visual saliency + net class; federated encoder updates; trust weighting.
+
+    P3: Full MEC coupling; policy benefits measured on real tasks; production opt‑in channel.
+
+14) Mathematical Appendix (key derivations)
+14.1 Predictive‑coding step (one update)
+
+Linearized emission gm(z)≈Gmz+bgm​(z)≈Gm​z+b. For Gaussian emission:
+E[−log⁡pm]∝∥sm−Gmzm∥Rm−12⇒∇zmF=−2Gm⊤Rm−1(sm−Gmzm)+Qm−1(zm−Amzm,−1−Bmc)
+E[−logpm​]∝∥sm​−Gm​zm​∥Rm−1​2​⇒∇zm​​F=−2Gm⊤​Rm−1​(sm​−Gm​zm​)+Qm−1​(zm​−Am​zm,−1​−Bm​c)
+14.2 MI estimate (InfoNCE)
+MI^(vi,vj)=E[log⁡exp⁡(f(vi,vj))∑vk−exp⁡(f(vi,vk−))]
+MI
+(vi​,vj​)=E[log∑vk−​​exp(f(vi​,vk−​))exp(f(vi​,vj​))​]
+
+with critic ff a bilinear form or small MLP; used to compute wijwij​ and FGFG​.
+15) Compliance & Ethics
+
+    Consent‑gated modalities; clear UI affordances.
+
+    PII minimization: no raw content on ledger; hashed summaries only.
+
+    Right to forget: rotate keys; GC old context hashes under policy.
+
+    DP controls: per‑modality ϵϵ budgets; audit logs.
+
+    DoD/SAM alignment: immutable audit, deterministic replay, rollback.
+
+16) What This Adds to Prism
+
+    Contextual Grounding: Injects real, lived context into objectives.
+
+    Reflexive Feedback: Converts interaction tension/flow into self‑regulation signals.
+
+    Semantic Plasticity: Aligns evolving ontology with environment rhythms.
+
+    Meta‑Causality: Lets the system rewire strategy conditioned on sensed states.
+
+    Governance: Every adaptation is cryptographically provable and replayable.
+
+17) Minimal Working Rust Skeletons
+
+    These compile‑oriented examples omit impl details but show boundaries & dataflow.
+
+Predictive‑coding update (context):
+
+fn predictive_coding_update(ctx: &ContextState, lats: &[Latent], fused: &Latent) -> ContextState {
+    // Placeholder: single gradient step on c and VAD; in practice use ndarray/tch tensors.
+    let mut c = ctx.c.clone();
+    for (i, ci) in c.iter_mut().enumerate() {
+        let err = fused.z.get(i).cloned().unwrap_or(0.0) - *ci;
+        *ci += 0.05 * err; // eta_c
+    }
+    let mut vad = ctx.vad;
+    vad[1] = (vad[1] * 0.99 + 0.01 * fused.z.iter().map(|x| x.abs()).sum::<f32>() / fused.z.len() as f32).clamp(0.0, 1.0);
+    ContextState { c, vad }
+}
+
+InfoNCE critic sketch:
+
+fn bilinear_critic(u: &[f32], v: &[f32], w: &[f32], d: usize) -> f32 {
+    // w is flattened dxd
+    let mut acc = 0.0;
+    for i in 0..d { for j in 0..d { acc += u[i]*w[i*d+j]*v[j]; } }
+    acc
+}
+
+18) Risks & Mitigations
+
+    Drift runaway: Limit ηz,ηcηz​,ηc​, add ℓ2ℓ2​ anchors to previous states, governance drift bounds.
+
+    Latency blow‑ups: Micro‑batch at 100 ms, GPU offload saliency only.
+
+    Privacy: DP noise and on‑device aggregation; no raw content in ledger; periodic redaction.
+
+    False affect inferences: Train with opt‑in, use uncertainty thresholds; never gate safety on affect alone.
+
+19) Acceptance Criteria
+
+    End‑to‑end tick < 50 ms median with audio+cursor+text.
+
+    Energy reduction: ΔEMEC+OIOL≤−10%ΔEMEC+OIOL​≤−10% vs. baseline on target tasks.
+
+    Ledger commit success = 100%; governance violations = 0.
+
+    Replay determinism: same seed + same inputs ⇒ identical ledger & outputs.
+
+Summary
+
+This specification extends Prism‑AI with a realistic, mathematically grounded ontogenic I/O layer that captures all feasible, consented I/O (tone, haptic, cursor, navigation, visual saliency) and fuses them into the MEC as context and affect. It preserves Prism’s deterministic shell, leverages heuristic/meta‑causal adaptation, and logs all changes on a post‑quantum, Merkle‑audited ledger. The result is a situationally self‑modulating platform that remains safe, verifiable, and production‑deployable.
+
+If you want this split into repo‑ready files (e.g., oiol_core.rs, oiol_encoders.rs, mec_hooks.rs, ledger_events.rs, plus a .proto for the gRPC messages), I can generate those next with the same level of specificity.
+You said:
+yes please
+ChatGPT said:
+Request for GPT-5 Pro
+Reasoned for 5m 47s
+
+Awesome — here’s a repo‑ready, file‑by‑file drop you can paste into your workspace.
+The package contains:
+
+    Cargo.toml (snippet)
+
+    src/lib.rs
+
+    src/oiol_core.rs
+
+    src/oiol_encoders.rs
+
+    src/mec_hooks.rs
+
+    src/ledger_events.rs
+
+    proto/mec_oiol.proto
+
+Every file is consistent with the MEC specs we’ve drafted (deterministic shell, heuristic core, blockchain telemetry, federated readiness). Where specialized implementations are needed (e.g., real mel‑spectrograms, prosody extraction, Dilithium bindings), I’ve left clearly labeled extension points.
+Cargo.toml (add or merge)
+
+[package]
+name = "prism_mec_oiol"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[lib]
+name = "prism_mec_oiol"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1"
+thiserror = "1"
+async-trait = "0.1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+parking_lot = "0.12"
+uuid = { version = "1", features = ["v4", "serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_repr = "0.1"
+prost = "0.13"
+prost-types = "0.13"
+tonic = { version = "0.12", features = ["transport"] }
+ndarray = "0.15"
+rand = "0.8"
+rand_distr = "0.4"
+blake3 = "1"
+sha3 = "0.10"
+hex = "0.4"
+time = { version = "0.3", features = ["macros"] }
+
+# Optional DP noise & lightweight ML helpers (you can replace with your own)
+statrs = "0.17"
+
+[features]
+# Enable Differential Privacy noise on aggregates
+dp = []
+# Use development crypto fallback (e.g., ed25519) instead of PQ signatures during prototyping
+dev-crypto = []
+
+    If your workspace is a larger monorepo, just copy the [dependencies] and [features] into your crate and update paths.
+
+src/lib.rs
+
+pub mod oiil {
+    pub mod core;
+    pub mod encoders;
+    pub mod mec_hooks;
+    pub mod ledger;
+}
+
+pub use oiil::core::*;
+pub use oiil::encoders::*;
+pub use oiil::mec_hooks::*;
+pub use oiil::ledger::*;
+
+src/oiol_core.rs
+
+//! Ontogenic I/O Layer (OIOL) core orchestration
+//! Deterministic capture + encoding → alignment → fusion → predictive-coding → MEC policy
+//! All aggregated context commits are signed & ledgered (no raw content stored).
+
+use std::collections::HashMap;
+use anyhow::Result;
+use async_trait::async_trait;
+use parking_lot::Mutex;
+use rand::{rngs::StdRng, SeedableRng};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+use crate::encoders::*;
+use crate::ledger::*;
+use crate::mec_hooks::*;
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub enum Modality { Audio, Text, Haptic, Cursor, Visual, Net }
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SensorMeta {
+    pub modality: Modality,
+    pub source_id: Uuid,
+    pub sampling_hz: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SensorPacket {
+    pub ts: u64,
+    pub bytes: Vec<u8>,
+    pub meta: SensorMeta,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FeatureVector {
+    pub ts: u64,
+    pub v: Vec<f32>,
+    pub modality: Modality,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Latent {
+    pub ts: u64,
+    pub z: Vec<f32>,
+    pub modality: Modality,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ContextState {
+    pub c: Vec<f32>,     // context vector
+    pub vad: [f32; 3],   // valence, arousal, dominance (0..1)
+}
+
+impl Default for ContextState {
+    fn default() -> Self {
+        Self { c: vec![0.0; 64], vad: [0.5, 0.5, 0.5] }
+    }
+}
+
+// ---------- Traits (deterministic capture + encoding) ----------
+
+#[async_trait]
+pub trait SensoryProbe: Send + Sync {
+    async fn capture(&self) -> Result<SensorPacket>;
+    fn normalize(&self, pkt: &SensorPacket) -> Result<FeatureVector>;
+}
+
+pub trait Encoder: Send + Sync {
+    fn encode(&self, fv: &FeatureVector) -> Latent;
+    fn dim_out(&self) -> usize;
+    // Optional slow update hook (run in sandbox)
+    fn update_slow(&mut self, _grad: &[f32]) {}
+}
+
+pub trait Aligner: Send + Sync {
+    fn align(&self, z: &[Latent], ctx: &ContextState) -> Vec<Latent>;
+}
+
+pub trait Fuser: Send + Sync {
+    fn fuse(&self, zs: &[Latent]) -> Latent;
+}
+
+// ---------- OIOL Orchestrator ----------
+
+pub struct OIOL {
+    pub probes: Vec<Box<dyn SensoryProbe>>,
+    pub encoders: HashMap<Modality, Box<dyn Encoder>>,
+    pub aligner: Box<dyn Aligner>,
+    pub fuser: Box<dyn Fuser>,
+    pub policy: Box<dyn Policy>,
+    pub mec: Box<dyn MecHooks>,
+    pub ledger: Box<dyn Ledger>,
+    pub ctx: ContextState,
+    rng: Mutex<StdRng>,
+    // predictive-coding hyperparams
+    eta_c: f32,
+    eta_vad: f32,
+}
+
+impl OIOL {
+    pub fn new(
+        probes: Vec<Box<dyn SensoryProbe>>,
+        encoders: HashMap<Modality, Box<dyn Encoder>>,
+        aligner: Box<dyn Aligner>,
+        fuser: Box<dyn Fuser>,
+        policy: Box<dyn Policy>,
+        mec: Box<dyn MecHooks>,
+        ledger: Box<dyn Ledger>,
+        seed: u64,
+    ) -> Self {
+        Self {
+            probes, encoders, aligner, fuser, policy, mec, ledger,
+            ctx: ContextState::default(),
+            rng: Mutex::new(StdRng::seed_from_u64(seed)),
+            eta_c: 0.05, eta_vad: 0.02,
+        }
+    }
+
+    /// One streaming tick: capture → features → encode → align → fuse → predictive-coding → policy → ledger
+    pub async fn tick(&mut self) -> Result<()> {
+        // 1) capture + deterministic features
+        let mut feats: Vec<FeatureVector> = Vec::with_capacity(self.probes.len());
+        for p in self.probes.iter() {
+            let pkt = p.capture().await?;
+            let fv = p.normalize(&pkt)?;
+            feats.push(fv);
+        }
+
+        // 2) encode
+        let mut lats: Vec<Latent> = Vec::with_capacity(feats.len());
+        for fv in feats.iter() {
+            if let Some(enc) = self.encoders.get(&fv.modality) {
+                lats.push(enc.encode(fv));
+            }
+        }
+
+        // 3) align and 4) fuse
+        let aligned = self.aligner.align(&lats, &self.ctx);
+        let fused = self.fuser.fuse(&aligned);
+
+        // 5) predictive coding (single-step gradient-like update on context & affect)
+        self.predictive_coding_step(&aligned, &fused);
+
+        // 6) compute extended energy (MEC + OIOL), policy action & update
+        let energy = self.mec.energy_mec_plus_oiol(&self.ctx, &aligned)?;
+        let reward = -energy - self.mec.latency_penalty()? - self.mec.risk_penalty()?;
+        let _action = self.policy.act(&self.ctx);
+        self.policy.update(reward, 1.0);
+
+        // 7) governance validation & ledger commit (aggregates only)
+        self.mec.validate_state_snapshot(&self.ctx, &aligned)?;
+        let evt = OntogenicContextEvent::from_ctx(&self.ctx, &aligned, energy);
+        self.ledger.commit(evt)?;
+
+        Ok(())
+    }
+
+    fn predictive_coding_step(&mut self, lats: &[Latent], fused: &Latent) {
+        // Update context vector c toward fused latent (simplified)
+        let n = self.ctx.c.len().min(fused.z.len());
+        for i in 0..n {
+            let err = fused.z[i] - self.ctx.c[i];
+            self.ctx.c[i] += self.eta_c * err;
+        }
+        // Update VAD arousal as a function of absolute latent activity (proxy)
+        let act = fused.z.iter().map(|x| x.abs()).sum::<f32>() / (fused.z.len().max(1) as f32);
+        self.ctx.vad[1] = (0.98 * self.ctx.vad[1] + 0.02 * act).clamp(0.0, 1.0);
+        // (Valence/Dominance mappable via learned regressors, integrated in encoders if desired)
+    }
+}
+
+// --------- Utilities ---------
+
+pub fn now_millis() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64
+}
+
+src/oiol_encoders.rs
+
+//! Deterministic feature extractors & lightweight encoders, plus alignment & fusion.
+//! Replace stubs with your DSP/NLP implementations where noted.
+
+use super::oiol_core::*;
+use anyhow::Result;
+
+// ---------------------- Feature Extractors (deterministic) ----------------------
+
+pub fn audio_features(wav: &[f32], sr: u32) -> FeatureVector {
+    // TODO: replace with proper mel + prosody (f0, energy, jitter/shimmer).
+    // Here we compute simple frame energy + crude band energies as placeholders.
+    let energy = wav.iter().map(|x| x * x).sum::<f32>() / (wav.len().max(1) as f32);
+    let mut v = vec![energy];
+    // crude bands
+    let stride = (wav.len().max(8) / 8).max(1);
+    for chunk in wav.chunks(stride) {
+        v.push(chunk.iter().map(|x| x.abs()).sum::<f32>() / chunk.len().max(1) as f32);
+    }
+    FeatureVector { ts: crate::oiol_core::now_millis(), v, modality: Modality::Audio }
+}
+
+pub fn text_tone_features(tokens: &[String]) -> FeatureVector {
+    let caps_ratio = if tokens.is_empty() { 0.0 }
+        else { tokens.iter().filter(|t| t.chars().all(|c| c.is_uppercase())).count() as f32 / tokens.len() as f32 };
+    let punct_entropy = punctuation_entropy(tokens);
+    let valence = lexicon_valence(tokens); // TODO: plug proper lexicon/embedding regressor
+    FeatureVector { ts: crate::oiol_core::now_millis(), v: vec![caps_ratio, punct_entropy, valence], modality: Modality::Text }
+}
+
+pub fn haptic_features(pressures: &[f32], times: &[u64]) -> FeatureVector {
+    let dwell = mean_dwell(times);
+    let dpdt = if pressures.len()>1 {
+        pressures.windows(2).map(|w| (w[1]-w[0]).abs()).sum::<f32>() / (pressures.len()-1) as f32
+    } else { 0.0 };
+    FeatureVector { ts: crate::oiol_core::now_millis(), v: vec![dwell, dpdt], modality: Modality::Haptic }
+}
+
+pub fn cursor_features(points: &[(f32,f32,u64)]) -> FeatureVector {
+    let (vel, acc, jerk) = kinematics(points);
+    FeatureVector { ts: crate::oiol_core::now_millis(), v: vec![vel, acc, jerk], modality: Modality::Cursor }
+}
+
+pub fn visual_saliency_features(saliency: &[f32]) -> FeatureVector {
+    // Expect precomputed lightweight saliency (e.g., spectral residual); aggregate moments.
+    let mean = if saliency.is_empty() { 0.0 } else { saliency.iter().sum::<f32>() / saliency.len() as f32 };
+    let var = if saliency.len() <= 1 { 0.0 } else {
+        saliency.iter().map(|x| (x - mean)*(x - mean)).sum::<f32>() / (saliency.len()-1) as f32
+    };
+    FeatureVector { ts: crate::oiol_core::now_millis(), v: vec![mean, var], modality: Modality::Visual }
+}
+
+pub fn net_features(domain_class: &[f32], dwell_ms: f32) -> FeatureVector {
+    let mut v = domain_class.to_vec(); v.push(dwell_ms);
+    FeatureVector { ts: crate::oiol_core::now_millis(), v, modality: Modality::Net }
+}
+
+// ---------------------- Lightweight Encoders ----------------------
+
+pub struct LinearTanhEncoder {
+    w: Vec<f32>, // flattened (d_out x d_in)
+    b: Vec<f32>, // d_out
+    d_in: usize,
+    d_out: usize,
+}
+
+impl LinearTanhEncoder {
+    pub fn new(d_in: usize, d_out: usize, seed: u64) -> Self {
+        let mut w = vec![0.0; d_in*d_out];
+        let mut b = vec![0.0; d_out];
+        // simple deterministic init
+        for i in 0..w.len() { w[i] = ((i as f32 * 0.0137 + (seed as f32)*1e-6).sin()) * 0.1; }
+        for i in 0..b.len() { b[i] = 0.0; }
+        Self { w, b, d_in, d_out }
+    }
+}
+
+impl Encoder for LinearTanhEncoder {
+    fn encode(&self, fv: &FeatureVector) -> Latent {
+        let mut z = vec![0.0f32; self.d_out];
+        for o in 0..self.d_out {
+            let mut acc = self.b[o];
+            for i in 0..self.d_in.min(fv.v.len()) {
+                acc += self.w[o*self.d_in + i] * fv.v[i];
+            }
+            z[o] = acc.tanh();
+        }
+        Latent { ts: fv.ts, z, modality: fv.modality }
+    }
+    fn dim_out(&self) -> usize { self.d_out }
+}
+
+// ---------------------- Alignment (attention-like) ----------------------
+
+pub struct DotAligner;
+impl Aligner for DotAligner {
+    fn align(&self, z: &[Latent], ctx: &ContextState) -> Vec<Latent> {
+        // Softmax weights vs. context vector over shared min-dimension
+        let d = z.iter().map(|l| l.z.len()).min().unwrap_or(0).min(ctx.c.len());
+        if d == 0 { return z.to_vec(); }
+        let mut scores: Vec<f32> = z.iter().map(|l| dot(&l.z[..d], &ctx.c[..d]) ).collect();
+        softmax_inplace(&mut scores);
+        z.iter().zip(scores.iter()).map(|(l, &w)| {
+            let mut znew = l.z.clone();
+            for i in 0..d { znew[i] = znew[i] * w; }
+            Latent { ts: l.ts, z: znew, modality: l.modality }
+        }).collect()
+    }
+}
+
+// ---------------------- Fusion ----------------------
+
+pub struct LinearFuser {
+    w: Vec<f32>, // flattened projection to fused dim
+    b: Vec<f32>,
+    d_in: usize,
+    d_out: usize,
+}
+
+impl LinearFuser {
+    pub fn new(total_in: usize, d_out: usize, seed: u64) -> Self {
+        let mut w = vec![0.0; total_in * d_out];
+        for i in 0..w.len() { w[i] = ((i as f32 * 0.009 + seed as f32 * 1e-6).cos()) * 0.08; }
+        let b = vec![0.0; d_out];
+        Self { w, b, d_in: total_in, d_out }
+    }
+}
+
+impl Fuser for LinearFuser {
+    fn fuse(&self, zs: &[Latent]) -> Latent {
+        let concat: Vec<f32> = zs.iter().flat_map(|l| l.z.iter().copied()).collect();
+        let mut out = vec![0.0; self.d_out];
+        for o in 0..self.d_out {
+            let mut acc = self.b[o];
+            for i in 0..self.d_in.min(concat.len()) {
+                acc += self.w[o*self.d_in + i] * concat[i];
+            }
+            out[o] = acc.tanh();
+        }
+        let ts = zs.first().map(|l| l.ts).unwrap_or(crate::oiol_core::now_millis());
+        Latent { ts, z: out, modality: Modality::Text } // modality unused at fused level
+    }
+}
+
+// ---------------------- Helpers ----------------------
+
+fn dot(a: &[f32], b: &[f32]) -> f32 { a.iter().zip(b.iter()).map(|(x,y)| x*y).sum() }
+
+fn softmax_inplace(x: &mut [f32]) {
+    let maxv = x.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    let mut sum = 0.0;
+    for v in x.iter_mut() { *v = (*v - maxv).exp(); sum += *v; }
+    if sum > 0.0 { for v in x.iter_mut() { *v /= sum; } }
+}
+
+fn punctuation_entropy(tokens: &[String]) -> f32 {
+    let mut cnt = [0usize; 4]; // .,?! approximated bins
+    for t in tokens {
+        for c in t.chars() {
+            match c { '.' => cnt[0]+=1, ','=>cnt[1]+=1, '?' => cnt[2]+=1, '!' => cnt[3]+=1, _=>{} }
+        }
+    }
+    let total: f32 = cnt.iter().sum::<usize>() as f32;
+    if total == 0.0 { return 0.0; }
+    cnt.iter().map(|&k| {
+        let p = k as f32 / total; if p>0.0 { -p * p.ln() } else { 0.0 }
+    }).sum()
+}
+
+fn lexicon_valence(_tokens: &[String]) -> f32 {
+    // TODO: plug your lexicon/embedding-based valence model; placeholder returns neutral
+    0.5
+}
+
+fn mean_dwell(times: &[u64]) -> f32 {
+    if times.len() < 2 { return 0.0; }
+    let mut diffs = Vec::with_capacity(times.len()-1);
+    for w in times.windows(2) { diffs.push((w[1] - w[0]) as f32); }
+    diffs.iter().sum::<f32>() / diffs.len() as f32
+}
+
+fn kinematics(points: &[(f32,f32,u64)]) -> (f32,f32,f32) {
+    if points.len() < 3 { return (0.0, 0.0, 0.0); }
+    let mut vels = Vec::new(); let mut accs = Vec::new(); let mut jerks = Vec::new();
+    for w in points.windows(2) {
+        let dt = ((w[1].2 as i64 - w[0].2 as i64).abs() as f32).max(1.0);
+        let dx = w[1].0 - w[0].0; let dy = w[1].1 - w[0].1;
+        vels.push(((dx*dx + dy*dy).sqrt()) / dt);
+    }
+    for w in vels.windows(2) {
+        let a = (w[1] - w[0]).abs();
+        accs.push(a);
+    }
+    for w in accs.windows(2) {
+        let j = (w[1] - w[0]).abs();
+        jerks.push(j);
+    }
+    let m = |x:&[f32]| if x.is_empty(){0.0}else{x.iter().sum::<f32>()/x.len() as f32};
+    (m(&vels), m(&accs), m(&jerks))
+}
+
+src/mec_hooks.rs
+
+//! Integration shims to MEC (energy extension, policy interface, governance checks).
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
+
+use crate::oiol_core::{ContextState, Latent};
+
+/// External MEC interface expected by OIOL.
+/// Implement this over your MEC orchestrator to bridge energy, risk, and validation.
+pub trait MecHooks: Send + Sync {
+    /// Extended energy with OIOL terms (task + context + affect + graph regularizers).
+    fn energy_mec_plus_oiol(&self, ctx: &ContextState, zs: &[Latent]) -> Result<f64>;
+    /// Latency penalty (ms→reward shaping) provided by orchestrator telemetry.
+    fn latency_penalty(&self) -> Result<f64> { Ok(0.0) }
+    /// Risk penalty (governance risk / violation probability).
+    fn risk_penalty(&self) -> Result<f64> { Ok(0.0) }
+    /// Hard validation of snapshot; must return Err on invariant violation.
+    fn validate_state_snapshot(&self, ctx: &ContextState, zs: &[Latent]) -> Result<()>;
+}
+
+/// Minimal policy contract used by OIOL.
+/// You likely wrap your ADP/actor here.
+pub trait Policy: Send + Sync {
+    fn act(&mut self, state: &ContextState) -> Action;
+    fn update(&mut self, reward: f64, grad_clip: f32);
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct Action {
+    pub code: u32,
+    pub strength: f32,
+}
+
+// -------- Example dev policy (replace with ADP) --------
+
+pub struct DevHeuristicPolicy {
+    last_reward: f64,
+    alpha: f32,
+}
+
+impl DevHeuristicPolicy {
+    pub fn new() -> Self { Self { last_reward: 0.0, alpha: 0.1 } }
+}
+
+impl Policy for DevHeuristicPolicy {
+    fn act(&mut self, state: &ContextState) -> Action {
+        // simple arousal → exploration coupling (placeholder)
+        let expl = state.vad[1];
+        Action { code: 1, strength: expl }
+    }
+    fn update(&mut self, reward: f64, _grad_clip: f32) {
+        // store EMA of reward for diagnostics
+        self.last_reward = 0.9*self.last_reward + 0.1*reward;
+    }
+}
+
+// -------- Example governance adapter (placeholder) --------
+
+pub struct DevMecHooks;
+impl MecHooks for DevMecHooks {
+    fn energy_mec_plus_oiol(&self, ctx: &ContextState, _zs: &[Latent]) -> Result<f64> {
+        // Toy energy: prefer moderate arousal, smaller context norm
+        let ctx_norm: f64 = ctx.c.iter().map(|x| (*x as f64)*(*x as f64)).sum::<f64>().sqrt();
+        let ar = ctx.vad[1] as f64;
+        Ok(0.05*ctx_norm + (ar - 0.5).abs())
+    }
+    fn validate_state_snapshot(&self, _ctx: &ContextState, _zs: &[Latent]) -> Result<()> {
+        // In production, enforce: no raw content, latency bounds, memory bounds, determinism envelopes.
+        Ok(())
+    }
+}
+
+src/ledger_events.rs
+
+//! Immutable, PQ-ready ledger events for ontogenic context commits.
+//! Stores only aggregated hashes (no raw content), ready for Merkle-DAG anchoring.
+
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use blake3;
+use sha3::{Digest, Keccak256};
+use std::collections::VecDeque;
+
+use crate::oiol_core::{ContextState, Latent};
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct OntogenicContextEvent {
+    pub ts: u64,
+    pub ctx_hash: [u8; 32],
+    pub energy: f64,
+    pub modalities_mask: u32,
+    pub signature: [u8; 64],
+    pub prev_root: [u8; 32],
+}
+
+impl OntogenicContextEvent {
+    pub fn from_ctx(ctx: &ContextState, lats: &[Latent], energy: f64) -> Self {
+        let ts = crate::oiol_core::now_millis();
+        let ctx_bytes = serialize_ctx(ctx, lats, energy, ts);
+        let ctx_hash = blake3::hash(&ctx_bytes).into();
+        let modalities_mask = mask_modalities(lats);
+        // PQ signature (replace with Dilithium in production)
+        let signature = dev_sign(&ctx_hash);
+        Self { ts, ctx_hash, energy, modalities_mask, signature, prev_root: [0u8; 32] }
+    }
+}
+
+fn serialize_ctx(ctx: &ContextState, lats: &[Latent], energy: f64, ts: u64) -> Vec<u8> {
+    // Aggregated stats only (no raw features): means/vars and dims.
+    let mut buf = Vec::new();
+    buf.extend_from_slice(&ts.to_le_bytes());
+    buf.extend_from_slice(&energy.to_le_bytes());
+    buf.extend(ctx.c.len().to_le_bytes());
+    let mean_c: f32 = if ctx.c.is_empty(){0.0}else{ ctx.c.iter().sum::<f32>() / ctx.c.len() as f32 };
+    buf.extend_from_slice(&mean_c.to_le_bytes());
+    buf.extend_from_slice(&ctx.vad[0].to_le_bytes());
+    buf.extend_from_slice(&ctx.vad[1].to_le_bytes());
+    buf.extend_from_slice(&ctx.vad[2].to_le_bytes());
+    let dims: u32 = lats.iter().map(|l| l.z.len() as u32).sum();
+    buf.extend_from_slice(&dims.to_le_bytes());
+    // lightweight entropy proxy
+    let act: f32 = lats.iter().flat_map(|l| l.z.iter()).map(|x| x.abs()).sum::<f32>() / (dims.max(1) as f32);
+    buf.extend_from_slice(&act.to_le_bytes());
+    buf
+}
+
+fn mask_modalities(lats: &[crate::oiol_core::Latent]) -> u32 {
+    let mut mask = 0u32;
+    for l in lats {
+        let bit = match l.modality {
+            crate::oiol_core::Modality::Audio => 1<<0,
+            crate::oiol_core::Modality::Text  => 1<<1,
+            crate::oiol_core::Modality::Haptic=> 1<<2,
+            crate::oiol_core::Modality::Cursor=> 1<<3,
+            crate::oiol_core::Modality::Visual=> 1<<4,
+            crate::oiol_core::Modality::Net   => 1<<5,
+        };
+        mask |= bit;
+    }
+    mask
+}
+
+// -------- Ledger abstraction --------
+
+pub trait Ledger: Send + Sync {
+    fn commit(&mut self, evt: OntogenicContextEvent) -> Result<()>;
+    fn root(&self) -> [u8; 32];
+}
+
+/// Simple in-memory Merkle chain; replace with your Merkle-DAG + network replication.
+pub struct MerkleLedger {
+    chain: VecDeque<[u8; 32]>,
+}
+
+impl MerkleLedger {
+    pub fn new() -> Self { Self { chain: VecDeque::new() } }
+}
+
+impl Ledger for MerkleLedger {
+    fn commit(&mut self, mut evt: OntogenicContextEvent) -> Result<()> {
+        let prev = self.chain.back().cloned().unwrap_or([0u8; 32]);
+        evt.prev_root = prev;
+        let mut hasher = Keccak256::new();
+        hasher.update(evt.ctx_hash);
+        hasher.update(prev);
+        hasher.update(evt.energy.to_le_bytes());
+        let root: [u8; 32] = hasher.finalize().into();
+        self.chain.push_back(root);
+        Ok(())
+    }
+    fn root(&self) -> [u8; 32] { self.chain.back().cloned().unwrap_or([0u8;32]) }
+}
+
+// --------- Crypto placeholders ---------
+// Replace with Dilithium in production (feature gate in Cargo.toml)
+
+#[cfg(feature = "dev-crypto")]
+fn dev_sign(hash: &[u8; 32]) -> [u8; 64] {
+    // NOT secure — placeholder to allow end-to-end wiring.
+    let mut sig = [0u8; 64];
+    sig[..32].copy_from_slice(hash);
+    sig[32..].copy_from_slice(hash);
+    sig
+}
+
+#[cfg(not(feature = "dev-crypto"))]
+fn dev_sign(hash: &[u8; 32]) -> [u8; 64] {
+    // Until PQ signatures are integrated, mirror hash (explicitly marked)
+    let mut sig = [0u8; 64];
+    sig[..32].copy_from_slice(hash);
+    sig[32..].copy_from_slice(hash);
+    sig
+}
+
+proto/mec_oiol.proto
+
+syntax = "proto3";
+
+package mec.oiol;
+
+message Empty {}
+
+enum Modality {
+  MODALITY_AUDIO = 0;
+  MODALITY_TEXT  = 1;
+  MODALITY_HAPTIC= 2;
+  MODALITY_CURSOR= 3;
+  MODALITY_VISUAL= 4;
+  MODALITY_NET   = 5;
+}
+
+message SensorMeta {
+  Modality modality = 1;
+  string source_id  = 2;  // UUID string
+  float sampling_hz = 3;
+}
+
+message SensorPacket {
+  uint64 ts     = 1;
+  bytes  bytes  = 2;  // raw bytes (local processing only)
+  SensorMeta meta = 3;
+}
+
+message FeatureVector {
+  uint64 ts     = 1;
+  repeated float v = 2;
+  Modality modality = 3;
+}
+
+message Latent {
+  uint64 ts     = 1;
+  repeated float z = 2;
+  Modality modality = 3;
+}
+
+message ContextState {
+  repeated float c = 1;
+  float valence = 2;
+  float arousal = 3;
+  float dominance = 4;
+}
+
+message ContextCommit {
+  uint64 ts = 1;
+  bytes  ctx_hash = 2;         // 32 bytes
+  double energy = 3;
+  uint32 modalities_mask = 4;
+  bytes  signature = 5;        // 64 bytes
+  bytes  prev_root  = 6;       // 32 bytes
+}
+
+message CommitAck {
+  bytes root = 1;              // 32 bytes
+}
+
+message TickRequest { uint64 seed = 1; }
+message TickReply   { double reward = 1; double energy = 2; }
+
+service OIOLService {
+  rpc StreamSensors(stream SensorPacket) returns (stream FeatureVector);
+  rpc Tick(TickRequest) returns (TickReply);
+  rpc CommitEvent(ContextCommit) returns (CommitAck);
+  rpc GetLedgerRoot(Empty) returns (CommitAck);
+}
+
+    Generate with prost/tonic as you do for other Prism services.
+
+How to wire into the MEC orchestrator
+
+    Instantiate OIOL::new(..) inside your MEC orchestrator, pass your ADP policy wrapper (implementing Policy) and your MEC hooks (implementing MecHooks).
+
+    Call oiol.tick().await? inside your orchestrator’s epoch loop (before/after ADP scheduling as you prefer).
+
+    Provide implementations for:
+
+        Probes for each modality you enable (web/desktop agent, SDKs, or in‑app hooks),
+
+        Encoders (you can start with LinearTanhEncoder and then swap to your trained encoders),
+
+        Ledger (swap MerkleLedger with your blockchain‑backed writer),
+
+        MecHooks (bridge to your extended energy and governance gates).
+
+Safety & Privacy guardrails (hard requirements)
+
+    Never commit raw content (audio buffers, keystrokes, URLs) to the ledger. Only commit aggregated stats and hashes as shown.
+
+    Use feature gating (--features dp) to add DP noise to aggregates if you process outside a secure enclave.
+
+    Always pass your snapshot through validate_state_snapshot(); hard‑fail and drop the tick on any invariant violation.
+
+

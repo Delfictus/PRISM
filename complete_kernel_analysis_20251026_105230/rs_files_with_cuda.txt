@@ -1,0 +1,8 @@
+./foundation/active_inference/gpu_inference.rs
+./foundation/gpu/kernel_executor.rs
+./foundation/integration/multi_modal_reasoner.rs
+./foundation/neuromorphic/src/cuda_kernels.rs
+./foundation/phase6/gpu_tda.rs
+./foundation/quantum/src/gpu_k_opt.rs
+./src/integration/multi_modal_reasoner.rs
+./tests/gpu_validation/test_gpu_minimal.rs

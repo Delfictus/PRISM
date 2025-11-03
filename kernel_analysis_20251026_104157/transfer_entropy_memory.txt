@@ -1,0 +1,18 @@
+=== MEMORY PATTERN ANALYSIS: transfer_entropy.ptx ===
+
+GLOBAL MEMORY OPERATIONS:
+  ld.global: 14
+  st.global: 0
+0
+
+SHARED MEMORY USAGE:
+  .shared declarations: 16
+  ld.shared: 9
+  st.shared: 7
+
+REGISTER FILE USAGE:
+  Register declarations: 0
+
+FUSION LIKELIHOOD SCORE:
+  ✓ High shared memory usage (+2)
+  VERDICT: Likely UNFUSED kernel (score: 2/5)

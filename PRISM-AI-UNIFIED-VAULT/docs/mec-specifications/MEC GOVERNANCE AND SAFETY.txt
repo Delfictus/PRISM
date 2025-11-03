@@ -1,0 +1,215 @@
+MEC_GOVERNANCE_AND_SAFETY_SPEC.md
+1. Purpose
+
+The Governance & Safety subsystem provides:
+
+    Constitutional enforcement: Hard constraints that define what the system must never violate.
+
+    Policy adaptability: Soft rules that may evolve as the system learns or the environment changes.
+
+    Reflexive amendment process: Meta-governance that allows the rules themselves to self-update.
+
+    Rollback and quarantine: Mechanisms to instantly revert unsafe self-modifications.
+
+Together these ensure that autonomy ≠ anarchy — the Prism-AI organism evolves only within provably safe bounds.
+2. Layered Architecture
+Layer	Function
+Core Constitution (CC-Layer)	Immutable guarantees (correctness, safety, non-malfeasance).
+Adaptive Policy Layer (APL)	Tunable thresholds for performance, exploration, and resource use.
+Reflexive Governance Engine (RGE)	Monitors compliance and proposes amendments.
+Rollback & Quarantine Layer (RQL)	Provides atomic reversion and sandboxing.
+Audit & Consensus Layer (ACL)	Verifies rule adherence using blockchain proofs.
+3. Constitutional Axes
+
+Each rule in the Core Constitution belongs to one of six axes:
+Axis	Invariant Example
+A1: Correctness	No self-mutation may cause failed unit or integration tests.
+A2: Determinism Bounds	Stochastic processes must remain within statistical predictability limits.
+A3: Performance Integrity	Runtime regression < 5 % under nominal load.
+A4: Memory & Energy Limits	Total resource use below configurable ceiling RmaxRmax​.
+A5: Compliance & Ethics	No violation of externally defined operational policies.
+A6: Traceability	Every change must be cryptographically logged.
+
+All constitutional invariants are hard constraints — failure instantly triggers rollback.
+4. Rust-Level Representation
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ConstitutionalRule {
+    pub id: Uuid,
+    pub axis: Axis,
+    pub description: String,
+    pub evaluator: fn(&SystemState) -> bool,
+    pub enforcement: EnforcementMode,
+}
+
+pub enum EnforcementMode {
+    Hard,   // Violations trigger immediate rollback
+    Soft,   // Violations produce warnings and policy re-evaluation
+}
+
+System Snapshot
+
+pub struct SystemState {
+    pub performance: f64,
+    pub memory_usage: f64,
+    pub compliance_score: f64,
+    pub test_pass_rate: f64,
+    pub entropy: f64,
+}
+
+5. Safety Evaluation Cycle
+
+    Snapshot: Capture current SystemState.
+
+    Evaluate: Apply all ConstitutionalRule evaluators.
+
+    Score: Compute violation vector VtVt​.
+
+    Decision:
+
+        If any Hard rule fails → rollback.
+
+        If Soft rules drift → invoke Policy Adaptation.
+
+    Log: Commit evaluation results to blockchain telemetry.
+
+Vt=[r1(st),r2(st),…,rn(st)]
+Vt​=[r1​(st​),r2​(st​),…,rn​(st​)]
+Safe(t)=∏iri(st)
+Safe(t)=i∏​ri​(st​)
+6. Policy Adaptation Mechanics
+
+Adaptive rules evolve through a Reinforcement-Governance loop:
+πAPLt+1=πAPLt+η∇πRsafety
+πAPLt+1​=πAPLt​+η∇π​Rsafety​
+
+where RsafetyRsafety​ is the long-term reward for stable yet efficient operation.
+
+Example:
+If exploratory mutations yield high innovation with minimal risk, the exploration quota is gradually increased.
+7. Reflexive Governance Engine (RGE)
+
+RGE functions as an embedded “legislator”.
+It observes system behavior, evaluates constitutional pressure, and may propose amendments to the Adaptive Policy Layer.
+RGE Rust Interface
+
+pub struct GovernanceProposal {
+    pub target_rule: Uuid,
+    pub proposed_change: String,
+    pub justification: String,
+    pub confidence: f64,
+}
+
+impl ReflexiveGovernanceEngine {
+    pub fn propose_amendment(&self, rule: &ConstitutionalRule) -> Option<GovernanceProposal> {
+        let drift = self.estimate_rule_drift(rule);
+        if drift > self.amendment_threshold {
+            Some(GovernanceProposal {
+                target_rule: rule.id,
+                proposed_change: format!("Adjust threshold by {}", drift * 0.1),
+                justification: "Performance/entropy balance drift detected".into(),
+                confidence: 0.92,
+            })
+        } else { None }
+    }
+}
+
+All proposals must be approved by the Audit & Consensus Layer before adoption.
+8. Rollback & Quarantine Layer (RQL)
+
+RQL provides atomic reversibility for any unsafe self-modification.
+Reversion Logic
+
+pub fn revert_to_checkpoint(checkpoints: &Vec<SystemState>, ledger_root: &[u8; 32]) -> SystemState {
+    let last_safe = checkpoints.last().expect("No safe checkpoint");
+    blockchain::log_rollback_event(ledger_root, last_safe);
+    last_safe.clone()
+}
+
+    Checkpoint cadence: every 100 ms or every major meta-update.
+
+    Sandbox mode: isolates the offending component in a simulated environment for analysis.
+
+    Forensic logging: all violations appended to blockchain GovernanceChange events.
+
+9. Blockchain Integration
+
+Each rule evaluation and amendment is stored as a GovernanceEvent block:
+
+pub struct GovernanceEvent {
+    pub timestamp: u64,
+    pub rule_id: Uuid,
+    pub status: String,
+    pub action: String,
+    pub prev_hash: [u8; 32],
+    pub signature: [u8; 64],
+}
+
+Hgov(t+1)=HPQ(Hgov(t)∥GovernanceEventt)
+Hgov​(t+1)=HPQ​(Hgov​(t)∥GovernanceEventt​)
+
+This yields a tamper-proof constitutional history.
+10. Mathematical Stability Conditions
+
+Let C(t)C(t) denote cumulative constitutional compliance.
+C(t)=∑iwi ri(st)
+C(t)=i∑​wi​ri​(st​)
+
+Governance stability is guaranteed if:
+dCdt≥0and∀i,  ri(st)∈[0,1]
+dtdC​≥0and∀i,ri​(st​)∈[0,1]
+
+The system triggers emergency rollback if:
+C(t)<τcritical
+C(t)<τcritical​
+11. Reflexive Amendment Protocol
+
+Amendments follow a three-phase meta-cycle:
+
+    Proposal (RGE): Drafts modification based on observed drift.
+
+    Simulation (Sandbox): Runs A/B trial with altered rule.
+
+    Ratification (Consensus): Requires ≥ ⅔ validator approval on blockchain.
+
+Approved amendments update the Adaptive Policy Layer while preserving Core Constitution integrity.
+12. Integration with MEC Layers
+MEC Layer	Governance Interaction
+Meta-Causality	Validates that self-rewrites remain compliant.
+Contextual Grounding	Adjusts policies to external context changes.
+Reflexive Feedback	Feeds system health metrics to RGE.
+Semantic Plasticity	Prevents representational drift beyond semantic bounds.
+Blockchain Telemetry	Provides immutable compliance evidence.
+Federated Node Learning	Enforces cross-node constitutional consistency.
+Quantum-Neuromorphic Fusion	Monitors decoherence safety envelopes.
+13. Safety Metrics
+Metric	Meaning	Threshold
+Violation Rate	Fraction of failed rule checks	< 0.1 %
+Entropy Drift	Relative change in system entropy	< 0.05
+Rollback Frequency	Count / hour	< 2
+Governance Latency	Proposal→ratification time	< 1 s
+Audit Consistency	Cross-node rule agreement	> 0.98
+14. Mathematical Audit Guarantee
+
+Theorem (Constitutional Integrity):
+If every constitutional invariant ri(st)ri​(st​) is satisfied and all blockchain hashes verify, then Prism’s self-modifying trajectory is provably safe.
+∀t,  Verify(Hgov(t))∧⋀iri(st)=1⇒Safe Evolution
+∀t,Verify(Hgov​(t))∧i⋀​ri​(st​)=1⇒Safe Evolution
+15. Summary
+
+The Governance & Safety subsystem gives Prism-AI the capacity to evolve responsibly:
+
+    Immutable constitutional invariants preserve correctness and ethics.
+
+    Adaptive policies allow contextual agility without breaking safety.
+
+    Blockchain proofs guarantee verifiable accountability.
+
+    Reflexive governance enables lawful self-amendment.
+
+    Instant rollback ensures recovery from unforeseen errors.
+
+Autopoiesis=Evolution+Accountability+Reversibility
+Autopoiesis=Evolution+Accountability+Reversibility
+
+End of MEC_GOVERNANCE_AND_SAFETY_SPEC.md

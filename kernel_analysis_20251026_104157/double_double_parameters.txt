@@ -1,0 +1,53 @@
+=== KERNEL PARAMETERS: double_double.ptx ===
+
+PARAMETER LAYOUT:
+.extern .func  (.param .b32 func_retval0) vprintf
+	.param .b64 vprintf_param_0,
+	.param .b64 vprintf_param_1
+	.param .u64 _Z12dd_array_addP7dd_realPKS_S2_i_param_0,
+	.param .u64 _Z12dd_array_addP7dd_realPKS_S2_i_param_1,
+	.param .u64 _Z12dd_array_addP7dd_realPKS_S2_i_param_2,
+	.param .u32 _Z12dd_array_addP7dd_realPKS_S2_i_param_3
+	ld.param.u64 	%rd1, [_Z12dd_array_addP7dd_realPKS_S2_i_param_0];
+	ld.param.u64 	%rd2, [_Z12dd_array_addP7dd_realPKS_S2_i_param_1];
+	ld.param.u64 	%rd3, [_Z12dd_array_addP7dd_realPKS_S2_i_param_2];
+	ld.param.u32 	%r2, [_Z12dd_array_addP7dd_realPKS_S2_i_param_3];
+	.param .u64 _Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i_param_0,
+	.param .u64 _Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i_param_1,
+	.param .u64 _Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i_param_2,
+	.param .u32 _Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i_param_3
+	ld.param.u64 	%rd8, [_Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i_param_1];
+	ld.param.u64 	%rd9, [_Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i_param_2];
+	ld.param.u32 	%r4, [_Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i_param_3];
+	ld.param.u64 	%rd16, [_Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i_param_0];
+	.param .u64 _Z23dd_deterministic_reduceP7dd_realPKS_i_param_0,
+	.param .u64 _Z23dd_deterministic_reduceP7dd_realPKS_i_param_1,
+	.param .u32 _Z23dd_deterministic_reduceP7dd_realPKS_i_param_2
+	ld.param.u64 	%rd2, [_Z23dd_deterministic_reduceP7dd_realPKS_i_param_0];
+	ld.param.u64 	%rd3, [_Z23dd_deterministic_reduceP7dd_realPKS_i_param_1];
+	ld.param.u32 	%r11, [_Z23dd_deterministic_reduceP7dd_realPKS_i_param_2];
+	.param .b64 param0;
+	st.param.b64 	[param0+0], %rd4;
+	.param .b64 param1;
+	st.param.b64 	[param1+0], 0;
+	.param .b32 retval0;
+	ld.param.b32 	%r4, [retval0+0];
+	.param .b64 param0;
+	st.param.b64 	[param0+0], %rd11;
+	.param .b64 param1;
+	st.param.b64 	[param1+0], %rd5;
+	.param .b32 retval0;
+	ld.param.b32 	%r5, [retval0+0];
+	.param .b64 param0;
+	st.param.b64 	[param0+0], %rd11;
+	.param .b64 param1;
+	st.param.b64 	[param1+0], %rd5;
+	.param .b32 retval0;
+	ld.param.b32 	%r6, [retval0+0];
+	.param .b64 param0;
+	st.param.b64 	[param0+0], %rd16;
+	.param .b64 param1;
+	st.param.b64 	[param1+0], %rd1;
+	.param .b32 retval0;
+	ld.param.b32 	%r7, [retval0+0];
+

@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Meta Determinism Manifest",
+  "type": "object",
+  "required": [
+    "build",
+    "seeds",
+    "hashes",
+    "artifacts"
+  ],
+  "properties": {
+    "build": {
+      "type": "object",
+      "required": ["commit", "timestamp"],
+      "properties": {
+        "commit": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "seeds": {
+      "type": "object",
+      "description": "Seed registry for reproducible executions."
+    },
+    "hashes": {
+      "type": "object",
+      "required": ["kernel_hash", "meta_hash"],
+      "properties": {
+        "kernel_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "meta_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "ontology_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

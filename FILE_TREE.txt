@@ -1,0 +1,148 @@
+PRISM-FINNAL-PUSH/ (Working Directory)
+│
+├── 📚 Documentation (Root Level)
+│   ├── README.md
+│   ├── ARCHITECTURE_MAP.md          ⭐ Platform overview
+│   ├── COMMAND_REFERENCE.md         ⭐ Command guide
+│   ├── GITIGNORE_CLEANUP_PR.md      ⭐ Git cleanup details
+│   ├── SEED_PROBE_DELIVERY.md       ⭐ Seed probe docs
+│   ├── WR_SWEEP_QUICKSTART.md       ⭐ WR sweep guide
+│   ├── WR_SWEEP_STRATEGY.md
+│   ├── WR_SWEEP_DELIVERY_SUMMARY.md
+│   ├── CONFIG_V1.1_VERIFICATION_REPORT.md
+│   ├── ACTUAL_GPU_ARCHITECTURE.md
+│   ├── ACTUAL_STATUS_AND_NEXT_STEPS.md
+│   └── GPU_QUANTUM_MLIR_INTEGRATION.md
+│
+├── 🔧 Foundation (Core Algorithms)
+│   ├── prct-core/                   ⭐ Main coloring engine
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── world_record_pipeline.rs
+│   │   │   ├── world_record_pipeline_gpu.rs  ⭐
+│   │   │   ├── quantum_coloring.rs
+│   │   │   ├── memetic_coloring.rs
+│   │   │   ├── dsatur.rs
+│   │   │   ├── gpu_coloring.rs
+│   │   │   ├── transfer_entropy_coloring.rs
+│   │   │   └── thermodynamic_coloring.rs
+│   │   ├── configs/                 ⭐ WR sweep configs
+│   │   │   ├── wr_sweep_A.v1.1.toml through G
+│   │   │   ├── wr_sweep_D_seed_42.v1.1.toml    ⭐
+│   │   │   ├── wr_sweep_D_seed_1337.v1.1.toml  ⭐
+│   │   │   ├── wr_sweep_D_seed_9001.v1.1.toml  ⭐
+│   │   │   ├── wr_sweep_F_seed_42.v1.1.toml    ⭐
+│   │   │   ├── wr_sweep_F_seed_1337.v1.1.toml  ⭐
+│   │   │   ├── wr_sweep_F_seed_9001.v1.1.toml  ⭐
+│   │   │   ├── wr_sweep_D_aggr_seed_42.v1.1.toml    ⭐
+│   │   │   ├── wr_sweep_D_aggr_seed_1337.v1.1.toml  ⭐
+│   │   │   └── wr_sweep_D_aggr_seed_9001.v1.1.toml  ⭐
+│   │   ├── examples/
+│   │   │   ├── world_record_dsjc1000.rs  ⭐
+│   │   │   ├── simple_dimacs_benchmark.rs
+│   │   │   └── test_comprehensive_config.rs
+│   │   └── Cargo.toml
+│   │
+│   ├── neuromorphic/                ⭐ GPU reservoir
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── gpu_reservoir.rs          ⭐ 398x speedup
+│   │   │   ├── gpu_optimization.rs
+│   │   │   └── cuda_kernels.rs           ⭐ cudarc 0.9
+│   │   └── Cargo.toml
+│   │
+│   ├── orchestration/               ⭐ Phase coordinator
+│   │   ├── src/
+│   │   │   ├── orchestrator.rs
+│   │   │   ├── phase_control.rs
+│   │   │   └── config.rs
+│   │   └── Cargo.toml
+│   │
+│   ├── active_inference/            ⭐ FEP + ADP
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── adp.rs                   (Q-learning)
+│   │   │   └── fep.rs                   (Free Energy)
+│   │   └── Cargo.toml
+│   │
+│   ├── cuda/                        ⭐ CUDA sources
+│   │   ├── adaptive_coloring.cu
+│   │   ├── prct_kernels.cu
+│   │   └── neuromorphic_gemv.cu         ⭐ 398x GEMV
+│   │
+│   ├── kernels/                     ⭐ Compiled PTX
+│   │   └── ptx/
+│   │       ├── active_inference.ptx
+│   │       ├── neuromorphic_gemv.ptx    ⭐
+│   │       ├── quantum_evolution.ptx
+│   │       ├── thermodynamic.ptx
+│   │       └── transfer_entropy.ptx
+│   │
+│   ├── cma/                         (CMA-ES optimizer)
+│   ├── mathematics/                 (Math utilities)
+│   └── optimization/                (Generic optimizers)
+│
+├── 🧠 Source (Meta-Cognitive Layers)
+│   ├── meta/
+│   │   ├── reflexive/               (Self-monitoring)
+│   │   ├── plasticity/              (Dynamic tuning)
+│   │   ├── federated/               (Multi-agent)
+│   │   └── ontology/                (Knowledge graph)
+│   ├── bin/
+│   │   ├── prism_unified.rs         ⭐ Main binary
+│   │   ├── prism_mec.rs
+│   │   └── ...
+│   └── lib.rs
+│
+├── 🛠️ Tools (Automation Scripts)
+│   ├── run_wr_sweep.sh              ⭐ Run all 7 sweeps
+│   ├── run_wr_seed_probe.sh         ⭐ Seed probe runner
+│   ├── validate_wr_sweep.sh         ⭐ Config validator
+│   ├── mcp_policy_checks.sh         ⭐ GPU policy enforcer
+│   └── ...
+│
+├── 📊 Results (Output Directory)
+│   ├── dsjc1000_seed_probe.jsonl    ⭐ Seed probe results
+│   └── logs/
+│       ├── wr_sweep_D_seed_42_<timestamp>.log
+│       ├── wr_sweep_F_seed_1337_<timestamp>.log
+│       └── ...
+│
+├── 🎯 Benchmarks
+│   └── dimacs/
+│       ├── dsjc1000.5.col           ⭐ Target instance
+│       ├── dsjc500.5.col
+│       └── ...
+│
+├── 📦 Data
+│   └── nipah/                       (Protein data)
+│
+├── 🗂️ Baseline
+│   └── baseline-v1.0/               (Pre-GPU baseline)
+│
+├── 📄 Configuration
+│   ├── .gitignore                   ⭐ Updated cleanup
+│   ├── Cargo.toml                   (Workspace root)
+│   └── Cargo.lock
+│
+└── 🔍 Build Artifacts (Now Untracked)
+    ├── target/                      (Build outputs)
+    ├── deps/                        (Cargo dependencies)
+    ├── venv/                        (Python virtualenv)
+    └── .fingerprint/                (Cargo cache)
+
+═══════════════════════════════════════════════════════════
+⭐ = Key files/directories for understanding PRISM
+═══════════════════════════════════════════════════════════
+
+Key Entry Points:
+1. COMMAND_REFERENCE.md - Start here for commands
+2. ARCHITECTURE_MAP.md - Understand the platform
+3. WR_SWEEP_QUICKSTART.md - Run WR sweeps
+4. foundation/prct-core/src/world_record_pipeline_gpu.rs - GPU pipeline
+5. foundation/prct-core/configs/ - All configurations
+
+Seed Probe System:
+- tools/run_wr_seed_probe.sh - Runner script
+- foundation/prct-core/configs/*_seed_*.toml - Seed variants
+- results/dsjc1000_seed_probe.jsonl - Results output

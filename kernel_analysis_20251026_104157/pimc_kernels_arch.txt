@@ -1,0 +1,10 @@
+=== ARCHITECTURAL METADATA: pimc_kernels.ptx ===
+
+TARGET ARCHITECTURE:
+.version 8.7
+.target sm_70
+.address_size 64
+
+COMPUTE CAPABILITY REQUIREMENTS:
+.target sm_70
+

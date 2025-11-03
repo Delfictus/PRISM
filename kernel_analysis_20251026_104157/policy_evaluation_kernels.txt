@@ -1,0 +1,290 @@
+=== KERNEL SIGNATURES: policy_evaluation.ptx ===
+
+.visible .entry _Z23evolve_satellite_kernelPKdPddi(
+	.param .u64 _Z23evolve_satellite_kernelPKdPddi_param_0,
+	.param .u64 _Z23evolve_satellite_kernelPKdPddi_param_1,
+	.param .f64 _Z23evolve_satellite_kernelPKdPddi_param_2,
+	.param .u32 _Z23evolve_satellite_kernelPKdPddi_param_3
+)
+{
+	.reg .pred 	%p<9>;
+	.reg .b32 	%r<20>;
+	.reg .f64 	%fd<46>;
+	.reg .b64 	%rd<9>;
+	// demoted variable
+	.shared .align 8 .b8 _ZZ23evolve_satellite_kernelPKdPddiE8position[24];
+	// demoted variable
+	.shared .align 8 .b8 _ZZ23evolve_satellite_kernelPKdPddiE8velocity[24];
+	// demoted variable
+	.shared .align 8 .b8 _ZZ23evolve_satellite_kernelPKdPddiE12acceleration[24];
+	// demoted variable
+	.shared .align 8 .b8 _ZZ23evolve_satellite_kernelPKdPddiE12new_position[24];
+	// demoted variable
+	.shared .align 8 .b8 _ZZ23evolve_satellite_kernelPKdPddiE16new_acceleration[24];
+
+	ld.param.u64 	%rd1, [_Z23evolve_satellite_kernelPKdPddi_param_0];
+	ld.param.u64 	%rd2, [_Z23evolve_satellite_kernelPKdPddi_param_1];
+	ld.param.f64 	%fd1, [_Z23evolve_satellite_kernelPKdPddi_param_2];
+	ld.param.u32 	%r8, [_Z23evolve_satellite_kernelPKdPddi_param_3];
+	mov.u32 	%r1, %ctaid.x;
+	setp.ge.s32 	%p1, %r1, %r8;
+	mov.u32 	%r2, %tid.x;
+	setp.gt.s32 	%p2, %r2, 5;
+	or.pred  	%p3, %p2, %p1;
+--
+.visible .entry _Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii(
+	.param .u64 _Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_0,
+	.param .u64 _Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_1,
+	.param .u64 _Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_2,
+	.param .u64 _Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_3,
+	.param .u64 _Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_4,
+	.param .f64 _Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_5,
+	.param .f64 _Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_6,
+	.param .f64 _Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_7,
+	.param .u32 _Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_8,
+	.param .u32 _Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_9
+)
+{
+	.reg .pred 	%p<16>;
+	.reg .f32 	%f<5>;
+	.reg .b32 	%r<134>;
+	.reg .f64 	%fd<188>;
+	.reg .b64 	%rd<30>;
+
+
+	ld.param.u64 	%rd3, [_Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_0];
+	ld.param.u64 	%rd4, [_Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_1];
+	ld.param.u64 	%rd6, [_Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_3];
+	ld.param.f64 	%fd34, [_Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_5];
+	ld.param.f64 	%fd35, [_Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_6];
+	ld.param.u32 	%r40, [_Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_8];
+	ld.param.u32 	%r39, [_Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii_param_9];
+	mov.u32 	%r1, %ctaid.x;
+	setp.ge.s32 	%p1, %r1, %r40;
+	mov.u32 	%r2, %tid.x;
+	setp.ge.s32 	%p2, %r2, %r39;
+--
+.visible .entry _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii(
+	.param .u64 _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_0,
+	.param .u64 _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_1,
+	.param .u64 _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_2,
+	.param .u64 _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_3,
+	.param .u64 _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_4,
+	.param .u64 _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_5,
+	.param .u64 _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_6,
+	.param .f64 _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_7,
+	.param .f64 _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_8,
+	.param .f64 _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_9,
+	.param .u32 _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_10,
+	.param .u32 _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_11,
+	.param .u32 _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_12,
+	.param .u32 _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_13,
+	.param .u32 _Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_14
+)
+{
+	.local .align 4 .b8 	__local_depot2[4];
+	.reg .b64 	%SP;
+	.reg .b64 	%SPL;
+	.reg .pred 	%p<29>;
+	.reg .f32 	%f<3>;
+	.reg .b32 	%r<184>;
+	.reg .f64 	%fd<216>;
+	.reg .b64 	%rd<43>;
+
+
+	mov.u64 	%SPL, __local_depot2;
+	cvta.local.u64 	%SP, %SPL;
+	ld.param.u64 	%rd12, [_Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii_param_0];
+--
+.visible .entry _Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii(
+	.param .u64 _Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_0,
+	.param .u64 _Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_1,
+	.param .u64 _Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_2,
+	.param .u64 _Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_3,
+	.param .u64 _Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_4,
+	.param .u64 _Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_5,
+	.param .u32 _Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_6,
+	.param .u32 _Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_7,
+	.param .u32 _Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_8,
+	.param .u32 _Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_9
+)
+{
+	.reg .pred 	%p<7>;
+	.reg .b32 	%r<26>;
+	.reg .f64 	%fd<56>;
+	.reg .b64 	%rd<46>;
+
+
+	ld.param.u64 	%rd24, [_Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_0];
+	ld.param.u64 	%rd25, [_Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_1];
+	ld.param.u64 	%rd26, [_Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_2];
+	ld.param.u64 	%rd21, [_Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_3];
+	ld.param.u64 	%rd22, [_Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_4];
+	ld.param.u64 	%rd23, [_Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_5];
+	ld.param.u32 	%r12, [_Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_8];
+	ld.param.u32 	%r13, [_Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii_param_9];
+	cvta.to.global.u64 	%rd1, %rd25;
+	cvta.to.global.u64 	%rd2, %rd24;
+	cvta.to.global.u64 	%rd3, %rd26;
+	mov.u32 	%r1, %ctaid.x;
+--
+.visible .entry _Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii(
+	.param .u64 _Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_0,
+	.param .u64 _Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_1,
+	.param .u64 _Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_2,
+	.param .u64 _Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_3,
+	.param .u64 _Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_4,
+	.param .u64 _Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_5,
+	.param .u64 _Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_6,
+	.param .u64 _Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_7,
+	.param .u32 _Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_8,
+	.param .u32 _Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_9,
+	.param .u32 _Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_10,
+	.param .u32 _Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_11
+)
+{
+	.reg .pred 	%p<23>;
+	.reg .f32 	%f<3>;
+	.reg .b32 	%r<86>;
+	.reg .f64 	%fd<134>;
+	.reg .b64 	%rd<35>;
+	// demoted variable
+	.shared .align 8 .f64 _ZZ18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiiiE11shared_risk;
+	// demoted variable
+	.shared .align 8 .f64 _ZZ18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiiiE16shared_ambiguity;
+	// demoted variable
+	.shared .align 8 .f64 _ZZ18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiiiE14shared_novelty;
+
+	ld.param.u64 	%rd6, [_Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_0];
+	ld.param.u64 	%rd7, [_Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_1];
+	ld.param.u64 	%rd8, [_Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_2];
+	ld.param.u64 	%rd9, [_Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii_param_3];
+--
+.visible .entry _Z22init_rng_states_kernelP17curandStateXORWOWyi(
+	.param .u64 _Z22init_rng_states_kernelP17curandStateXORWOWyi_param_0,
+	.param .u64 _Z22init_rng_states_kernelP17curandStateXORWOWyi_param_1,
+	.param .u32 _Z22init_rng_states_kernelP17curandStateXORWOWyi_param_2
+)
+{
+	.reg .pred 	%p<24>;
+	.reg .b32 	%r<435>;
+	.reg .b64 	%rd<28>;
+
+
+	ld.param.u32 	%r182, [_Z22init_rng_states_kernelP17curandStateXORWOWyi_param_2];
+	mov.u32 	%r183, %ctaid.x;
+	mov.u32 	%r184, %ntid.x;
+	mov.u32 	%r185, %tid.x;
+	mad.lo.s32 	%r1, %r183, %r184, %r185;
+	setp.ge.s32 	%p1, %r1, %r182;
+	@%p1 bra 	$L__BB5_44;
+
+	ld.param.u64 	%rd26, [_Z22init_rng_states_kernelP17curandStateXORWOWyi_param_1];
+	ld.param.u64 	%rd25, [_Z22init_rng_states_kernelP17curandStateXORWOWyi_param_0];
+	cvta.to.global.u64 	%rd1, %rd25;
+	cvt.u32.u64 	%r186, %rd26;
+	xor.b32  	%r187, %r186, -1429050551;
+	mul.lo.s32 	%r188, %r187, 1099087573;
+	shr.u64 	%rd11, %rd26, 32;
+	cvt.u32.u64 	%r189, %rd11;
+	xor.b32  	%r190, %r189, -136515619;
+	mul.lo.s32 	%r191, %r190, -1703105765;
+	add.s32 	%r192, %r188, %r191;
+	cvt.s64.s32 	%rd2, %r1;
+--
+.visible .entry predict_trajectories_kernel(
+	.param .u64 predict_trajectories_kernel_param_0,
+	.param .u64 predict_trajectories_kernel_param_1,
+	.param .u64 predict_trajectories_kernel_param_2,
+	.param .u64 predict_trajectories_kernel_param_3,
+	.param .u64 predict_trajectories_kernel_param_4,
+	.param .u64 predict_trajectories_kernel_param_5,
+	.param .u64 predict_trajectories_kernel_param_6,
+	.param .u64 predict_trajectories_kernel_param_7,
+	.param .u64 predict_trajectories_kernel_param_8,
+	.param .u64 predict_trajectories_kernel_param_9,
+	.param .u64 predict_trajectories_kernel_param_10,
+	.param .f64 predict_trajectories_kernel_param_11,
+	.param .f64 predict_trajectories_kernel_param_12,
+	.param .f64 predict_trajectories_kernel_param_13,
+	.param .f64 predict_trajectories_kernel_param_14,
+	.param .f64 predict_trajectories_kernel_param_15,
+	.param .f64 predict_trajectories_kernel_param_16,
+	.param .f64 predict_trajectories_kernel_param_17,
+	.param .u32 predict_trajectories_kernel_param_18,
+	.param .u32 predict_trajectories_kernel_param_19,
+	.param .u32 predict_trajectories_kernel_param_20
+)
+{
+
+
+
+	ret;
+
+}
+	// .globl	_Z13matvec_kernelPKdS0_Pdii
+.visible .entry _Z13matvec_kernelPKdS0_Pdii(
+	.param .u64 _Z13matvec_kernelPKdS0_Pdii_param_0,
+	.param .u64 _Z13matvec_kernelPKdS0_Pdii_param_1,
+	.param .u64 _Z13matvec_kernelPKdS0_Pdii_param_2,
+	.param .u32 _Z13matvec_kernelPKdS0_Pdii_param_3,
+	.param .u32 _Z13matvec_kernelPKdS0_Pdii_param_4
+)
+{
+	.reg .pred 	%p<7>;
+	.reg .b32 	%r<25>;
+	.reg .f64 	%fd<30>;
+	.reg .b64 	%rd<27>;
+
+
+	ld.param.u64 	%rd15, [_Z13matvec_kernelPKdS0_Pdii_param_0];
+	ld.param.u64 	%rd16, [_Z13matvec_kernelPKdS0_Pdii_param_1];
+	ld.param.u64 	%rd14, [_Z13matvec_kernelPKdS0_Pdii_param_2];
+	ld.param.u32 	%r12, [_Z13matvec_kernelPKdS0_Pdii_param_3];
+	ld.param.u32 	%r11, [_Z13matvec_kernelPKdS0_Pdii_param_4];
+	cvta.to.global.u64 	%rd1, %rd16;
+	cvta.to.global.u64 	%rd2, %rd15;
+	mov.u32 	%r13, %ntid.x;
+	mov.u32 	%r14, %ctaid.x;
+	mov.u32 	%r15, %tid.x;
+	mad.lo.s32 	%r1, %r14, %r13, %r15;
+	setp.ge.s32 	%p1, %r1, %r12;
+	@%p1 bra 	$L__BB7_9;
+
+	setp.lt.s32 	%p2, %r11, 1;
+	mov.f64 	%fd29, 0d0000000000000000;
+	@%p2 bra 	$L__BB7_8;
+--
+.visible .entry _Z20sum_reduction_kernelPKdPdi(
+	.param .u64 _Z20sum_reduction_kernelPKdPdi_param_0,
+	.param .u64 _Z20sum_reduction_kernelPKdPdi_param_1,
+	.param .u32 _Z20sum_reduction_kernelPKdPdi_param_2
+)
+{
+	.reg .pred 	%p<6>;
+	.reg .b32 	%r<15>;
+	.reg .f64 	%fd<10>;
+	.reg .b64 	%rd<7>;
+	// demoted variable
+	.shared .align 8 .b8 _ZZ20sum_reduction_kernelPKdPdiE6shared[2048];
+
+	ld.param.u64 	%rd1, [_Z20sum_reduction_kernelPKdPdi_param_0];
+	ld.param.u64 	%rd2, [_Z20sum_reduction_kernelPKdPdi_param_1];
+	ld.param.u32 	%r8, [_Z20sum_reduction_kernelPKdPdi_param_2];
+	mov.u32 	%r1, %ntid.x;
+	mov.u32 	%r9, %ctaid.x;
+	mov.u32 	%r2, %tid.x;
+	mad.lo.s32 	%r3, %r9, %r1, %r2;
+	setp.ge.s32 	%p1, %r3, %r8;
+	mov.f64 	%fd9, 0d0000000000000000;
+	@%p1 bra 	$L__BB8_2;
+
+	cvta.to.global.u64 	%rd3, %rd1;
+	mul.wide.s32 	%rd4, %r3, 8;
+	add.s64 	%rd5, %rd3, %rd4;
+	ld.global.nc.f64 	%fd9, [%rd5];
+
+$L__BB8_2:
+	shl.b32 	%r10, %r2, 3;
+
+TOTAL KERNELS: 9

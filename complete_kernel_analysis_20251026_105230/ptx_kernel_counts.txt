@@ -1,0 +1,12 @@
+8 kernels: ./foundation/kernels/cuda/matrix_ops.ptx
+10 kernels: ./foundation/kernels/ptx/active_inference.ptx
+4 kernels: ./foundation/kernels/ptx/double_double.ptx
+7 kernels: ./foundation/kernels/ptx/ksg_kernels.ptx
+3 kernels: ./foundation/kernels/ptx/neuromorphic_gemv.ptx
+2 kernels: ./foundation/kernels/ptx/parallel_coloring.ptx
+6 kernels: ./foundation/kernels/ptx/pimc_kernels.ptx
+9 kernels: ./foundation/kernels/ptx/policy_evaluation.ptx
+16 kernels: ./foundation/kernels/ptx/quantum_evolution.ptx
+6 kernels: ./foundation/kernels/ptx/quantum_mlir.ptx
+6 kernels: ./foundation/kernels/ptx/thermodynamic.ptx
+6 kernels: ./foundation/kernels/ptx/transfer_entropy.ptx

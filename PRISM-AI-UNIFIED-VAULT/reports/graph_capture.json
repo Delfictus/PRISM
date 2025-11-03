@@ -1,0 +1,41 @@
+{
+  "timestamp": "2025-10-20T00:39:53.494975+00:00",
+  "captured": true,
+  "nodes": [
+    {
+      "name": "ensemble_generation",
+      "type": "kernel"
+    },
+    {
+      "name": "coherence_fusion",
+      "type": "kernel"
+    },
+    {
+      "name": "graph_coloring",
+      "type": "kernel"
+    },
+    {
+      "name": "sa_tempering",
+      "type": "kernel"
+    }
+  ],
+  "edges": [
+    {
+      "from": "ensemble_generation",
+      "to": "coherence_fusion"
+    },
+    {
+      "from": "coherence_fusion",
+      "to": "graph_coloring"
+    },
+    {
+      "from": "graph_coloring",
+      "to": "sa_tempering"
+    }
+  ],
+  "persistent_kernel": {
+    "enabled": true,
+    "work_stealing": true
+  },
+  "notes": "Placeholder graph capture summary."
+}

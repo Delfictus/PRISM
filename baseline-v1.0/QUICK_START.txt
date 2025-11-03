@@ -1,0 +1,111 @@
+═══════════════════════════════════════════════════════════════
+  PRISM-AI Baseline v1.0 - QUICK START
+═══════════════════════════════════════════════════════════════
+
+This is your STABLE BASELINE - use as reference for development!
+
+───────────────────────────────────────────────────────────────
+  RUN BENCHMARKS (No compilation needed!)
+───────────────────────────────────────────────────────────────
+
+DIMACS (Default):
+  $ cd bin
+  $ ./simple_dimacs_benchmark
+
+DIMACS (10,000 attempts):
+  $ cd bin
+  $ ./simple_dimacs_benchmark /home/diddy/Downloads/PRISM-master/benchmarks/dimacs 10000
+
+Protein (Nipah virus):
+  $ cd bin
+  $ ./protein_structure_benchmark ../data/nipah/2VSM.pdb 8.0 5000
+
+───────────────────────────────────────────────────────────────
+  COMPARE AGAINST BASELINE
+───────────────────────────────────────────────────────────────
+
+# Run baseline
+$ ./bin/simple_dimacs_benchmark [dir] [attempts] > baseline.txt
+
+# Run your new version
+$ /path/to/new/benchmark [dir] [attempts] > new.txt
+
+# Compare
+$ diff baseline.txt new.txt
+$ grep "Chromatic" baseline.txt new.txt
+
+───────────────────────────────────────────────────────────────
+  GIT TAG
+───────────────────────────────────────────────────────────────
+
+Return to baseline anytime:
+  $ git checkout v1.0-baseline
+
+Return to development:
+  $ git checkout main
+
+───────────────────────────────────────────────────────────────
+  EXPECTED RESULTS
+───────────────────────────────────────────────────────────────
+
+DIMACS (1000 attempts):
+  • DSJC125.1: 7 colors (40% gap)
+  • myciel6: 7 colors (0% gap) ✓ PERFECT
+  • Success: 100% (14/14 graphs)
+
+DIMACS (10,000 attempts):
+  • DSJC125.1: 6 colors (20% gap) - 50% BETTER!
+  • DSJR500.1: 12 colors (0% gap) ✓ PERFECT
+  • le450_25a: 25 colors (0% gap) ✓ PERFECT
+
+Protein (Nipah, 5000 attempts):
+  • 550 residues → 7 colors
+  • Time: 58ms
+  • Throughput: 9,452 residues/second
+
+───────────────────────────────────────────────────────────────
+  FULL DOCUMENTATION
+───────────────────────────────────────────────────────────────
+
+See docs/ directory:
+  • README.md - This baseline overview
+  • HOW_TO_RUN_PRISM.md - Complete platform guide
+  • ENHANCED_BENCHMARK_GUIDE.md - DIMACS details
+  • PROTEIN_STRUCTURE_GUIDE.md - Protein analysis
+  • ENHANCEMENT_SUMMARY.md - Implementation details
+
+───────────────────────────────────────────────────────────────
+  WHAT'S INCLUDED
+───────────────────────────────────────────────────────────────
+
+✓ GPU parallel coloring (adaptive sparse/dense kernels)
+✓ Unlimited configurable attempts
+✓ DIMACS benchmark (14 graphs)
+✓ Protein structure analysis (PDB parser)
+✓ MEC tools (flags, reflexive, federated)
+✓ 11 PTX kernels compiled
+✓ Complete documentation
+
+───────────────────────────────────────────────────────────────
+  WHAT'S NOT INCLUDED (Future Development)
+───────────────────────────────────────────────────────────────
+
+✗ PRCT-TSP algorithm (code exists, not integrated)
+✗ Transfer entropy coherence
+✗ Neuromorphic reservoir predictions
+✗ GNN attention weights
+✗ Iterative learning mode
+
+These will be your next development targets!
+
+───────────────────────────────────────────────────────────────
+  STATUS
+───────────────────────────────────────────────────────────────
+
+Release: v1.0-baseline
+Date: October 31, 2025
+Git: commit d91b896
+GPU: NVIDIA RTX 5070
+Status: ✓ PRODUCTION READY
+
+Ready to use as baseline for PRCT-TSP integration!

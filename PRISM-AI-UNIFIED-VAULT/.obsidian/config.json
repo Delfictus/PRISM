@@ -1,0 +1,13 @@
+{
+  "theme": "obsidian",
+  "cssTheme": "Minimal",
+  "vaultName": "PRISM-AI-UNIFIED-IMPLEMENTATION",
+  "attachmentFolderPath": "./attachments",
+  "alwaysUpdateLinks": true,
+  "newFileLocation": "folder",
+  "newFileFolderPath": "01-ACTIVE",
+  "useMarkdownLinks": false,
+  "showFrontmatter": true,
+  "defaultViewMode": "preview",
+  "workspaces": true
+}

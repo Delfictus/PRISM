@@ -1,0 +1,17 @@
+=== MEMORY PATTERN ANALYSIS: thermodynamic.ptx ===
+
+GLOBAL MEMORY OPERATIONS:
+  ld.global: 309
+  st.global: 7
+
+SHARED MEMORY USAGE:
+  .shared declarations: 36
+  ld.shared: 18
+  st.shared: 18
+
+REGISTER FILE USAGE:
+  Register declarations: 0
+
+FUSION LIKELIHOOD SCORE:
+  ✓ High shared memory usage (+2)
+  VERDICT: Likely UNFUSED kernel (score: 2/5)

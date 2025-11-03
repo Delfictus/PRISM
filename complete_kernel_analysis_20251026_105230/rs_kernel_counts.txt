@@ -1,0 +1,8 @@
+1 kernels: ./foundation/active_inference/gpu_inference.rs
+41 kernels: ./foundation/gpu/kernel_executor.rs
+2 kernels: ./foundation/integration/multi_modal_reasoner.rs
+4 kernels: ./foundation/neuromorphic/src/cuda_kernels.rs
+3 kernels: ./foundation/phase6/gpu_tda.rs
+2 kernels: ./foundation/quantum/src/gpu_k_opt.rs
+2 kernels: ./src/integration/multi_modal_reasoner.rs
+1 kernels: ./tests/gpu_validation/test_gpu_minimal.rs

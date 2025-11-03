@@ -1,0 +1,69 @@
+=== PERFORMANCE CHARACTERISTICS ===
+
+FILE: active_inference.ptx
+─────────────────────────────────────────
+  Arithmetic Ops: add=75, mul=39, fma=48
+  Control Flow: branches=37
+  Memory Access Patterns:
+
+FILE: double_double.ptx
+─────────────────────────────────────────
+  Arithmetic Ops: add=63, mul=19, fma=20
+  Control Flow: branches=11
+  Memory Access Patterns:
+  ⚠ High-precision arithmetic (quad-precision emulation)
+
+FILE: ksg_kernels.ptx
+─────────────────────────────────────────
+  Arithmetic Ops: add=197, mul=85, fma=96
+  Control Flow: branches=131
+  Memory Access Patterns:
+
+FILE: neuromorphic_gemv.ptx
+─────────────────────────────────────────
+  Arithmetic Ops: add=28, mul=16, fma=19
+  Control Flow: branches=19
+  Memory Access Patterns:
+
+FILE: parallel_coloring.ptx
+─────────────────────────────────────────
+  Arithmetic Ops: add=211, mul=37, fma=18
+  Control Flow: branches=160
+  Memory Access Patterns:
+
+FILE: pimc_kernels.ptx
+─────────────────────────────────────────
+  Arithmetic Ops: add=140, mul=90, fma=69
+  Control Flow: branches=117
+  Memory Access Patterns:
+
+FILE: policy_evaluation.ptx
+─────────────────────────────────────────
+  Arithmetic Ops: add=172, mul=122, fma=161
+  Control Flow: branches=105
+  Memory Access Patterns:
+
+FILE: quantum_evolution.ptx
+─────────────────────────────────────────
+  Arithmetic Ops: add=286, mul=177, fma=196
+  Control Flow: branches=124
+  Memory Access Patterns:
+
+FILE: quantum_mlir.ptx
+─────────────────────────────────────────
+  Arithmetic Ops: add=78, mul=86, fma=105
+  Control Flow: branches=86
+  Memory Access Patterns:
+
+FILE: thermodynamic.ptx
+─────────────────────────────────────────
+  Arithmetic Ops: add=208, mul=134, fma=130
+  Control Flow: branches=150
+  Memory Access Patterns:
+
+FILE: transfer_entropy.ptx
+─────────────────────────────────────────
+  Arithmetic Ops: add=62, mul=38, fma=18
+  Control Flow: branches=56
+  Memory Access Patterns:
+

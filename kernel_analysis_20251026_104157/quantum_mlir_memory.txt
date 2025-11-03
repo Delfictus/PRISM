@@ -1,0 +1,16 @@
+=== MEMORY PATTERN ANALYSIS: quantum_mlir.ptx ===
+
+GLOBAL MEMORY OPERATIONS:
+  ld.global: 75
+  st.global: 23
+
+SHARED MEMORY USAGE:
+  .shared declarations: 2
+  ld.shared: 1
+  st.shared: 1
+
+REGISTER FILE USAGE:
+  Register declarations: 0
+
+FUSION LIKELIHOOD SCORE:
+  VERDICT: Likely UNFUSED kernel (score: 0/5)

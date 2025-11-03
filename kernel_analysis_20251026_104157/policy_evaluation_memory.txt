@@ -1,0 +1,17 @@
+=== MEMORY PATTERN ANALYSIS: policy_evaluation.ptx ===
+
+GLOBAL MEMORY OPERATIONS:
+  ld.global: 142
+  st.global: 35
+
+SHARED MEMORY USAGE:
+  .shared declarations: 36
+  ld.shared: 19
+  st.shared: 14
+
+REGISTER FILE USAGE:
+  Register declarations: 0
+
+FUSION LIKELIHOOD SCORE:
+  ✓ High shared memory usage (+2)
+  VERDICT: Likely UNFUSED kernel (score: 2/5)

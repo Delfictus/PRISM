@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MEC Telemetry Schema v1",
+  "type": "object",
+  "required": [
+    "timestamp_us",
+    "component",
+    "stage",
+    "determinism",
+    "metrics"
+  ],
+  "properties": {
+    "timestamp_us": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Microsecond timestamp when the event was recorded."
+    },
+    "component": {
+      "type": "string",
+      "description": "Meta component emitting the telemetry (e.g., orchestrator, ontology, reflexive)."
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "bootstrap",
+        "ingest",
+        "orchestrate",
+        "evaluate",
+        "select",
+        "align",
+        "reflexive",
+        "plasticity",
+        "federated",
+        "rollout"
+      ],
+      "description": "Lifecycle stage for durability enforcement."
+    },
+    "determinism": {
+      "type": "object",
+      "required": [
+        "kernel_hash",
+        "meta_hash"
+      ],
+      "properties": {
+        "kernel_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "meta_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "ontology_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "lattice_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Phase specific metrics payload."
+    },
+    "governance": {
+      "type": "object",
+      "properties": {
+        "violations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "approval_token": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

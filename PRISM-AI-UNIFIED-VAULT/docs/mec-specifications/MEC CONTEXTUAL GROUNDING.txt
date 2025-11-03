@@ -1,0 +1,224 @@
+MEC_CONTEXTUAL_GROUNDING_SPEC.md
+1. Overview
+
+Contextual Grounding provides Prism-AI with situational plasticity —
+the ability to evolve its internal objectives, representations, and learning heuristics
+based on changes in its external environment or internal semantic field.
+
+In contrast to fixed reward systems, MEC’s contextual grounding treats reward, cost, and meaning as co-evolving objects, dynamically reconstructed through semantic feedback loops.
+System State={Θt,Φt,Ξt}
+System State={Θt​,Φt​,Ξt​}
+
+    ΘtΘt​: active parameter set
+
+    ΦtΦt​: environmental semantic field (context)
+
+    ΞtΞt​: self-state metrics and reflexive telemetry
+
+2. Dynamic Objective Function
+2.1 Unified Energy Formulation
+
+The global optimization criterion is expressed as a dynamic energy functional:
+Et=∑iwi(t) Li(xt,yt;θt)+Ω(Φt,Ξt)
+Et​=i∑​wi​(t)Li​(xt​,yt​;θt​)+Ω(Φt​,Ξt​)
+
+    wi(t)wi​(t): adaptive weighting coefficients (governed by contextual learning)
+
+    LiLi​: loss components (performance, latency, entropy, semantic coherence)
+
+    ΩΩ: contextual potential — an emergent term encoding environmental relevance
+
+The learning signal derives from the contextual gradient:
+∇θtEt=∑i∇θt[wi(t) Li]+∇θtΩ(Φt,Ξt)
+∇θt​​Et​=i∑​∇θt​​[wi​(t)Li​]+∇θt​​Ω(Φt​,Ξt​)
+2.2 Reward Evolution
+
+Reward functions themselves evolve according to semantic feedback:
+Rt+1=f(Rt,∂tΦt,∂tΞt)
+Rt+1​=f(Rt​,∂t​Φt​,∂t​Ξt​)
+
+This recursive adaptation allows the system to redefine “success” dynamically.
+3. Semantic Feedback Architecture
+
+Prism’s semantic feedback architecture establishes bi-directional channels between the environment and its internal goal network.
+Component	Function
+Semantic Interpreter	Converts raw signals into high-level contextual variables (ΦtΦt​).
+Goal Synthesizer	Adjusts energy function terms and reward structure based on ΦtΦt​.
+Adaptive Weight Engine (AWE)	Learns new relative importances among losses.
+Context Memory Buffer	Stores temporal context traces to detect regime shifts.
+4. Mathematical Formulation of Contextual Weighting
+
+Let the vector of adaptive weights be wt=[w1,w2,…,wn]wt​=[w1​,w2​,…,wn​].
+wt+1=softmax(wt−η∇wLtotal+σ F(Φt,Ξt))
+wt+1​=softmax(wt​−η∇w​Ltotal​+σF(Φt​,Ξt​))
+
+    ηη: contextual learning rate
+
+    σσ: semantic sensitivity
+
+    FF: context influence vector mapping semantics to loss weights
+
+The contextual energy gradient introduces semantic torque into learning dynamics.
+5. Rust-Like Implementation
+
+pub struct ContextualEngine {
+    pub weights: Vec<f64>,
+    pub semantic_field: SemanticField,
+    pub self_state: ReflexiveState,
+    pub lr: f64,
+    pub sensitivity: f64,
+}
+
+impl ContextualEngine {
+    pub fn update(&mut self, losses: &[f64]) {
+        let grad: Vec<f64> = self.weights
+            .iter()
+            .zip(losses)
+            .map(|(w, l)| w - self.lr * l)
+            .collect();
+
+        let influence = self.semantic_field.compute_influence(&self.self_state);
+        self.weights = softmax(&add_vecs(&grad, &scale_vec(&influence, self.sensitivity)));
+    }
+}
+
+pub struct SemanticField {
+    pub features: Vec<f64>,
+}
+
+impl SemanticField {
+    pub fn compute_influence(&self, state: &ReflexiveState) -> Vec<f64> {
+        self.features.iter().zip(&state.metrics)
+            .map(|(a, b)| a * b.tanh())
+            .collect()
+    }
+}
+
+This implementation allows live rebalancing of loss-term weights
+based on semantic and reflexive feedback.
+6. Contextual Drift Detection
+
+Prism detects shifts in operational context through multivariate time-series analysis of telemetry.
+Dt=∥Φt−Φt−1∥2+∥Ξt−Ξt−1∥2
+Dt​=∥Φt​−Φt−1​∥2​+∥Ξt​−Ξt−1​∥2​
+
+If Dt>δcontextDt​>δcontext​, a context change event is triggered, causing the system to:
+
+    Spawn a new reward configuration R′R′
+
+    Adjust learning rates and mutation thresholds
+
+    Store an entry in the blockchain ledger
+
+fn detect_drift(phi_t: &[f64], phi_prev: &[f64], xi_t: &[f64], xi_prev: &[f64], threshold: f64) -> bool {
+    let d = l2_diff(phi_t, phi_prev) + l2_diff(xi_t, xi_prev);
+    d > threshold
+}
+
+7. Adaptive Reward Composition
+7.1 Reward Tensor
+Rt=λ1Rperf+λ2Rstability+λ3Rcoherence+λ4Rnovelty
+Rt​=λ1​Rperf​+λ2​Rstability​+λ3​Rcoherence​+λ4​Rnovelty​
+
+Each λiλi​ is dynamically regulated by the semantic field gradient:
+λi˙=κi∂Φt∂t+νiΞt
+λi​˙​=κi​∂t∂Φt​​+νi​Ξt​
+7.2 Rust Pattern
+
+pub struct RewardTensor {
+    pub perf: f64,
+    pub stability: f64,
+    pub coherence: f64,
+    pub novelty: f64,
+    pub coeffs: [f64; 4],
+}
+
+impl RewardTensor {
+    pub fn evolve(&mut self, phi: &[f64], xi: &[f64]) {
+        for (i, c) in self.coeffs.iter_mut().enumerate() {
+            *c += phi[i % phi.len()] * 0.01 + xi[i % xi.len()] * 0.02;
+        }
+    }
+
+    pub fn total(&self) -> f64 {
+        self.perf * self.coeffs[0]
+            + self.stability * self.coeffs[1]
+            + self.coherence * self.coeffs[2]
+            + self.novelty * self.coeffs[3]
+    }
+}
+
+8. Semantic Coupling to the Environment
+
+Environmental semantic field ΦtΦt​ evolves through both internal and external stimuli:
+dΦtdt=A Φt+B Ξt+C Ut+ϵt
+dtdΦt​​=AΦt​+BΞt​+CUt​+ϵt​
+
+    UtUt​: exogenous user/environmental input vector
+
+    A,B,CA,B,C: learned coupling matrices
+
+    ϵtϵt​: stochastic semantic noise
+
+This enables ontogenic computation — the system develops its own representation of meaning structures over time.
+9. Blockchain-Audited Contextual Transitions
+
+Every context change and reward mutation is recorded as an immutable audit block:
+
+struct ContextTransition {
+    pub timestamp: u64,
+    pub delta_phi_hash: [u8; 32],
+    pub delta_reward: f64,
+    pub validation_sig: Signature,
+}
+
+Merkle chain property:
+Roott+1=H(Roott∥ContextTransitiont)
+Roott+1​=H(Roott​∥ContextTransitiont​)
+
+This ensures interpretability of “why” a system’s goals changed, providing cryptographic provenance for self-adaptation.
+10. Feedback Integration Pipeline
+
+Stages:
+
+    Perception: Capture semantic cues from environment (e.g., performance patterns, user feedback).
+
+    Interpretation: Encode into ΦtΦt​ through embedding functions.
+
+    Synthesis: Adjust internal weights wi(t)wi​(t) and reward coefficients λiλi​.
+
+    Validation: Evaluate improvement and audit via blockchain commit.
+
+    Assimilation: Persist new context into memory buffer.
+
+11. Equilibrium Condition
+
+System achieves contextual equilibrium when:
+∂Et∂Φt≈0,∂Rt∂t≈0
+∂Φt​∂Et​​≈0,∂t∂Rt​​≈0
+
+Meaning — reward semantics and environment alignment reach a steady phase.
+When these derivatives diverge, a context re-evaluation cycle begins.
+12. Safety and Drift Boundaries
+
+Bounded contextual adaptation is enforced through constraints:
+∥Δw∥2<ϵw,∥Δλ∥2<ϵλ
+∥Δw∥2​<ϵw​,∥Δλ∥2​<ϵλ​
+
+Violations result in rollback or partial reversion of contextual variables.
+13. Summary
+
+Contextual Grounding transforms Prism-AI from a static optimizer into a living adaptive entity whose goals evolve with context.
+
+    Adapts what to optimize, not just how to optimize.
+
+    Integrates semantic understanding into objective formation.
+
+    Provides cryptographically auditable evolution of reward semantics.
+
+    Couples external meaning and internal motivation within a unified mathematical structure.
+
+Adaptation=F(Φt,Ξt,∇θEt)⇒Emergent Goal Rewriting
+Adaptation=F(Φt​,Ξt​,∇θ​Et​)⇒Emergent Goal Rewriting
+
+End of MEC_CONTEXTUAL_GROUNDING_SPEC.md

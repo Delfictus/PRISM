@@ -1,0 +1,182 @@
+[
+  {
+    "binder_size": 80,
+    "chi_binder": 5,
+    "chi_complex_est": 3,
+    "predicted_kd_nm": 13.88437205763783,
+    "predicted_dg": -10.728853651441884,
+    "n_contacts": 128,
+    "sequence": "LREEADSKKKRSDKSSREKKGPYPRDRRREESDINRESEDREPDKWSDEDKRSSRSTSESRDDSEREFESSPEDESDEEI"
+  },
+  {
+    "binder_size": 87,
+    "chi_binder": 5,
+    "chi_complex_est": 3,
+    "predicted_kd_nm": 13.88437205763783,
+    "predicted_dg": -10.728853651441884,
+    "n_contacts": 139,
+    "sequence": "MRRKSDESEESEYDRRRKDSSAREMDSERKKEKEEKWKERKSSDRRRESVERRRSDEKSRKHKEKSSSDKSEEHDAKDEEKGKKDKV"
+  },
+  {
+    "binder_size": 92,
+    "chi_binder": 5,
+    "chi_complex_est": 3,
+    "predicted_kd_nm": 13.88437205763783,
+    "predicted_dg": -10.728853651441884,
+    "n_contacts": 142,
+    "sequence": "IKERSKKEDDSMDRSKRRREGRTDNEKSERSSSRMKEKRERRKDEHEEKSSRSSRRHDSRKRDSDSEKHEEDKRKEDEKMKDSSKSESRDKS"
+  },
+  {
+    "binder_size": 99,
+    "chi_binder": 4,
+    "chi_complex_est": 3,
+    "predicted_kd_nm": 13.88437205763783,
+    "predicted_dg": -10.728853651441884,
+    "n_contacts": 145,
+    "sequence": "TSEDKPEKEKSEYESRSRKERERRLSRSEEDRKKADHREKRKRSKSDERIREPSSERRSKGVERQERRDSSSKFKKRKRRAERKSFERRRDDKSEDSES"
+  },
+  {
+    "binder_size": 85,
+    "chi_binder": 4,
+    "chi_complex_est": 3,
+    "predicted_kd_nm": 13.88437205763783,
+    "predicted_dg": -10.728853651441884,
+    "n_contacts": 127,
+    "sequence": "ISSEKRDKKRSKTSSKSEDKESDEHEEKRDSSRKADLERSKEDRDDEKHDRQEKNSEKREIEDSKSSREKEEHKDSERKSRDRKF"
+  },
+  {
+    "binder_size": 118,
+    "chi_binder": 5,
+    "chi_complex_est": 3,
+    "predicted_kd_nm": 13.88437205763783,
+    "predicted_dg": -10.728853651441884,
+    "n_contacts": 185,
+    "sequence": "SDRSSSKEEERFKRSSESRDNESVDKKKREKEDSESRKEEDDKSSDSSKSDSKESEKRSDDSRSDRESSEFDERESDDERPVDDDDDEKDERRWKEDRRSKRDDDTEEDRRKSSSDRF"
+  },
+  {
+    "binder_size": 113,
+    "chi_binder": 6,
+    "chi_complex_est": 3,
+    "predicted_kd_nm": 13.88437205763783,
+    "predicted_dg": -10.728853651441884,
+    "n_contacts": 173,
+    "sequence": "WSKRDSKEDPRFSRDSSRKRKESKDSEKDRSKEWKGDRSSDDSEYSREEKRAESSKYDEKEDEDREKVEDEESKDKDDFSRESDRKKRRGDDDDKQSDDKVERKSRSDKDKET"
+  },
+  {
+    "binder_size": 85,
+    "chi_binder": 5,
+    "chi_complex_est": 4,
+    "predicted_kd_nm": 23.30322179873383,
+    "predicted_dg": -10.421781807306854,
+    "n_contacts": 129,
+    "sequence": "YDSDPESSEDKRMDSKDDEKKEDKVESDSEESESKSTEDKDKDDKDSSWRQSKDKEEDKRYRDKGKEKDKRRMREDRKRRKEESF"
+  },
+  {
+    "binder_size": 112,
+    "chi_binder": 5,
+    "chi_complex_est": 4,
+    "predicted_kd_nm": 23.30322179873383,
+    "predicted_dg": -10.421781807306854,
+    "n_contacts": 188,
+    "sequence": "MEEKREEDDSKHERSRDKSKQKLSSRRRSSSRDMSSEKRESREKWSERKRSKSKSFEDKKDERRKDLRRKKDREKRRTERPRQQDRSRFSDKSERNRKRFKSDRSEKDDKRT"
+  },
+  {
+    "binder_size": 95,
+    "chi_binder": 4,
+    "chi_complex_est": 4,
+    "predicted_kd_nm": 23.30322179873383,
+    "predicted_dg": -10.421781807306854,
+    "n_contacts": 144,
+    "sequence": "VDDRDKEKESKYERSEKQDESRETSDSEKKDSKKDVESESSRDKSSSSRSDKDGSSDDHESRKDSESKSKYKKKKSKSDDKEMKSSSRSDSRKRS"
+  },
+  {
+    "binder_size": 95,
+    "chi_binder": 5,
+    "chi_complex_est": 4,
+    "predicted_kd_nm": 23.30322179873383,
+    "predicted_dg": -10.421781807306854,
+    "n_contacts": 139,
+    "sequence": "YERDEEEDSDESDDKRKEDEQGEYREDKSRKSEDRHRSRKRKKSKKSHSSDKEARRSKSSDDEERDRKKKSSKDSRSSREREVEERKREDRKKRS"
+  },
+  {
+    "binder_size": 99,
+    "chi_binder": 5,
+    "chi_complex_est": 4,
+    "predicted_kd_nm": 23.30322179873383,
+    "predicted_dg": -10.421781807306854,
+    "n_contacts": 141,
+    "sequence": "TRKEDSGEESSDYSRDKRKESDEDSSSKEDKDRRERVERSEESSEKSKRIDKARDSSRDRDSDRNKKDKRKDKSKEDREDDRKSKHRDRDKSRKEEDSW"
+  },
+  {
+    "binder_size": 100,
+    "chi_binder": 5,
+    "chi_complex_est": 4,
+    "predicted_kd_nm": 23.30322179873383,
+    "predicted_dg": -10.421781807306854,
+    "n_contacts": 155,
+    "sequence": "VDRRDERSREDYDRSDKRRSKRSDKKDKKDESRYREKRRKESERMRSRSDRSQRDVKSSERDESQRTEDKDSKKREKIDSDDKDSRESNDDDDKEERSRF"
+  },
+  {
+    "binder_size": 103,
+    "chi_binder": 6,
+    "chi_complex_est": 4,
+    "predicted_kd_nm": 23.30322179873383,
+    "predicted_dg": -10.421781807306854,
+    "n_contacts": 165,
+    "sequence": "TSEERESDRDKSRKRKSDEKENYRSEKRKSSDSSFSEKSERDDESFRDKDSGRRDRFDKEKKDKQRKRMQSSRKDERKKWDNRDSESRSDYKPEKEKKRERDF"
+  },
+  {
+    "binder_size": 110,
+    "chi_binder": 5,
+    "chi_complex_est": 4,
+    "predicted_kd_nm": 23.30322179873383,
+    "predicted_dg": -10.421781807306854,
+    "n_contacts": 185,
+    "sequence": "FKEDEEDKKEHKSRSRSRRDDLESDRRDEDSRIKEQDSSDKDKWSDEKRDDPSSWESKKDSDERPMKKSSSKDDEKFDRRNPQRDSDFESREDESSEDLSDERRRKSDEH"
+  },
+  {
+    "binder_size": 97,
+    "chi_binder": 5,
+    "chi_complex_est": 5,
+    "predicted_kd_nm": 34.822022531844965,
+    "predicted_dg": -10.183598380634066,
+    "n_contacts": 149,
+    "sequence": "TRKDDDKKDEDRIKESKKEREDDRLSSKKKSRSEEDMKKRKKRREESSMKRQKRRRKKEKTRRKDRERESKKYEEKDKSDRPEGFSKSKDKDEEERV"
+  },
+  {
+    "binder_size": 93,
+    "chi_binder": 6,
+    "chi_complex_est": 5,
+    "predicted_kd_nm": 34.822022531844965,
+    "predicted_dg": -10.183598380634066,
+    "n_contacts": 149,
+    "sequence": "TKEKEESKKRETEKRDKKDSRRSFESSEKSDQRNWRRESESKRESDLEESDRPEDREYKREKRDSRSERYSRKSERKDRDMSDRERRRDSSEL"
+  },
+  {
+    "binder_size": 88,
+    "chi_binder": 5,
+    "chi_complex_est": 5,
+    "predicted_kd_nm": 34.822022531844965,
+    "predicted_dg": -10.183598380634066,
+    "n_contacts": 136,
+    "sequence": "FSKSDKREDSSKFSKKREKESNEATSKERESKEERPSVKSSEREKESSKFKRKSEKEDRSEEWDKSEEKKKSEEYEEKRESRKKEREH"
+  },
+  {
+    "binder_size": 85,
+    "chi_binder": 5,
+    "chi_complex_est": 5,
+    "predicted_kd_nm": 34.822022531844965,
+    "predicted_dg": -10.183598380634066,
+    "n_contacts": 133,
+    "sequence": "MSDRDREKDESKHKDKSRKKRPKKLGSSDDESAEKGMKDRRESSRRDDTADKRSSREERKMDERDEDKKRRSVKNSDEKERSKKT"
+  },
+  {
+    "binder_size": 96,
+    "chi_binder": 4,
+    "chi_complex_est": 5,
+    "predicted_kd_nm": 34.822022531844965,
+    "predicted_dg": -10.183598380634066,
+    "n_contacts": 147,
+    "sequence": "SEDKKKSEKDKTRDSKSSEDRDRWRRSRRREQSSRHRSEEDEKEDKEFDRARSKRERKDFSKEEKDSSDDSWEERDDDKKKKDYRRSSKSDDEDDM"
+  }
+]

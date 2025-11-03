@@ -1,0 +1,515 @@
+=== KERNEL SIGNATURES: quantum_evolution.ptx ===
+
+.visible .entry _Z12dd_array_addP7dd_realPKS_S2_i(
+	.param .u64 _Z12dd_array_addP7dd_realPKS_S2_i_param_0,
+	.param .u64 _Z12dd_array_addP7dd_realPKS_S2_i_param_1,
+	.param .u64 _Z12dd_array_addP7dd_realPKS_S2_i_param_2,
+	.param .u32 _Z12dd_array_addP7dd_realPKS_S2_i_param_3
+)
+{
+	.reg .pred 	%p<2>;
+	.reg .b32 	%r<6>;
+	.reg .f64 	%fd<19>;
+	.reg .b64 	%rd<11>;
+
+
+	ld.param.u64 	%rd1, [_Z12dd_array_addP7dd_realPKS_S2_i_param_0];
+	ld.param.u64 	%rd2, [_Z12dd_array_addP7dd_realPKS_S2_i_param_1];
+	ld.param.u64 	%rd3, [_Z12dd_array_addP7dd_realPKS_S2_i_param_2];
+	ld.param.u32 	%r2, [_Z12dd_array_addP7dd_realPKS_S2_i_param_3];
+	mov.u32 	%r3, %ntid.x;
+	mov.u32 	%r4, %ctaid.x;
+	mov.u32 	%r5, %tid.x;
+	mad.lo.s32 	%r1, %r4, %r3, %r5;
+	setp.ge.s32 	%p1, %r1, %r2;
+	@%p1 bra 	$L__BB0_2;
+
+	cvta.to.global.u64 	%rd4, %rd2;
+	mul.wide.s32 	%rd5, %r1, 16;
+	add.s64 	%rd6, %rd4, %rd5;
+	cvta.to.global.u64 	%rd7, %rd3;
+	add.s64 	%rd8, %rd7, %rd5;
+	ld.global.nc.f64 	%fd1, [%rd8];
+	ld.global.nc.f64 	%fd2, [%rd6];
+--
+.visible .entry _Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i(
+	.param .u64 _Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i_param_0,
+	.param .u64 _Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i_param_1,
+	.param .u64 _Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i_param_2,
+	.param .u32 _Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i_param_3
+)
+{
+	.reg .pred 	%p<4>;
+	.reg .b32 	%r<15>;
+	.reg .f64 	%fd<150>;
+	.reg .b64 	%rd<19>;
+
+
+	ld.param.u64 	%rd8, [_Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i_param_1];
+	ld.param.u64 	%rd9, [_Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i_param_2];
+	ld.param.u32 	%r4, [_Z20dd_matrix_vector_mulP10dd_complexPKS_S2_i_param_3];
+	mov.u32 	%r5, %ntid.x;
+	mov.u32 	%r6, %ctaid.x;
+	mov.u32 	%r7, %tid.x;
+	mad.lo.s32 	%r1, %r6, %r5, %r7;
+	setp.ge.s32 	%p1, %r1, %r4;
+	@%p1 bra 	$L__BB1_5;
+
+	setp.lt.s32 	%p2, %r4, 1;
+	mov.f64 	%fd146, 0d0000000000000000;
+	mov.f64 	%fd147, %fd146;
+	mov.f64 	%fd148, %fd146;
+	mov.f64 	%fd149, %fd146;
+	@%p2 bra 	$L__BB1_4;
+
+	mul.lo.s32 	%r9, %r4, %r1;
+--
+.visible .entry _Z23dd_deterministic_reduceP7dd_realPKS_i(
+	.param .u64 _Z23dd_deterministic_reduceP7dd_realPKS_i_param_0,
+	.param .u64 _Z23dd_deterministic_reduceP7dd_realPKS_i_param_1,
+	.param .u32 _Z23dd_deterministic_reduceP7dd_realPKS_i_param_2
+)
+{
+	.reg .pred 	%p<9>;
+	.reg .b32 	%r<18>;
+	.reg .f64 	%fd<53>;
+	.reg .b64 	%rd<11>;
+
+
+	ld.param.u64 	%rd2, [_Z23dd_deterministic_reduceP7dd_realPKS_i_param_0];
+	ld.param.u64 	%rd3, [_Z23dd_deterministic_reduceP7dd_realPKS_i_param_1];
+	ld.param.u32 	%r11, [_Z23dd_deterministic_reduceP7dd_realPKS_i_param_2];
+	cvta.to.global.u64 	%rd1, %rd3;
+	mov.u32 	%r1, %ntid.x;
+	shl.b32 	%r12, %r1, 1;
+	mov.u32 	%r2, %ctaid.x;
+	mov.u32 	%r3, %tid.x;
+	mad.lo.s32 	%r4, %r12, %r2, %r3;
+	setp.ge.s32 	%p1, %r4, %r11;
+	mov.f64 	%fd51, 0d0000000000000000;
+	mov.f64 	%fd52, %fd51;
+	@%p1 bra 	$L__BB2_3;
+
+	mul.wide.s32 	%rd4, %r4, 16;
+	add.s64 	%rd5, %rd1, %rd4;
+	ld.global.nc.f64 	%fd51, [%rd5];
+	ld.global.nc.f64 	%fd52, [%rd5+8];
+	add.s32 	%r5, %r4, %r1;
+--
+.visible .entry _Z18test_dd_arithmeticv()
+{
+	.local .align 16 .b8 	__local_depot3[48];
+	.reg .b64 	%SP;
+	.reg .b64 	%SPL;
+	.reg .pred 	%p<2>;
+	.reg .b32 	%r<8>;
+	.reg .f64 	%fd<7>;
+	.reg .b64 	%rd<17>;
+
+
+	mov.u64 	%SPL, __local_depot3;
+	cvta.local.u64 	%SP, %SPL;
+	mov.u32 	%r1, %ctaid.x;
+	mov.u32 	%r2, %tid.x;
+	or.b32  	%r3, %r2, %r1;
+	setp.ne.s32 	%p1, %r3, 0;
+	@%p1 bra 	$L__BB3_2;
+
+	add.u64 	%rd1, %SP, 32;
+	add.u64 	%rd2, %SPL, 32;
+	mov.u64 	%rd3, $str$1;
+	cvta.global.u64 	%rd4, %rd3;
+	{ // callseq 0, 0
+	.reg .b32 temp_param_reg;
+	.param .b64 param0;
+	st.param.b64 	[param0+0], %rd4;
+	.param .b64 param1;
+	st.param.b64 	[param1+0], 0;
+	.param .b32 retval0;
+	call.uni (retval0), 
+--
+.visible .entry _Z24apply_diagonal_evolutionP7double2PKdid(
+	.param .u64 _Z24apply_diagonal_evolutionP7double2PKdid_param_0,
+	.param .u64 _Z24apply_diagonal_evolutionP7double2PKdid_param_1,
+	.param .u32 _Z24apply_diagonal_evolutionP7double2PKdid_param_2,
+	.param .f64 _Z24apply_diagonal_evolutionP7double2PKdid_param_3
+)
+{
+	.local .align 4 .b8 	__local_depot4[8];
+	.reg .b64 	%SP;
+	.reg .b64 	%SPL;
+	.reg .pred 	%p<11>;
+	.reg .b32 	%r<30>;
+	.reg .f64 	%fd<94>;
+	.reg .b64 	%rd<22>;
+
+
+	mov.u64 	%SPL, __local_depot4;
+	cvta.local.u64 	%SP, %SPL;
+	ld.param.u64 	%rd4, [_Z24apply_diagonal_evolutionP7double2PKdid_param_0];
+	ld.param.u64 	%rd5, [_Z24apply_diagonal_evolutionP7double2PKdid_param_1];
+	ld.param.u32 	%r10, [_Z24apply_diagonal_evolutionP7double2PKdid_param_2];
+	ld.param.f64 	%fd26, [_Z24apply_diagonal_evolutionP7double2PKdid_param_3];
+	add.u64 	%rd6, %SP, 0;
+	add.u64 	%rd1, %SPL, 0;
+	add.u64 	%rd7, %SP, 4;
+	add.u64 	%rd2, %SPL, 4;
+	mov.u32 	%r11, %ntid.x;
+	mov.u32 	%r12, %ctaid.x;
+	mov.u32 	%r13, %tid.x;
+	mad.lo.s32 	%r1, %r12, %r11, %r13;
+	setp.ge.s32 	%p2, %r1, %r10;
+--
+.visible .entry _Z32apply_kinetic_evolution_momentumP7double2PKdidd(
+	.param .u64 _Z32apply_kinetic_evolution_momentumP7double2PKdidd_param_0,
+	.param .u64 _Z32apply_kinetic_evolution_momentumP7double2PKdidd_param_1,
+	.param .u32 _Z32apply_kinetic_evolution_momentumP7double2PKdidd_param_2,
+	.param .f64 _Z32apply_kinetic_evolution_momentumP7double2PKdidd_param_3,
+	.param .f64 _Z32apply_kinetic_evolution_momentumP7double2PKdidd_param_4
+)
+{
+	.local .align 4 .b8 	__local_depot5[8];
+	.reg .b64 	%SP;
+	.reg .b64 	%SPL;
+	.reg .pred 	%p<11>;
+	.reg .b32 	%r<30>;
+	.reg .f64 	%fd<97>;
+	.reg .b64 	%rd<22>;
+
+
+	mov.u64 	%SPL, __local_depot5;
+	cvta.local.u64 	%SP, %SPL;
+	ld.param.u64 	%rd4, [_Z32apply_kinetic_evolution_momentumP7double2PKdidd_param_0];
+	ld.param.u64 	%rd5, [_Z32apply_kinetic_evolution_momentumP7double2PKdidd_param_1];
+	ld.param.u32 	%r10, [_Z32apply_kinetic_evolution_momentumP7double2PKdidd_param_2];
+	ld.param.f64 	%fd26, [_Z32apply_kinetic_evolution_momentumP7double2PKdidd_param_3];
+	ld.param.f64 	%fd27, [_Z32apply_kinetic_evolution_momentumP7double2PKdidd_param_4];
+	add.u64 	%rd6, %SP, 0;
+	add.u64 	%rd1, %SPL, 0;
+	add.u64 	%rd7, %SP, 4;
+	add.u64 	%rd2, %SPL, 4;
+	mov.u32 	%r11, %ntid.x;
+	mov.u32 	%r12, %ctaid.x;
+	mov.u32 	%r13, %tid.x;
+--
+.visible .entry _Z31build_tight_binding_hamiltonianP7double2PKiPKdiid(
+	.param .u64 _Z31build_tight_binding_hamiltonianP7double2PKiPKdiid_param_0,
+	.param .u64 _Z31build_tight_binding_hamiltonianP7double2PKiPKdiid_param_1,
+	.param .u64 _Z31build_tight_binding_hamiltonianP7double2PKiPKdiid_param_2,
+	.param .u32 _Z31build_tight_binding_hamiltonianP7double2PKiPKdiid_param_3,
+	.param .u32 _Z31build_tight_binding_hamiltonianP7double2PKiPKdiid_param_4,
+	.param .f64 _Z31build_tight_binding_hamiltonianP7double2PKiPKdiid_param_5
+)
+{
+	.reg .pred 	%p<2>;
+	.reg .b32 	%r<12>;
+	.reg .f64 	%fd<7>;
+	.reg .b64 	%rd<15>;
+
+
+	ld.param.u64 	%rd1, [_Z31build_tight_binding_hamiltonianP7double2PKiPKdiid_param_0];
+	ld.param.u64 	%rd2, [_Z31build_tight_binding_hamiltonianP7double2PKiPKdiid_param_1];
+	ld.param.u64 	%rd3, [_Z31build_tight_binding_hamiltonianP7double2PKiPKdiid_param_2];
+	ld.param.u32 	%r2, [_Z31build_tight_binding_hamiltonianP7double2PKiPKdiid_param_3];
+	ld.param.u32 	%r3, [_Z31build_tight_binding_hamiltonianP7double2PKiPKdiid_param_4];
+	ld.param.f64 	%fd1, [_Z31build_tight_binding_hamiltonianP7double2PKiPKdiid_param_5];
+	mov.u32 	%r4, %ntid.x;
+	mov.u32 	%r5, %ctaid.x;
+	mov.u32 	%r6, %tid.x;
+	mad.lo.s32 	%r1, %r5, %r4, %r6;
+	setp.ge.s32 	%p1, %r1, %r3;
+	@%p1 bra 	$L__BB6_2;
+
+	cvta.to.global.u64 	%rd4, %rd1;
+	cvta.to.global.u64 	%rd5, %rd3;
+	shl.b32 	%r7, %r1, 1;
+--
+.visible .entry _Z23build_ising_hamiltonianP7double2PKdS2_i(
+	.param .u64 _Z23build_ising_hamiltonianP7double2PKdS2_i_param_0,
+	.param .u64 _Z23build_ising_hamiltonianP7double2PKdS2_i_param_1,
+	.param .u64 _Z23build_ising_hamiltonianP7double2PKdS2_i_param_2,
+	.param .u32 _Z23build_ising_hamiltonianP7double2PKdS2_i_param_3
+)
+{
+	.reg .pred 	%p<15>;
+	.reg .b32 	%r<107>;
+	.reg .f64 	%fd<73>;
+	.reg .b64 	%rd<20>;
+
+
+	ld.param.u64 	%rd7, [_Z23build_ising_hamiltonianP7double2PKdS2_i_param_0];
+	ld.param.u64 	%rd8, [_Z23build_ising_hamiltonianP7double2PKdS2_i_param_1];
+	ld.param.u64 	%rd9, [_Z23build_ising_hamiltonianP7double2PKdS2_i_param_2];
+	ld.param.u32 	%r24, [_Z23build_ising_hamiltonianP7double2PKdS2_i_param_3];
+	cvta.to.global.u64 	%rd1, %rd9;
+	cvta.to.global.u64 	%rd2, %rd8;
+	mov.u32 	%r25, %ntid.x;
+	mov.u32 	%r26, %ctaid.x;
+	mov.u32 	%r27, %tid.x;
+	mad.lo.s32 	%r1, %r26, %r25, %r27;
+	mov.u32 	%r28, 1;
+	shl.b32 	%r29, %r28, %r24;
+	setp.ge.s32 	%p1, %r1, %r29;
+	@%p1 bra 	$L__BB7_19;
+
+	setp.lt.s32 	%p2, %r24, 1;
+	mov.f64 	%fd71, 0d0000000000000000;
+	@%p2 bra 	$L__BB7_7;
+--
+.visible .entry _Z20qpe_phase_extractionP7double2PKS_S2_ii(
+	.param .u64 _Z20qpe_phase_extractionP7double2PKS_S2_ii_param_0,
+	.param .u64 _Z20qpe_phase_extractionP7double2PKS_S2_ii_param_1,
+	.param .u64 _Z20qpe_phase_extractionP7double2PKS_S2_ii_param_2,
+	.param .u32 _Z20qpe_phase_extractionP7double2PKS_S2_ii_param_3,
+	.param .u32 _Z20qpe_phase_extractionP7double2PKS_S2_ii_param_4
+)
+{
+	.reg .pred 	%p<12>;
+	.reg .b32 	%r<58>;
+	.reg .f64 	%fd<126>;
+	.reg .b64 	%rd<21>;
+
+
+	ld.param.u64 	%rd3, [_Z20qpe_phase_extractionP7double2PKS_S2_ii_param_0];
+	ld.param.u64 	%rd4, [_Z20qpe_phase_extractionP7double2PKS_S2_ii_param_1];
+	ld.param.u64 	%rd5, [_Z20qpe_phase_extractionP7double2PKS_S2_ii_param_2];
+	ld.param.u32 	%r15, [_Z20qpe_phase_extractionP7double2PKS_S2_ii_param_3];
+	ld.param.u32 	%r16, [_Z20qpe_phase_extractionP7double2PKS_S2_ii_param_4];
+	cvta.to.global.u64 	%rd1, %rd5;
+	mov.u32 	%r17, %ntid.x;
+	mov.u32 	%r18, %ctaid.x;
+	mov.u32 	%r19, %tid.x;
+	mad.lo.s32 	%r1, %r18, %r17, %r19;
+	shl.b32 	%r20, %r16, %r15;
+	setp.ge.s32 	%p1, %r1, %r20;
+	@%p1 bra 	$L__BB8_18;
+
+	div.s32 	%r2, %r1, %r16;
+	mul.lo.s32 	%r21, %r2, %r16;
+	sub.s32 	%r3, %r1, %r21;
+--
+.visible .entry _Z21vqe_expectation_valuePdPK7double2S2_i(
+	.param .u64 _Z21vqe_expectation_valuePdPK7double2S2_i_param_0,
+	.param .u64 _Z21vqe_expectation_valuePdPK7double2S2_i_param_1,
+	.param .u64 _Z21vqe_expectation_valuePdPK7double2S2_i_param_2,
+	.param .u32 _Z21vqe_expectation_valuePdPK7double2S2_i_param_3
+)
+{
+	.reg .pred 	%p<11>;
+	.reg .b32 	%r<33>;
+	.reg .f64 	%fd<120>;
+	.reg .b64 	%rd<27>;
+
+
+	ld.param.u64 	%rd14, [_Z21vqe_expectation_valuePdPK7double2S2_i_param_0];
+	ld.param.u64 	%rd15, [_Z21vqe_expectation_valuePdPK7double2S2_i_param_1];
+	ld.param.u64 	%rd16, [_Z21vqe_expectation_valuePdPK7double2S2_i_param_2];
+	ld.param.u32 	%r17, [_Z21vqe_expectation_valuePdPK7double2S2_i_param_3];
+	cvta.to.global.u64 	%rd1, %rd16;
+	cvta.to.global.u64 	%rd2, %rd15;
+	mov.u32 	%r1, %ntid.x;
+	mov.u32 	%r18, %ctaid.x;
+	mov.u32 	%r2, %tid.x;
+	mad.lo.s32 	%r3, %r18, %r1, %r2;
+	setp.ge.s32 	%p1, %r3, %r17;
+	mov.f64 	%fd119, 0d0000000000000000;
+	@%p1 bra 	$L__BB9_9;
+
+	setp.lt.s32 	%p2, %r17, 1;
+	mov.f64 	%fd117, 0d0000000000000000;
+	mov.f64 	%fd118, %fd117;
+	@%p2 bra 	$L__BB9_8;
+--
+.visible .entry _Z10qaoa_layerP7double2PKS_S2_ddi(
+	.param .u64 _Z10qaoa_layerP7double2PKS_S2_ddi_param_0,
+	.param .u64 _Z10qaoa_layerP7double2PKS_S2_ddi_param_1,
+	.param .u64 _Z10qaoa_layerP7double2PKS_S2_ddi_param_2,
+	.param .f64 _Z10qaoa_layerP7double2PKS_S2_ddi_param_3,
+	.param .f64 _Z10qaoa_layerP7double2PKS_S2_ddi_param_4,
+	.param .u32 _Z10qaoa_layerP7double2PKS_S2_ddi_param_5
+)
+{
+	.local .align 4 .b8 	__local_depot10[4];
+	.reg .b64 	%SP;
+	.reg .b64 	%SPL;
+	.reg .pred 	%p<20>;
+	.reg .b32 	%r<54>;
+	.reg .f64 	%fd<179>;
+	.reg .b64 	%rd<29>;
+
+
+	mov.u64 	%SPL, __local_depot10;
+	cvta.local.u64 	%SP, %SPL;
+	ld.param.u64 	%rd6, [_Z10qaoa_layerP7double2PKS_S2_ddi_param_0];
+	ld.param.f64 	%fd51, [_Z10qaoa_layerP7double2PKS_S2_ddi_param_3];
+	ld.param.f64 	%fd52, [_Z10qaoa_layerP7double2PKS_S2_ddi_param_4];
+	ld.param.u32 	%r18, [_Z10qaoa_layerP7double2PKS_S2_ddi_param_5];
+	add.u64 	%rd7, %SP, 0;
+	add.u64 	%rd1, %SPL, 0;
+	mov.u32 	%r19, %ntid.x;
+	mov.u32 	%r20, %ctaid.x;
+	mov.u32 	%r21, %tid.x;
+	mad.lo.s32 	%r1, %r20, %r19, %r21;
+	setp.ge.s32 	%p3, %r1, %r18;
+--
+.visible .entry _Z17quantum_evolve_ddP10dd_complexPKS_id(
+	.param .u64 _Z17quantum_evolve_ddP10dd_complexPKS_id_param_0,
+	.param .u64 _Z17quantum_evolve_ddP10dd_complexPKS_id_param_1,
+	.param .u32 _Z17quantum_evolve_ddP10dd_complexPKS_id_param_2,
+	.param .f64 _Z17quantum_evolve_ddP10dd_complexPKS_id_param_3
+)
+{
+	.reg .pred 	%p<4>;
+	.reg .b32 	%r<15>;
+	.reg .f64 	%fd<271>;
+	.reg .b64 	%rd<18>;
+
+
+	ld.param.u64 	%rd8, [_Z17quantum_evolve_ddP10dd_complexPKS_id_param_0];
+	ld.param.u64 	%rd7, [_Z17quantum_evolve_ddP10dd_complexPKS_id_param_1];
+	ld.param.u32 	%r4, [_Z17quantum_evolve_ddP10dd_complexPKS_id_param_2];
+	cvta.to.global.u64 	%rd16, %rd8;
+	mov.u32 	%r5, %ntid.x;
+	mov.u32 	%r6, %ctaid.x;
+	mov.u32 	%r7, %tid.x;
+	mad.lo.s32 	%r1, %r6, %r5, %r7;
+	setp.ge.s32 	%p1, %r1, %r4;
+	@%p1 bra 	$L__BB11_5;
+
+	setp.lt.s32 	%p2, %r4, 1;
+	mov.f64 	%fd267, 0d0000000000000000;
+	mov.f64 	%fd268, %fd267;
+	mov.f64 	%fd269, %fd267;
+	mov.f64 	%fd270, %fd267;
+	@%p2 bra 	$L__BB11_4;
+
+--
+.visible .entry _Z32measure_probability_distributionPdPK7double2i(
+	.param .u64 _Z32measure_probability_distributionPdPK7double2i_param_0,
+	.param .u64 _Z32measure_probability_distributionPdPK7double2i_param_1,
+	.param .u32 _Z32measure_probability_distributionPdPK7double2i_param_2
+)
+{
+	.reg .pred 	%p<2>;
+	.reg .b32 	%r<6>;
+	.reg .f64 	%fd<7>;
+	.reg .b64 	%rd<9>;
+
+
+	ld.param.u64 	%rd1, [_Z32measure_probability_distributionPdPK7double2i_param_0];
+	ld.param.u64 	%rd2, [_Z32measure_probability_distributionPdPK7double2i_param_1];
+	ld.param.u32 	%r2, [_Z32measure_probability_distributionPdPK7double2i_param_2];
+	mov.u32 	%r3, %ctaid.x;
+	mov.u32 	%r4, %ntid.x;
+	mov.u32 	%r5, %tid.x;
+	mad.lo.s32 	%r1, %r3, %r4, %r5;
+	setp.ge.s32 	%p1, %r1, %r2;
+	@%p1 bra 	$L__BB12_2;
+
+	cvta.to.global.u64 	%rd3, %rd2;
+	mul.wide.s32 	%rd4, %r1, 16;
+	add.s64 	%rd5, %rd3, %rd4;
+	ld.global.nc.v2.f64 	{%fd1, %fd2}, [%rd5];
+	mul.f64 	%fd5, %fd2, %fd2;
+	fma.rn.f64 	%fd6, %fd1, %fd1, %fd5;
+	cvta.to.global.u64 	%rd6, %rd1;
+	mul.wide.s32 	%rd7, %r1, 8;
+	add.s64 	%rd8, %rd6, %rd7;
+--
+.visible .entry _Z15compute_entropyPdPKdi(
+	.param .u64 _Z15compute_entropyPdPKdi_param_0,
+	.param .u64 _Z15compute_entropyPdPKdi_param_1,
+	.param .u32 _Z15compute_entropyPdPKdi_param_2
+)
+{
+	.reg .pred 	%p<11>;
+	.reg .f32 	%f<2>;
+	.reg .b32 	%r<42>;
+	.reg .f64 	%fd<71>;
+	.reg .b64 	%rd<7>;
+
+
+	ld.param.u64 	%rd1, [_Z15compute_entropyPdPKdi_param_0];
+	ld.param.u64 	%rd2, [_Z15compute_entropyPdPKdi_param_1];
+	ld.param.u32 	%r18, [_Z15compute_entropyPdPKdi_param_2];
+	mov.u32 	%r1, %ntid.x;
+	mov.u32 	%r19, %ctaid.x;
+	mov.u32 	%r2, %tid.x;
+	mad.lo.s32 	%r3, %r19, %r1, %r2;
+	setp.ge.s32 	%p1, %r3, %r18;
+	mov.f64 	%fd70, 0d0000000000000000;
+	@%p1 bra 	$L__BB13_10;
+
+	cvta.to.global.u64 	%rd3, %rd2;
+	mul.wide.s32 	%rd4, %r3, 8;
+	add.s64 	%rd5, %rd3, %rd4;
+	ld.global.nc.f64 	%fd1, [%rd5];
+	setp.leu.f64 	%p2, %fd1, 0d3CD203AF9EE75616;
+	@%p2 bra 	$L__BB13_10;
+
+--
+.visible .entry _Z15normalize_stateP7double2i(
+	.param .u64 _Z15normalize_stateP7double2i_param_0,
+	.param .u32 _Z15normalize_stateP7double2i_param_1
+)
+{
+	.reg .pred 	%p<10>;
+	.reg .b32 	%r<7>;
+	.reg .f64 	%fd<26>;
+	.reg .b64 	%rd<6>;
+	// demoted variable
+	.shared .align 8 .f64 _ZZ15normalize_stateP7double2iE12norm_squared;
+
+	ld.param.u64 	%rd2, [_Z15normalize_stateP7double2i_param_0];
+	ld.param.u32 	%r3, [_Z15normalize_stateP7double2i_param_1];
+	mov.u32 	%r1, %tid.x;
+	setp.ne.s32 	%p1, %r1, 0;
+	@%p1 bra 	$L__BB14_2;
+
+	mov.u64 	%rd3, 0;
+	st.shared.u64 	[_ZZ15normalize_stateP7double2iE12norm_squared], %rd3;
+
+$L__BB14_2:
+	bar.sync 	0;
+	mov.u32 	%r4, %ntid.x;
+	mov.u32 	%r5, %ctaid.x;
+	mad.lo.s32 	%r2, %r5, %r4, %r1;
+	setp.ge.s32 	%p2, %r2, %r3;
+	cvta.to.global.u64 	%rd4, %rd2;
+	mul.wide.s32 	%rd5, %r2, 16;
+	add.s64 	%rd1, %rd4, %rd5;
+	@%p2 bra 	$L__BB14_4;
+--
+.visible .entry _Z20create_initial_stateP7double2ii(
+	.param .u64 _Z20create_initial_stateP7double2ii_param_0,
+	.param .u32 _Z20create_initial_stateP7double2ii_param_1,
+	.param .u32 _Z20create_initial_stateP7double2ii_param_2
+)
+{
+	.reg .pred 	%p<3>;
+	.reg .b32 	%r<7>;
+	.reg .f64 	%fd<4>;
+	.reg .b64 	%rd<7>;
+
+
+	ld.param.u64 	%rd2, [_Z20create_initial_stateP7double2ii_param_0];
+	ld.param.u32 	%r3, [_Z20create_initial_stateP7double2ii_param_1];
+	ld.param.u32 	%r2, [_Z20create_initial_stateP7double2ii_param_2];
+	cvta.to.global.u64 	%rd1, %rd2;
+	mov.u32 	%r4, %ntid.x;
+	mov.u32 	%r5, %ctaid.x;
+	mov.u32 	%r6, %tid.x;
+	mad.lo.s32 	%r1, %r5, %r4, %r6;
+	setp.ge.s32 	%p1, %r1, %r3;
+	@%p1 bra 	$L__BB15_4;
+
+	setp.eq.s32 	%p2, %r1, %r2;
+	@%p2 bra 	$L__BB15_3;
+	bra.uni 	$L__BB15_2;
+
+$L__BB15_3:
+	mul.wide.s32 	%rd5, %r2, 16;
+	add.s64 	%rd6, %rd1, %rd5;
+	mov.f64 	%fd2, 0d0000000000000000;
+
+TOTAL KERNELS: 16

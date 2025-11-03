@@ -1,0 +1,718 @@
+=== CUDARC API USAGE ===
+
+CURRENT load_ptx() CALLS:
+foundation/neuromorphic/src/gpu_reservoir.rs:            let _module = device.load_ptx(ptx, "neuromorphic_gemv", &[
+foundation/cma/transfer_entropy_gpu.rs:        let module = device.load_ptx(cuda_ptx, "ksg_te", &[
+foundation/quantum/src/gpu_tsp.rs:            .load_ptx(ptx, "tsp_solver", &["compute_distance_matrix", "two_opt_improve"])
+foundation/quantum/src/gpu_k_opt.rs:        let module = device.load_ptx(ptx, "k_opt", &["two_opt_improvements", "three_opt_improvements", "four_opt_improvements"])?;
+foundation/quantum/src/gpu_coloring.rs:            .load_ptx(ptx, "chromatic_coloring", &["check_conflicts", "dsatur_coloring"])
+foundation/quantum/src/gpu_coloring.rs:                .load_ptx(ptx, "chromatic_coloring", &["check_conflicts", "dsatur_coloring"])
+foundation/quantum_mlir/cuda_kernels_ptx.rs:        device.load_ptx(
+foundation/active_inference/gpu_policy_eval.rs:        let module = device.load_ptx(ptx, "policy_eval", &[
+foundation/active_inference/gpu.rs:        let module = device.load_ptx(ptx, "active_inference", &[
+foundation/cuda/prism_pipeline.rs:        let module = device.load_ptx(
+foundation/cuda/ensemble_generation.rs:        let module = device.load_ptx(
+foundation/cuda/gpu_coloring.rs:        let module = device.load_ptx(
+
+PTX FILE PATH REFERENCES:
+foundation/neuromorphic/src/gpu_reservoir.rs:        let ptx_path = "foundation/kernels/ptx/neuromorphic_gemv.ptx";
+foundation/neuromorphic/src/gpu_reservoir.rs:        let ptx_path = "target/ptx/neuromorphic_gemv.ptx";
+foundation/cma/transfer_entropy_gpu.rs:        let ptx_path = std::path::Path::new("target/ptx/ksg_kernels.ptx");
+foundation/cma/transfer_entropy_gpu.rs:                "-o", "/tmp/ksg_kernels.ptx"
+foundation/cma/transfer_entropy_gpu.rs:        std::fs::read_to_string("/tmp/ksg_kernels.ptx")
+foundation/cma/quantum/pimc_gpu.rs:        let ptx_path = std::path::Path::new("target/ptx/pimc_kernels.ptx");
+foundation/cma/quantum/pimc_gpu.rs:                "-o", "/tmp/pimc_kernels.ptx"
+foundation/cma/quantum/pimc_gpu.rs:        std::fs::read_to_string("/tmp/pimc_kernels.ptx")
+foundation/quantum/src/gpu_tsp.rs:            let ptx_path = std::path::Path::new(&out_dir).join("tsp_solver.ptx");
+foundation/quantum/src/gpu_tsp.rs:                let runtime_path = std::path::Path::new("target/ptx/tsp_solver.ptx");
+foundation/quantum/src/gpu_tsp.rs:            let runtime_path = std::path::Path::new("target/ptx/tsp_solver.ptx");
+foundation/quantum/src/gpu_coloring.rs:            let ptx_path = std::path::Path::new(&out_dir).join("graph_coloring.ptx");
+foundation/quantum/src/gpu_coloring.rs:                let runtime_path = std::path::Path::new("target/ptx/graph_coloring.ptx");
+foundation/quantum/src/gpu_coloring.rs:            let runtime_path = std::path::Path::new("target/ptx/graph_coloring.ptx");
+foundation/quantum/src/gpu_coloring.rs:            let ptx_path = std::path::Path::new(&out_dir).join("parallel_coloring.ptx");
+foundation/quantum/src/gpu_coloring.rs:                let runtime_path = std::path::Path::new("foundation/kernels/ptx/parallel_coloring.ptx");
+foundation/quantum/src/gpu_coloring.rs:            let runtime_path = std::path::Path::new("foundation/kernels/ptx/parallel_coloring.ptx");
+foundation/information_theory/gpu_transfer_entropy.rs:            std::path::Path::new("src/kernels/ptx/transfer_entropy.ptx").exists()
+foundation/information_theory/gpu.rs:        let ptx_path = "target/ptx/transfer_entropy.ptx";
+foundation/quantum_mlir/cuda_kernels_ptx.rs:        let ptx_quantum = include_str!("../../target/ptx/quantum_mlir.ptx");
+foundation/quantum_mlir/cuda_kernels.rs:        println!("[Quantum PTX] Loading quantum_mlir.ptx...");
+foundation/quantum_mlir/cuda_kernels.rs:            "foundation/kernels/ptx/quantum_mlir.ptx",  // Actual location
+foundation/quantum_mlir/cuda_kernels.rs:            "target/ptx/quantum_mlir.ptx",
+foundation/quantum_mlir/cuda_kernels.rs:            "../target/ptx/quantum_mlir.ptx",
+foundation/quantum_mlir/cuda_kernels.rs:            "../../target/ptx/quantum_mlir.ptx",
+foundation/quantum_mlir/cuda_kernels.rs:            concat!(env!("OUT_DIR"), "/quantum_mlir.ptx"),
+foundation/quantum_mlir/cuda_kernels.rs:            .ok_or_else(|| anyhow::anyhow!("quantum_mlir.ptx not found in any expected location"))?;
+foundation/statistical_mechanics/gpu_bindings.rs:        let ptx_path = "target/ptx/thermodynamic_evolution.ptx";
+foundation/statistical_mechanics/gpu_integration.rs:            std::path::Path::new("src/kernels/ptx/thermodynamic.ptx").exists()
+foundation/statistical_mechanics/gpu.rs:        let ptx_path = "target/ptx/thermodynamic.ptx";
+foundation/active_inference/gpu_policy_eval.rs:        let ptx_path = "foundation/kernels/ptx/policy_evaluation.ptx";
+foundation/active_inference/gpu.rs:        let ptx_path = "target/ptx/active_inference.ptx";
+foundation/cuda/prism_pipeline.rs:        let ptx_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/ptx/adaptive_coloring.ptx"));
+foundation/cuda/ensemble_generation.rs:        let ptx_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/ptx/adaptive_coloring.ptx"));
+foundation/cuda/gpu_coloring.rs:        let ptx_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/ptx/adaptive_coloring.ptx"));
+foundation/cuda/gpu_coloring.rs:        println!("[GPU] ✅ Loaded adaptive_coloring.ptx");
+foundation/gpu_coloring.rs:        let ptx_path = "foundation/kernels/ptx/parallel_coloring.ptx";
+
+KERNEL LAUNCH PATTERNS:
+foundation/pwsa/satellite_adapters.rs:/// Mission: Detect missile launches, track hypersonic threats globally.
+foundation/pwsa/satellite_adapters.rs:        // Placeholder: ICBM launches more likely during military exercises
+foundation/optimization/memory_optimizer.rs:                // In real usage, launch kernel here
+foundation/neuromorphic/src/gpu_reservoir.rs:            let cfg = cudarc::driver::LaunchConfig {
+foundation/neuromorphic/src/gpu_reservoir.rs:            let mut launch = self.device.launch_builder(kernel);
+foundation/neuromorphic/src/gpu_reservoir.rs:            launch.arg(&self.gpu_weights_input);
+foundation/neuromorphic/src/gpu_reservoir.rs:            launch.arg(&self.gpu_input_buffer);
+foundation/neuromorphic/src/gpu_reservoir.rs:            launch.arg(&mut self.gpu_temp_buffer);
+foundation/neuromorphic/src/gpu_reservoir.rs:            launch.arg(&alpha);
+foundation/neuromorphic/src/gpu_reservoir.rs:            launch.arg(&beta);
+foundation/neuromorphic/src/gpu_reservoir.rs:            launch.arg(&m_i32);
+foundation/neuromorphic/src/gpu_reservoir.rs:            launch.arg(&n_i32);
+foundation/neuromorphic/src/gpu_reservoir.rs:                launch.launch(cfg)?;
+foundation/neuromorphic/src/gpu_reservoir.rs:            let cfg = cudarc::driver::LaunchConfig {
+foundation/neuromorphic/src/gpu_reservoir.rs:            let mut launch = self.device.launch_builder(kernel);
+foundation/neuromorphic/src/gpu_reservoir.rs:            launch.arg(&self.gpu_weights_reservoir);
+foundation/neuromorphic/src/gpu_reservoir.rs:            launch.arg(&self.gpu_state_previous);
+foundation/neuromorphic/src/gpu_reservoir.rs:            launch.arg(&mut self.gpu_temp_buffer);
+foundation/neuromorphic/src/gpu_reservoir.rs:            launch.arg(&alpha);
+foundation/neuromorphic/src/gpu_reservoir.rs:            launch.arg(&beta);
+foundation/neuromorphic/src/gpu_reservoir.rs:            launch.arg(&m_i32);
+foundation/neuromorphic/src/gpu_reservoir.rs:                launch.launch(cfg)?;
+foundation/neuromorphic/src/gpu_optimization.rs:    LaunchOverhead,  // CUDA kernel launch overhead
+foundation/neuromorphic/src/gpu_optimization.rs:                            "Reduce kernel launch overhead in '{}' by batching operations \
+foundation/neuromorphic/src/cuda_kernels.rs:/// Kernel launch configuration for RTX 5070 optimization
+foundation/neuromorphic/src/cuda_kernels.rs:        let cfg = LaunchConfig {
+foundation/neuromorphic/src/cuda_kernels.rs:        let mut launch_args = self.device.launch_builder(&*self.leaky_integration_kernel);
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(current_state); // float* current_state
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(previous_state); // const float* previous_state
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(input_contrib); // const float* input_contrib
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(recurrent_contrib); // const float* recurrent_contrib
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(&leak_rate); // const float leak_rate
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(&noise_level); // const float noise_level
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(&n_neurons_u32); // const unsigned int n_neurons
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(&seed); // const unsigned long long seed
+foundation/neuromorphic/src/cuda_kernels.rs:        unsafe { launch_args.launch(cfg) }
+foundation/neuromorphic/src/cuda_kernels.rs:            .map_err(|e| anyhow::anyhow!("Failed to launch leaky integration kernel: {}", e))?;
+foundation/neuromorphic/src/cuda_kernels.rs:        let cfg = LaunchConfig {
+foundation/neuromorphic/src/cuda_kernels.rs:        let mut launch_args = self.device.launch_builder(&*self.spike_encoding_kernel);
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(output_vector); // float* output_vector
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(spike_times); // const float* spike_times
+foundation/neuromorphic/src/cuda_kernels.rs:            launch_args.arg(amplitudes); // const float* spike_amplitudes
+foundation/neuromorphic/src/cuda_kernels.rs:            launch_args.arg(&dummy_buffer);
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(spike_neuron_ids); // const unsigned int* spike_neuron_ids
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(&n_spikes_u32); // const unsigned int n_spikes
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(&n_bins_u32); // const unsigned int n_bins
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(&duration_ms); // const float duration_ms
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(&normalization_factor); // const float normalization_factor
+foundation/neuromorphic/src/cuda_kernels.rs:        unsafe { launch_args.launch(cfg) }
+foundation/neuromorphic/src/cuda_kernels.rs:            .map_err(|e| anyhow::anyhow!("Failed to launch spike encoding kernel: {}", e))?;
+foundation/neuromorphic/src/cuda_kernels.rs:        let cfg = LaunchConfig {
+foundation/neuromorphic/src/cuda_kernels.rs:        let mut launch_args = self.device.launch_builder(&*self.pattern_detection_kernel);
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(pattern_scores); // float* pattern_scores
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(neuron_states); // const float* neuron_states
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(pattern_templates); // const float* pattern_templates
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(&n_neurons_u32); // const unsigned int n_neurons
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(&n_patterns_u32); // const unsigned int n_patterns
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(&threshold); // const float threshold
+foundation/neuromorphic/src/cuda_kernels.rs:        unsafe { launch_args.launch(cfg) }
+foundation/neuromorphic/src/cuda_kernels.rs:            .map_err(|e| anyhow::anyhow!("Failed to launch pattern detection kernel: {}", e))?;
+foundation/neuromorphic/src/cuda_kernels.rs:        let cfg = LaunchConfig {
+foundation/neuromorphic/src/cuda_kernels.rs:        let mut launch_args = self.device.launch_builder(&*self.spectral_radius_kernel);
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(output_vector); // float* output_vector
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(input_vector); // const float* input_vector
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(matrix); // const float* matrix
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(&n_dim_u32); // const unsigned int n_dim
+foundation/neuromorphic/src/cuda_kernels.rs:        launch_args.arg(norm_result); // float* norm_result
+foundation/neuromorphic/src/cuda_kernels.rs:        unsafe { launch_args.launch(cfg) }
+foundation/neuromorphic/src/cuda_kernels.rs:            .map_err(|e| anyhow::anyhow!("Failed to launch spectral radius kernel: {}", e))?;
+foundation/orchestration/optimization/mdl_prompt_optimizer.rs:        importance.insert("similar_launches".to_string(), 0.9);
+foundation/orchestration/local_llm/gpu_transformer.rs:use cudarc::driver::{CudaDevice, CudaSlice, LaunchConfig};
+foundation/orchestration/local_llm/gpu_transformer.rs:        let cfg = LaunchConfig {
+foundation/orchestration/local_llm/gpu_transformer.rs:            self.device.launch_builder(kernel)
+foundation/orchestration/local_llm/gpu_transformer.rs:                .launch(cfg)?;
+foundation/orchestration/local_llm/gpu_transformer.rs:        let cfg = LaunchConfig {
+foundation/orchestration/local_llm/gpu_transformer.rs:            self.device.launch_builder(kernel)
+foundation/orchestration/local_llm/gpu_transformer.rs:                .launch(cfg)?;
+foundation/orchestration/local_llm/gpu_transformer.rs:        let cfg = LaunchConfig::for_num_elems(hidden.len() as u32);
+foundation/orchestration/local_llm/gpu_transformer.rs:            self.device.launch_builder(kernel)
+foundation/orchestration/local_llm/gpu_transformer.rs:                .launch(cfg)?;
+foundation/orchestration/local_llm/gpu_transformer.rs:        let cfg = LaunchConfig {
+foundation/orchestration/local_llm/gpu_transformer.rs:            self.device.launch_builder(kernel)
+foundation/orchestration/local_llm/gpu_transformer.rs:                .launch(cfg)?;
+foundation/orchestration/thermodynamic/gpu_thermodynamic_consensus.rs:        use cudarc::driver::{LaunchConfig};
+foundation/orchestration/thermodynamic/gpu_thermodynamic_consensus.rs:        let cfg = LaunchConfig {
+foundation/orchestration/thermodynamic/gpu_thermodynamic_consensus.rs:            self.device.launch_builder(kernel)
+foundation/orchestration/thermodynamic/gpu_thermodynamic_consensus.rs:                .launch(cfg)?;
+foundation/orchestration/thermodynamic/optimized_thermodynamic_consensus.rs:        let cfg = cudarc::driver::LaunchConfig {
+foundation/orchestration/thermodynamic/optimized_thermodynamic_consensus.rs:            self.device.launch_builder(kernel)
+foundation/orchestration/thermodynamic/optimized_thermodynamic_consensus.rs:                .launch(cfg)?;
+foundation/gpu_ffi.rs:    fn launch_transfer_entropy(source: *const f64, target: *const f64, n: i32) -> f32;
+foundation/gpu_ffi.rs:    fn launch_thermodynamic(phases: *mut f64, velocities: *mut f64, n_osc: i32, n_steps: i32);
+foundation/gpu_ffi.rs:        let result = launch_transfer_entropy(
+foundation/gpu_ffi.rs:        launch_thermodynamic(
+foundation/cma/transfer_entropy_gpu.rs:        let config = LaunchConfig {
+foundation/cma/transfer_entropy_gpu.rs:            compute_dist_func.launch(
+foundation/cma/transfer_entropy_gpu.rs:            find_kth_func.launch(
+foundation/cma/transfer_entropy_gpu.rs:            count_y_func.launch(
+foundation/cma/transfer_entropy_gpu.rs:            count_xz_func.launch(
+foundation/cma/transfer_entropy_gpu.rs:            count_z_func.launch(
+foundation/cma/transfer_entropy_gpu.rs:            compute_te_func.launch(
+foundation/cma/transfer_entropy_gpu.rs:        let reduce_config = LaunchConfig {
+foundation/cma/transfer_entropy_gpu.rs:            reduce_func.launch(
+foundation/cma/quantum/pimc_gpu.rs:        let init_config = LaunchConfig {
+foundation/cma/quantum/pimc_gpu.rs:            init_rand.launch(
+foundation/cma/quantum/pimc_gpu.rs:            let config = LaunchConfig {
+foundation/cma/quantum/pimc_gpu.rs:            update_func.launch(
+foundation/gpu/kernel_executor.rs:    driver::{CudaDevice, LaunchConfig, CudaFunction},
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig::for_num_elems(n as u32);
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig {
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig::for_num_elems(n as u32);
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig {
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig::for_num_elems(n as u32);
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig::for_num_elems(n as u32);
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig {
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig::for_num_elems(n as u32);
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig {
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig {
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig::for_num_elems(n as u32);
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig::for_num_elems(n as u32);
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig {
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig {
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig {
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/kernel_executor.rs:        let cfg = LaunchConfig::for_num_elems(total as u32);
+foundation/gpu/kernel_executor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/kernel_executor.rs:                .launch(cfg)?;
+foundation/gpu/optimized_gpu_tensor.rs:use cudarc::driver::{CudaDevice, CudaSlice, CudaStream, LaunchConfig};
+foundation/gpu/optimized_gpu_tensor.rs:        let cfg = LaunchConfig {
+foundation/gpu/optimized_gpu_tensor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/optimized_gpu_tensor.rs:                .launch(cfg)?;
+foundation/gpu/optimized_gpu_tensor.rs:        let cfg = LaunchConfig::for_num_elems(self.data_gpu.len() as u32);
+foundation/gpu/optimized_gpu_tensor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/optimized_gpu_tensor.rs:                .launch(cfg)?;
+foundation/gpu/optimized_gpu_tensor.rs:        let cfg = LaunchConfig::for_num_elems((batch_size * features) as u32);
+foundation/gpu/optimized_gpu_tensor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/optimized_gpu_tensor.rs:                .launch(cfg)?;
+foundation/gpu/optimized_gpu_tensor.rs:        let cfg = LaunchConfig {
+foundation/gpu/optimized_gpu_tensor.rs:            self.device.launch_builder(kernel)
+foundation/gpu/optimized_gpu_tensor.rs:                .launch(cfg)?;
+foundation/gpu/optimized_gpu_tensor.rs:// - Fused kernels reduce kernel launch overhead
+foundation/gpu/gpu_tensor_optimized.rs:use cudarc::driver::{CudaDevice, CudaSlice, LaunchConfig};
+foundation/gpu/gpu_tensor_optimized.rs:        let cfg = LaunchConfig {
+foundation/gpu/gpu_tensor_optimized.rs:            self.device.launch_builder(kernel)
+foundation/gpu/gpu_tensor_optimized.rs:                .launch(cfg)?;
+foundation/gpu/gpu_tensor_optimized.rs:        let cfg = LaunchConfig::for_num_elems(n as u32);
+foundation/gpu/gpu_tensor_optimized.rs:            self.device.launch_builder(kernel)
+foundation/gpu/gpu_tensor_optimized.rs:                .launch(cfg)?;
+foundation/gpu/gpu_tensor_optimized.rs:        let cfg = LaunchConfig {
+foundation/gpu/gpu_tensor_optimized.rs:            self.device.launch_builder(kernel)
+foundation/gpu/gpu_tensor_optimized.rs:                .launch(cfg)?;
+foundation/gpu/gpu_tensor_optimized.rs:        let cfg = LaunchConfig::for_num_elems((batch_size * features) as u32);
+foundation/gpu/gpu_tensor_optimized.rs:            self.device.launch_builder(kernel)
+foundation/gpu/gpu_tensor_optimized.rs:                .launch(cfg)?;
+foundation/gpu/gpu_tensor_optimized.rs:        let cfg = LaunchConfig {
+foundation/gpu/gpu_tensor_optimized.rs:            self.device.launch_builder(kernel)
+foundation/gpu/gpu_tensor_optimized.rs:                .launch(cfg)?;
+foundation/gpu/mod.rs:// pub mod kernel_launcher;
+foundation/quantum/src/gpu_tsp.rs:        let cfg = LaunchConfig {
+foundation/quantum/src/gpu_tsp.rs:        let mut launch_args1 = self.device.launch_builder(&compute_fn);
+foundation/quantum/src/gpu_tsp.rs:        launch_args1.arg(&gpu_coupling_real);
+foundation/quantum/src/gpu_tsp.rs:        launch_args1.arg(&gpu_coupling_imag);
+foundation/quantum/src/gpu_tsp.rs:        launch_args1.arg(&gpu_distances);
+foundation/quantum/src/gpu_tsp.rs:        launch_args1.arg(&n_u32);
+foundation/quantum/src/gpu_tsp.rs:            launch_args1.launch(cfg)?;
+foundation/quantum/src/gpu_tsp.rs:        let cfg_max = LaunchConfig {
+foundation/quantum/src/gpu_tsp.rs:        let mut launch_args2 = self.device.launch_builder(&find_max_fn);
+foundation/quantum/src/gpu_tsp.rs:        launch_args2.arg(&gpu_distances);
+foundation/quantum/src/gpu_tsp.rs:        launch_args2.arg(&gpu_partial_maxs);
+foundation/quantum/src/gpu_tsp.rs:        launch_args2.arg(&n_u32);
+foundation/quantum/src/gpu_tsp.rs:            launch_args2.launch(cfg_max)?;
+foundation/quantum/src/gpu_tsp.rs:        let mut launch_args3 = self.device.launch_builder(&normalize_fn);
+foundation/quantum/src/gpu_tsp.rs:        launch_args3.arg(&gpu_distances);
+foundation/quantum/src/gpu_tsp.rs:        launch_args3.arg(&max_distance);
+foundation/quantum/src/gpu_tsp.rs:        launch_args3.arg(&n_u32);
+foundation/quantum/src/gpu_tsp.rs:            launch_args3.launch(cfg)?;
+foundation/quantum/src/gpu_tsp.rs:            let cfg = LaunchConfig {
+foundation/quantum/src/gpu_tsp.rs:            let mut launch_args1 = self.device.launch_builder(&evaluate_fn);
+foundation/quantum/src/gpu_tsp.rs:            launch_args1.arg(&gpu_distances);
+foundation/quantum/src/gpu_tsp.rs:            launch_args1.arg(&gpu_tour);
+foundation/quantum/src/gpu_tsp.rs:            launch_args1.arg(&gpu_deltas);
+foundation/quantum/src/gpu_tsp.rs:            launch_args1.arg(&gpu_swap_pairs);
+foundation/quantum/src/gpu_tsp.rs:            launch_args1.arg(&n_u32);
+foundation/quantum/src/gpu_tsp.rs:                launch_args1.launch(cfg)?;
+foundation/quantum/src/gpu_tsp.rs:            let cfg_min = LaunchConfig {
+foundation/quantum/src/gpu_tsp.rs:            let mut launch_args2 = self.device.launch_builder(&find_min_fn);
+foundation/quantum/src/gpu_tsp.rs:            launch_args2.arg(&gpu_deltas);
+foundation/quantum/src/gpu_tsp.rs:            launch_args2.arg(&gpu_partial_mins);
+foundation/quantum/src/gpu_tsp.rs:            launch_args2.arg(&gpu_partial_indices);
+foundation/quantum/src/gpu_tsp.rs:            launch_args2.arg(&total_swaps_u32);
+foundation/quantum/src/gpu_tsp.rs:                launch_args2.launch(cfg_min)?;
+foundation/quantum/src/gpu_k_opt.rs:use cudarc::driver::{CudaDevice, LaunchConfig};
+foundation/quantum/src/gpu_k_opt.rs:            let _cfg = LaunchConfig {
+foundation/quantum/src/gpu_k_opt.rs:            // Note: This is pseudocode - actual kernel launch would go here
+foundation/quantum/src/gpu_coloring.rs:        let cfg = LaunchConfig::for_num_elems((n * n) as u32);
+foundation/quantum/src/gpu_coloring.rs:        let mut launch_args = self.device.launch_builder(&build_adjacency);
+foundation/quantum/src/gpu_coloring.rs:        launch_args.arg(&gpu_coupling);
+foundation/quantum/src/gpu_coloring.rs:        launch_args.arg(&threshold_f32);
+foundation/quantum/src/gpu_coloring.rs:        launch_args.arg(&gpu_adjacency);
+foundation/quantum/src/gpu_coloring.rs:        launch_args.arg(&n_u32);
+foundation/quantum/src/gpu_coloring.rs:            launch_args
+foundation/quantum/src/gpu_coloring.rs:                .launch(cfg)
+foundation/quantum/src/gpu_coloring.rs:                .context("GPU kernel launch failed - check CUDA runtime")?;
+foundation/quantum/src/gpu_coloring.rs:        let cfg = LaunchConfig::for_num_elems(n as u32);
+foundation/quantum/src/gpu_coloring.rs:        let mut launch_args = self.device.launch_builder(&init_priorities);
+foundation/quantum/src/gpu_coloring.rs:        launch_args.arg(&gpu_priorities);
+foundation/quantum/src/gpu_coloring.rs:        launch_args.arg(&gpu_colors);
+foundation/quantum/src/gpu_coloring.rs:        launch_args.arg(&n_u32);
+foundation/quantum/src/gpu_coloring.rs:        launch_args.arg(&seed);
+foundation/quantum/src/gpu_coloring.rs:            launch_args
+foundation/quantum/src/gpu_coloring.rs:                .launch(cfg)
+foundation/quantum/src/gpu_coloring.rs:                .context("Failed to launch init_priorities kernel")?;
+foundation/quantum/src/gpu_coloring.rs:            let mut launch_args1 = self.device.launch_builder(&find_independent_set);
+foundation/quantum/src/gpu_coloring.rs:            launch_args1.arg(gpu_adjacency);
+foundation/quantum/src/gpu_coloring.rs:            launch_args1.arg(&gpu_priorities);
+foundation/quantum/src/gpu_coloring.rs:            launch_args1.arg(&gpu_colors);
+foundation/quantum/src/gpu_coloring.rs:            launch_args1.arg(&gpu_can_color);
+foundation/quantum/src/gpu_coloring.rs:            launch_args1.arg(&n_u32);
+foundation/quantum/src/gpu_coloring.rs:                launch_args1
+foundation/quantum/src/gpu_coloring.rs:                    .launch(cfg)
+foundation/quantum/src/gpu_coloring.rs:                    .context("Failed to launch find_independent_set kernel")?;
+foundation/quantum/src/gpu_coloring.rs:            let cfg_with_shared = LaunchConfig {
+foundation/quantum/src/gpu_coloring.rs:            let mut launch_args2 = self.device.launch_builder(&color_independent_set);
+foundation/quantum/src/gpu_coloring.rs:            launch_args2.arg(gpu_adjacency);
+foundation/quantum/src/gpu_coloring.rs:            launch_args2.arg(&gpu_can_color);
+foundation/quantum/src/gpu_coloring.rs:            launch_args2.arg(&gpu_colors);
+foundation/quantum/src/gpu_coloring.rs:            launch_args2.arg(&n_u32);
+foundation/quantum/src/gpu_coloring.rs:            launch_args2.arg(&max_colors_u32);
+foundation/quantum/src/gpu_coloring.rs:                launch_args2
+foundation/quantum/src/gpu_coloring.rs:                    .launch(cfg_with_shared)
+foundation/quantum/src/gpu_coloring.rs:                    .context("Failed to launch color_independent_set kernel")?;
+foundation/quantum/src/gpu_coloring.rs:            let mut launch_args3 = self.device.launch_builder(&count_uncolored);
+foundation/quantum/src/gpu_coloring.rs:            launch_args3.arg(&gpu_colors);
+foundation/quantum/src/gpu_coloring.rs:            launch_args3.arg(&gpu_uncolored_count);
+foundation/quantum/src/gpu_coloring.rs:            launch_args3.arg(&n_u32);
+foundation/quantum/src/gpu_coloring.rs:                launch_args3
+foundation/quantum/src/gpu_coloring.rs:                    .launch(cfg)
+foundation/quantum/src/gpu_coloring.rs:                    .context("Failed to launch count_uncolored kernel")?;
+foundation/quantum/src/gpu_coloring.rs:        let cfg = LaunchConfig::for_num_elems((n * n) as u32);
+foundation/quantum/src/gpu_coloring.rs:        let mut launch_args = self.device.launch_builder(&count_conflicts);
+foundation/quantum/src/gpu_coloring.rs:        launch_args.arg(&self.gpu_adjacency);
+foundation/quantum/src/gpu_coloring.rs:        launch_args.arg(&gpu_coloring);
+foundation/quantum/src/gpu_coloring.rs:        launch_args.arg(&gpu_conflicts);
+foundation/quantum/src/gpu_coloring.rs:        launch_args.arg(&n_u32);
+foundation/quantum/src/gpu_coloring.rs:            launch_args.launch(cfg)?;
+foundation/mlir_runtime.rs:        gpu.launch blocks(%bx, %by, %bz) in (%grid_x = %c1, %grid_y = %c1, %grid_z = %c1)
+foundation/mlir_runtime.rs:        gpu.launch blocks(%bx, %by, %bz) in (%grid_x = %c1, %grid_y = %c1, %grid_z = %c1)
+foundation/mlir_runtime.rs:        assert!(hamiltonian_code.contains("gpu.launch"));
+foundation/information_theory/gpu_transfer_entropy.rs:        // GPU launcher disabled for now
+foundation/information_theory/gpu.rs:use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchConfig, DeviceRepr, ValidAsZeroBits};
+foundation/information_theory/gpu.rs:        let cfg = LaunchConfig {
+foundation/information_theory/gpu.rs:        // Launch minmax for source (using launch_builder pattern)
+foundation/information_theory/gpu.rs:        let mut launch_args = self.device.launch_builder(&self.minmax_kernel);
+foundation/information_theory/gpu.rs:        launch_args.arg(&source_gpu);
+foundation/information_theory/gpu.rs:        launch_args.arg(&length_i32);
+foundation/information_theory/gpu.rs:        launch_args.arg(&source_min_gpu);
+foundation/information_theory/gpu.rs:        launch_args.arg(&source_max_gpu);
+foundation/information_theory/gpu.rs:            launch_args.launch(cfg)?;
+foundation/information_theory/gpu.rs:        let mut launch_args2 = self.device.launch_builder(&self.minmax_kernel);
+foundation/information_theory/gpu.rs:        launch_args2.arg(&target_gpu);
+foundation/information_theory/gpu.rs:        launch_args2.arg(&length_i32);
+foundation/information_theory/gpu.rs:        launch_args2.arg(&target_min_gpu);
+foundation/information_theory/gpu.rs:        launch_args2.arg(&target_max_gpu);
+foundation/information_theory/gpu.rs:            launch_args2.launch(cfg)?;
+foundation/information_theory/gpu.rs:        let hist_cfg = LaunchConfig {
+foundation/information_theory/gpu.rs:        let mut launch3d = self.device.launch_builder(&self.hist_3d_kernel);
+foundation/information_theory/gpu.rs:        launch3d.arg(&source_gpu);
+foundation/information_theory/gpu.rs:        launch3d.arg(&target_gpu);
+foundation/information_theory/gpu.rs:        launch3d.arg(&length_i32);
+foundation/information_theory/gpu.rs:        launch3d.arg(&embedding_dim_i32);
+foundation/information_theory/gpu.rs:        launch3d.arg(&tau_i32);
+foundation/information_theory/gpu.rs:        launch3d.arg(&n_bins_i32);
+foundation/information_theory/gpu.rs:        launch3d.arg(&source_min);
+foundation/information_theory/gpu.rs:        launch3d.arg(&source_max);
+foundation/information_theory/gpu.rs:        launch3d.arg(&target_min);
+foundation/information_theory/gpu.rs:        launch3d.arg(&target_max);
+foundation/information_theory/gpu.rs:        launch3d.arg(&mut hist_3d);
+foundation/information_theory/gpu.rs:        unsafe { launch3d.launch(hist_cfg)?; }
+foundation/information_theory/gpu.rs:        let mut launch2d_yf_yp = self.device.launch_builder(&self.hist_2d_yf_yp_kernel);
+foundation/information_theory/gpu.rs:        launch2d_yf_yp.arg(&target_gpu);
+foundation/information_theory/gpu.rs:        launch2d_yf_yp.arg(&length_i32);
+foundation/information_theory/gpu.rs:        launch2d_yf_yp.arg(&embedding_dim_i32);
+foundation/information_theory/gpu.rs:        launch2d_yf_yp.arg(&tau_i32);
+foundation/information_theory/gpu.rs:        launch2d_yf_yp.arg(&n_bins_i32);
+foundation/information_theory/gpu.rs:        launch2d_yf_yp.arg(&target_min);
+foundation/information_theory/gpu.rs:        launch2d_yf_yp.arg(&target_max);
+foundation/information_theory/gpu.rs:        launch2d_yf_yp.arg(&mut hist_2d_yf_yp);
+foundation/information_theory/gpu.rs:        unsafe { launch2d_yf_yp.launch(hist_cfg)?; }
+foundation/information_theory/gpu.rs:        let mut launch2d_xp_yp = self.device.launch_builder(&self.hist_2d_xp_yp_kernel);
+foundation/information_theory/gpu.rs:        launch2d_xp_yp.arg(&source_gpu);
+foundation/information_theory/gpu.rs:        launch2d_xp_yp.arg(&target_gpu);
+foundation/information_theory/gpu.rs:        launch2d_xp_yp.arg(&length_i32);
+foundation/information_theory/gpu.rs:        launch2d_xp_yp.arg(&embedding_dim_i32);
+foundation/information_theory/gpu.rs:        launch2d_xp_yp.arg(&tau_i32);
+foundation/information_theory/gpu.rs:        launch2d_xp_yp.arg(&n_bins_i32);
+foundation/information_theory/gpu.rs:        launch2d_xp_yp.arg(&source_min);
+foundation/information_theory/gpu.rs:        launch2d_xp_yp.arg(&source_max);
+foundation/information_theory/gpu.rs:        launch2d_xp_yp.arg(&target_min);
+foundation/information_theory/gpu.rs:        launch2d_xp_yp.arg(&target_max);
+foundation/information_theory/gpu.rs:        launch2d_xp_yp.arg(&mut hist_2d_xp_yp);
+foundation/information_theory/gpu.rs:        unsafe { launch2d_xp_yp.launch(hist_cfg)?; }
+foundation/information_theory/gpu.rs:        let mut launch1d = self.device.launch_builder(&self.hist_1d_kernel);
+foundation/information_theory/gpu.rs:        launch1d.arg(&target_gpu);
+foundation/information_theory/gpu.rs:        launch1d.arg(&length_i32);
+foundation/information_theory/gpu.rs:        launch1d.arg(&embedding_dim_i32);
+foundation/information_theory/gpu.rs:        launch1d.arg(&tau_i32);
+foundation/information_theory/gpu.rs:        launch1d.arg(&n_bins_i32);
+foundation/information_theory/gpu.rs:        launch1d.arg(&target_min);
+foundation/information_theory/gpu.rs:        launch1d.arg(&target_max);
+foundation/information_theory/gpu.rs:        launch1d.arg(&mut hist_1d_yp);
+foundation/information_theory/gpu.rs:        unsafe { launch1d.launch(hist_cfg)?; }
+foundation/information_theory/gpu.rs:        let te_cfg = LaunchConfig {
+foundation/information_theory/gpu.rs:        let mut launch_te = self.device.launch_builder(&self.compute_te_kernel);
+foundation/information_theory/gpu.rs:        launch_te.arg(&hist_3d);
+foundation/information_theory/gpu.rs:        launch_te.arg(&hist_2d_yf_yp);
+foundation/information_theory/gpu.rs:        launch_te.arg(&hist_2d_xp_yp);
+foundation/information_theory/gpu.rs:        launch_te.arg(&hist_1d_yp);
+foundation/information_theory/gpu.rs:        launch_te.arg(&n_bins_i32);
+foundation/information_theory/gpu.rs:        launch_te.arg(&total_samples);
+foundation/information_theory/gpu.rs:        launch_te.arg(&mut te_result);
+foundation/information_theory/gpu.rs:        unsafe { launch_te.launch(te_cfg)?; }
+foundation/quantum_mlir/runtime.rs:        // Evolution kernel would be launched here
+foundation/quantum_mlir/cuda_kernels_ptx.rs:use cudarc::driver::{DeviceRepr, ValidAsZeroBits, CudaSlice, LaunchAsync, LaunchConfig};
+foundation/quantum_mlir/cuda_kernels_ptx.rs:        let config = LaunchConfig {
+foundation/quantum_mlir/cuda_kernels_ptx.rs:            func.launch(
+foundation/quantum_mlir/cuda_kernels_ptx.rs:        let config = LaunchConfig {
+foundation/quantum_mlir/cuda_kernels_ptx.rs:            func.launch(
+foundation/quantum_mlir/cuda_kernels_ptx.rs:        let config = LaunchConfig {
+foundation/quantum_mlir/cuda_kernels_ptx.rs:            func.launch(
+foundation/quantum_mlir/cuda_kernels_ptx.rs:        // Simplified - would need proper kernel launch
+foundation/quantum_mlir/cuda_kernels.rs:        let config = LaunchConfig {
+foundation/quantum_mlir/cuda_kernels.rs:        let mut launch_args = self.device.launch_builder(func);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(state);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(&qubit_i32);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(&num_qubits_i32);
+foundation/quantum_mlir/cuda_kernels.rs:            launch_args.launch(config)
+foundation/quantum_mlir/cuda_kernels.rs:                .context("Hadamard kernel launch failed")?;
+foundation/quantum_mlir/cuda_kernels.rs:        let config = LaunchConfig {
+foundation/quantum_mlir/cuda_kernels.rs:        let mut launch_args = self.device.launch_builder(func);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(state);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(&control_i32);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(&target_i32);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(&num_qubits_i32);
+foundation/quantum_mlir/cuda_kernels.rs:            launch_args.launch(config)
+foundation/quantum_mlir/cuda_kernels.rs:                .context("CNOT kernel launch failed")?;
+foundation/quantum_mlir/cuda_kernels.rs:        let config = LaunchConfig {
+foundation/quantum_mlir/cuda_kernels.rs:        let mut launch_args = self.device.launch_builder(func);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(state);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(&num_qubits_i32);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(&inverse);
+foundation/quantum_mlir/cuda_kernels.rs:            launch_args.launch(config)
+foundation/quantum_mlir/cuda_kernels.rs:                .context("QFT kernel launch failed")?;
+foundation/quantum_mlir/cuda_kernels.rs:        let config = LaunchConfig {
+foundation/quantum_mlir/cuda_kernels.rs:        let mut launch_args = self.device.launch_builder(func);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(state);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(parameters);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(&num_qubits_i32);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(&num_layers_i32);
+foundation/quantum_mlir/cuda_kernels.rs:            launch_args.launch(config)
+foundation/quantum_mlir/cuda_kernels.rs:                .context("VQE kernel launch failed")?;
+foundation/quantum_mlir/cuda_kernels.rs:        let config = LaunchConfig {
+foundation/quantum_mlir/cuda_kernels.rs:        let mut launch_args = self.device.launch_builder(func);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(state);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(probabilities);
+foundation/quantum_mlir/cuda_kernels.rs:        launch_args.arg(&dimension_i32);
+foundation/quantum_mlir/cuda_kernels.rs:            launch_args.launch(config)
+foundation/quantum_mlir/cuda_kernels.rs:                .context("Measure kernel launch failed")?;
+foundation/statistical_mechanics/gpu_bindings.rs:        let cfg = LaunchConfig {
+foundation/statistical_mechanics/gpu_bindings.rs:            kernel.launch(
+foundation/statistical_mechanics/gpu_bindings.rs:        let cfg = LaunchConfig {
+foundation/statistical_mechanics/gpu_bindings.rs:            kernel.launch(
+foundation/statistical_mechanics/gpu_bindings.rs:        let cfg = LaunchConfig {
+foundation/statistical_mechanics/gpu_bindings.rs:            kernel.launch(
+foundation/statistical_mechanics/gpu_bindings.rs:        let cfg = LaunchConfig {
+foundation/statistical_mechanics/gpu_bindings.rs:            kernel.launch(
+foundation/statistical_mechanics/gpu.rs:use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchConfig, DeviceRepr, ValidAsZeroBits};
+foundation/statistical_mechanics/gpu.rs:        let cfg = LaunchConfig {
+foundation/statistical_mechanics/gpu.rs:            init_kernel.launch(
+foundation/statistical_mechanics/gpu.rs:        let cfg = LaunchConfig {
+foundation/statistical_mechanics/gpu.rs:        let mut launch_forces = self.device.launch_builder(&self.forces_kernel);
+foundation/statistical_mechanics/gpu.rs:        launch_forces.arg(&self.positions);
+foundation/statistical_mechanics/gpu.rs:        launch_forces.arg(&self.coupling_matrix);
+foundation/statistical_mechanics/gpu.rs:        launch_forces.arg(&mut forces);
+foundation/statistical_mechanics/gpu.rs:        launch_forces.arg(&n_i32);
+foundation/statistical_mechanics/gpu.rs:        launch_forces.arg(&coupling_strength);
+foundation/statistical_mechanics/gpu.rs:        unsafe { launch_forces.launch(cfg)?; }
+foundation/statistical_mechanics/gpu.rs:        let mut launch_evolve = self.device.launch_builder(&self.evolve_kernel);
+foundation/statistical_mechanics/gpu.rs:        launch_evolve.arg(&mut self.positions);
+foundation/statistical_mechanics/gpu.rs:        launch_evolve.arg(&mut self.velocities);
+foundation/statistical_mechanics/gpu.rs:        launch_evolve.arg(&mut self.phases);
+foundation/statistical_mechanics/gpu.rs:        launch_evolve.arg(&forces);
+foundation/statistical_mechanics/gpu.rs:        launch_evolve.arg(&dt);
+foundation/statistical_mechanics/gpu.rs:        launch_evolve.arg(&damping);
+foundation/statistical_mechanics/gpu.rs:        launch_evolve.arg(&temperature);
+foundation/statistical_mechanics/gpu.rs:        launch_evolve.arg(&n_i32);
+foundation/statistical_mechanics/gpu.rs:        launch_evolve.arg(&seed);
+foundation/statistical_mechanics/gpu.rs:        launch_evolve.arg(&iter_i32);
+foundation/statistical_mechanics/gpu.rs:        unsafe { launch_evolve.launch(cfg)?; }
+foundation/statistical_mechanics/gpu.rs:        let cfg = LaunchConfig {
+foundation/statistical_mechanics/gpu.rs:        let mut launch_energy = self.device.launch_builder(&self.energy_kernel);
+foundation/statistical_mechanics/gpu.rs:        launch_energy.arg(&self.positions);
+foundation/statistical_mechanics/gpu.rs:        launch_energy.arg(&self.velocities);
+foundation/statistical_mechanics/gpu.rs:        launch_energy.arg(&self.coupling_matrix);
+foundation/statistical_mechanics/gpu.rs:        launch_energy.arg(&mut energy_components);
+foundation/statistical_mechanics/gpu.rs:        launch_energy.arg(&n_i32);
+foundation/statistical_mechanics/gpu.rs:        launch_energy.arg(&coupling_strength);
+foundation/statistical_mechanics/gpu.rs:        unsafe { launch_energy.launch(cfg)?; }
+foundation/statistical_mechanics/gpu.rs:        let mut launch_entropy = self.device.launch_builder(&self.entropy_kernel);
+foundation/statistical_mechanics/gpu.rs:        launch_entropy.arg(&self.positions);
+foundation/statistical_mechanics/gpu.rs:        launch_entropy.arg(&self.velocities);
+foundation/statistical_mechanics/gpu.rs:        launch_entropy.arg(&mut entropy_result);
+foundation/statistical_mechanics/gpu.rs:        launch_entropy.arg(&n_i32);
+foundation/statistical_mechanics/gpu.rs:        launch_entropy.arg(&temperature);
+foundation/statistical_mechanics/gpu.rs:        unsafe { launch_entropy.launch(cfg)?; }
+foundation/statistical_mechanics/gpu.rs:        let mut launch_order = self.device.launch_builder(&self.order_kernel);
+foundation/statistical_mechanics/gpu.rs:        launch_order.arg(&self.phases);
+foundation/statistical_mechanics/gpu.rs:        launch_order.arg(&mut order_real);
+foundation/statistical_mechanics/gpu.rs:        launch_order.arg(&mut order_imag);
+foundation/statistical_mechanics/gpu.rs:        launch_order.arg(&n_i32);
+foundation/statistical_mechanics/gpu.rs:        unsafe { launch_order.launch(cfg)?; }
+foundation/statistical_mechanics/gpu.rs:        let cfg = LaunchConfig {
+foundation/statistical_mechanics/gpu.rs:        let mut launch_order = self.device.launch_builder(&self.order_kernel);
+foundation/statistical_mechanics/gpu.rs:        launch_order.arg(&self.phases);
+foundation/statistical_mechanics/gpu.rs:        launch_order.arg(&mut order_real);
+foundation/statistical_mechanics/gpu.rs:        launch_order.arg(&mut order_imag);
+foundation/statistical_mechanics/gpu.rs:        launch_order.arg(&n_i32);
+foundation/statistical_mechanics/gpu.rs:        unsafe { launch_order.launch(cfg)?; }
+foundation/active_inference/gpu_inference.rs:        let config = LaunchConfig {
+foundation/active_inference/gpu_inference.rs:        let mut launcher = self.device.launch_builder(&self.gemv_kernel);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&gpu_result);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&gpu_jacobian);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&gpu_state);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&m_i32);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&n_i32);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&alpha);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&beta);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&transpose);
+foundation/active_inference/gpu_inference.rs:            launcher.launch(config)?;
+foundation/active_inference/gpu_inference.rs:        let config = LaunchConfig {
+foundation/active_inference/gpu_inference.rs:        let mut launcher = self.device.launch_builder(&self.gemv_kernel);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&gpu_result);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&gpu_jacobian);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&gpu_error);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&n_i32);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&m_i32);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&alpha);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&beta);
+foundation/active_inference/gpu_inference.rs:        launcher.arg(&transpose);
+foundation/active_inference/gpu_inference.rs:            launcher.launch(config)?;
+foundation/active_inference/gpu_policy_eval.rs:use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchConfig};
+foundation/active_inference/gpu_policy_eval.rs:        let cfg = LaunchConfig {
+foundation/active_inference/gpu_policy_eval.rs:        let mut launch = self.device.launch_builder(rng_kernel);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(rng_states);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&seed);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&n_states_i32);
+foundation/active_inference/gpu_policy_eval.rs:        unsafe { launch.launch(cfg)?; }
+foundation/active_inference/gpu_policy_eval.rs:                let cfg = LaunchConfig {
+foundation/active_inference/gpu_policy_eval.rs:        let mut launch = self.device.launch_builder(&self.satellite_kernel);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.model_buffers.initial_satellite);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&mut self.trajectories.satellite_states);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&dt_satellite);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&n_policies_i32);
+foundation/active_inference/gpu_policy_eval.rs:        unsafe { launch.launch(cfg)?; }
+foundation/active_inference/gpu_policy_eval.rs:                let cfg = LaunchConfig {
+foundation/active_inference/gpu_policy_eval.rs:        let mut launch = self.device.launch_builder(&self.atmosphere_kernel);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.model_buffers.initial_atmosphere);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.model_buffers.initial_variances);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&mut self.trajectories.atmosphere_states);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&mut self.trajectories.variances);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.rng_states_atmosphere);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&dt_atmosphere);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.decorrelation_rate);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.c_n_squared);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&n_policies_i32);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&n_modes_i32);
+foundation/active_inference/gpu_policy_eval.rs:        unsafe { launch.launch(cfg)?; }
+foundation/active_inference/gpu_policy_eval.rs:        let cfg = LaunchConfig {
+foundation/active_inference/gpu_policy_eval.rs:        let mut launch = self.device.launch_builder(&self.windows_kernel);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.model_buffers.initial_windows);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.model_buffers.initial_variances);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.trajectories.atmosphere_states);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.model_buffers.actions);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&mut self.trajectories.window_states);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&mut self.trajectories.variances);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.rng_states_windows);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&dt_windows);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.damping);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.diffusion);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&n_policies_i32);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&horizon_i32);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&n_windows_i32);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&n_modes_i32);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&substeps_i32);
+foundation/active_inference/gpu_policy_eval.rs:        unsafe { launch.launch(cfg)?; }
+foundation/active_inference/gpu_policy_eval.rs:                // One kernel launch for all policies × horizon
+foundation/active_inference/gpu_policy_eval.rs:        let cfg = LaunchConfig {
+foundation/active_inference/gpu_policy_eval.rs:        let mut launch = self.device.launch_builder(&self.observation_kernel);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.trajectories.window_states);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.trajectories.variances);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.model_buffers.observation_matrix);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.model_buffers.observation_noise);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&mut self.trajectories.predicted_obs);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&mut self.trajectories.obs_variances);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&n_policies_i32);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&horizon_i32);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&n_windows_i32);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&obs_dim_i32);
+foundation/active_inference/gpu_policy_eval.rs:        unsafe { launch.launch(cfg)?; }
+foundation/active_inference/gpu_policy_eval.rs:        let cfg = LaunchConfig {
+foundation/active_inference/gpu_policy_eval.rs:        let mut launch = self.device.launch_builder(&self.efe_kernel);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.trajectories.predicted_obs);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.trajectories.obs_variances);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.model_buffers.preferred_obs);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.trajectories.variances);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&self.model_buffers.prior_variance);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&mut self.efe_buffers.risk);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&mut self.efe_buffers.ambiguity);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&mut self.efe_buffers.novelty);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&n_policies_i32);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&horizon_i32);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&obs_dim_i32);
+foundation/active_inference/gpu_policy_eval.rs:        launch.arg(&n_windows_i32);
+foundation/active_inference/gpu_policy_eval.rs:        unsafe { launch.launch(cfg)?; }
+foundation/active_inference/gpu.rs:use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchConfig};
+foundation/active_inference/gpu.rs:        let cfg = LaunchConfig {
+foundation/active_inference/gpu.rs:        let mut launch_kl = self.device.launch_builder(&self.kl_divergence_kernel);
+foundation/active_inference/gpu.rs:        launch_kl.arg(&mean_q_gpu);
+foundation/active_inference/gpu.rs:        launch_kl.arg(&mean_p_gpu);
+foundation/active_inference/gpu.rs:        launch_kl.arg(&var_q_gpu);
+foundation/active_inference/gpu.rs:        launch_kl.arg(&var_p_gpu);
+foundation/active_inference/gpu.rs:        launch_kl.arg(&mut kl_components);
+foundation/active_inference/gpu.rs:        launch_kl.arg(&n_i32);
+foundation/active_inference/gpu.rs:        unsafe { launch_kl.launch(cfg)?; }
+foundation/active_inference/gpu.rs:        let mut launch_sum_kl = self.device.launch_builder(&self.sum_reduction_kernel);
+foundation/active_inference/gpu.rs:        launch_sum_kl.arg(&kl_components);
+foundation/active_inference/gpu.rs:        launch_sum_kl.arg(&mut complexity_result);
+foundation/active_inference/gpu.rs:        launch_sum_kl.arg(&n_i32);
+foundation/active_inference/gpu.rs:        unsafe { launch_sum_kl.launch(cfg)?; }
+foundation/active_inference/gpu.rs:        let obs_cfg = LaunchConfig {
+foundation/active_inference/gpu.rs:        let mut launch_pred_err = self.device.launch_builder(&self.prediction_error_kernel);
+foundation/active_inference/gpu.rs:        launch_pred_err.arg(&mut error_gpu);
+foundation/active_inference/gpu.rs:        launch_pred_err.arg(&obs_gpu);
+foundation/active_inference/gpu.rs:        launch_pred_err.arg(&mean_q_gpu);
+foundation/active_inference/gpu.rs:        launch_pred_err.arg(&precision_gpu);
+foundation/active_inference/gpu.rs:        launch_pred_err.arg(&obs_n_i32);
+foundation/active_inference/gpu.rs:        unsafe { launch_pred_err.launch(obs_cfg)?; }
+foundation/active_inference/gpu.rs:        let mut launch_acc = self.device.launch_builder(&self.accuracy_kernel);
+foundation/active_inference/gpu.rs:        launch_acc.arg(&error_gpu);
+foundation/active_inference/gpu.rs:        launch_acc.arg(&precision_gpu);
+foundation/active_inference/gpu.rs:        launch_acc.arg(&mut accuracy_components);
+foundation/active_inference/gpu.rs:        launch_acc.arg(&obs_n_i32);
+foundation/active_inference/gpu.rs:        unsafe { launch_acc.launch(obs_cfg)?; }
+foundation/active_inference/gpu.rs:        let mut launch_sum_acc = self.device.launch_builder(&self.sum_reduction_kernel);
+foundation/active_inference/gpu.rs:        launch_sum_acc.arg(&accuracy_components);
+foundation/active_inference/gpu.rs:        launch_sum_acc.arg(&mut accuracy_result);
+foundation/active_inference/gpu.rs:        launch_sum_acc.arg(&obs_n_i32);
+foundation/active_inference/gpu.rs:        unsafe { launch_sum_acc.launch(obs_cfg)?; }
+foundation/active_inference/gpu.rs:        let obs_cfg = LaunchConfig {
+foundation/active_inference/gpu.rs:        let mut launch_err = self.device.launch_builder(&self.prediction_error_kernel);
+foundation/active_inference/gpu.rs:        launch_err.arg(&mut pred_error);
+foundation/active_inference/gpu.rs:        launch_err.arg(&obs_gpu);
+foundation/active_inference/gpu.rs:        launch_err.arg(&mean_gpu);  // Use as prediction
+foundation/active_inference/gpu.rs:        launch_err.arg(&precision_gpu);
+foundation/active_inference/gpu.rs:        launch_err.arg(&obs_n_i32);
+foundation/active_inference/gpu.rs:        unsafe { launch_err.launch(obs_cfg)?; }
+foundation/active_inference/gpu.rs:        let state_cfg = LaunchConfig {
+foundation/active_inference/gpu.rs:        let mut launch_gemv = self.device.launch_builder(&self.gemv_kernel);
+foundation/active_inference/gpu.rs:        launch_gemv.arg(&mut gradient);
+foundation/active_inference/gpu.rs:        launch_gemv.arg(&jac_gpu);
+foundation/active_inference/gpu.rs:        launch_gemv.arg(&pred_error);
+foundation/active_inference/gpu.rs:        launch_gemv.arg(&m_i32);
+foundation/active_inference/gpu.rs:        launch_gemv.arg(&n_i32);
+foundation/active_inference/gpu.rs:        launch_gemv.arg(&alpha);
+foundation/active_inference/gpu.rs:        launch_gemv.arg(&beta);
+foundation/active_inference/gpu.rs:        launch_gemv.arg(&transpose);
+foundation/active_inference/gpu.rs:        unsafe { launch_gemv.launch(state_cfg)?; }
+foundation/active_inference/gpu.rs:        let mut launch_update = self.device.launch_builder(&self.belief_update_kernel);
+foundation/active_inference/gpu.rs:        launch_update.arg(&mut mean_gpu);
+foundation/active_inference/gpu.rs:        launch_update.arg(&gradient);
+foundation/active_inference/gpu.rs:        launch_update.arg(&lr);
+foundation/active_inference/gpu.rs:        launch_update.arg(&n_i32);
+foundation/active_inference/gpu.rs:        unsafe { launch_update.launch(state_cfg)?; }
+foundation/cuda/mod.rs:/// CUDA kernel launcher (external C API)
+foundation/cuda/mod.rs:/// - CUDA kernel launch failure
+foundation/cuda/prism_pipeline.rs:use cudarc::driver::{CudaDevice, CudaSlice, LaunchConfig};
+foundation/cuda/prism_pipeline.rs:        let config = LaunchConfig {
+foundation/cuda/prism_pipeline.rs:            self.fusion_kernel.clone().launch(
+foundation/cuda/ensemble_generation.rs:use cudarc::driver::{CudaDevice, CudaSlice, LaunchConfig};
+foundation/cuda/ensemble_generation.rs:        let config = LaunchConfig {
+foundation/cuda/ensemble_generation.rs:            self.generate_kernel.clone().launch(
+foundation/cuda/gpu_coloring.rs:use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchConfig};
+foundation/cuda/gpu_coloring.rs:        let config = LaunchConfig {
+foundation/cuda/gpu_coloring.rs:            self.sparse_kernel.clone().launch(
+foundation/cuda/gpu_coloring.rs:        let config = LaunchConfig {
+foundation/cuda/gpu_coloring.rs:            self.dense_kernel.clone().launch(
+foundation/gpu_coloring.rs:use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchConfig};
+foundation/gpu_coloring.rs:        let cfg = LaunchConfig {
+foundation/gpu_coloring.rs:        let mut launch_greedy = self.device.launch_builder(&self.greedy_kernel);
+foundation/gpu_coloring.rs:        launch_greedy.arg(&adjacency_gpu);
+foundation/gpu_coloring.rs:        launch_greedy.arg(&phases_gpu);
+foundation/gpu_coloring.rs:        launch_greedy.arg(&order_gpu);
+foundation/gpu_coloring.rs:        launch_greedy.arg(&coherence_gpu);
+foundation/gpu_coloring.rs:        launch_greedy.arg(&mut colorings_gpu);
+foundation/gpu_coloring.rs:        launch_greedy.arg(&mut chromatic_gpu);
+foundation/gpu_coloring.rs:        launch_greedy.arg(&mut conflicts_gpu);
+foundation/gpu_coloring.rs:        launch_greedy.arg(&n_i32);
+foundation/gpu_coloring.rs:        launch_greedy.arg(&n_attempts_i32);
+foundation/gpu_coloring.rs:        launch_greedy.arg(&max_colors_i32);
+foundation/gpu_coloring.rs:        launch_greedy.arg(&seed);
+foundation/gpu_coloring.rs:        unsafe { launch_greedy.launch(cfg)?; }
+foundation/gpu_coloring.rs:        let cfg = LaunchConfig {
+foundation/gpu_coloring.rs:        let mut launch_sa = self.device.launch_builder(&self.sa_kernel);
+foundation/gpu_coloring.rs:        launch_sa.arg(&adjacency_gpu);
+foundation/gpu_coloring.rs:        launch_sa.arg(&mut colorings_gpu);
+foundation/gpu_coloring.rs:        launch_sa.arg(&mut chromatic_gpu);
+foundation/gpu_coloring.rs:        launch_sa.arg(&n_i32);
+foundation/gpu_coloring.rs:        launch_sa.arg(&n_chains_i32);
+foundation/gpu_coloring.rs:        launch_sa.arg(&target_colors_i32);
+foundation/gpu_coloring.rs:        launch_sa.arg(&iterations_i32);
+foundation/gpu_coloring.rs:        launch_sa.arg(&initial_temperature);
+foundation/gpu_coloring.rs:        launch_sa.arg(&seed);
+foundation/gpu_coloring.rs:        unsafe { launch_sa.launch(cfg)?; }
+foundation/phase6/gpu_tda.rs:use cudarc::driver::{CudaDevice, CudaSlice, LaunchConfig};
+foundation/phase6/gpu_tda.rs:        let cfg = LaunchConfig::for_num_elems(n as u32);
+foundation/phase6/gpu_tda.rs:            self.device.launch_builder(kernel)
+foundation/phase6/gpu_tda.rs:                .launch(cfg)?;
+foundation/phase6/gpu_tda.rs:        let cfg = LaunchConfig {
+foundation/phase6/gpu_tda.rs:            self.device.launch_builder(kernel)
+foundation/phase6/gpu_tda.rs:                .launch(cfg)?;
+foundation/phase6/gpu_tda.rs:        let cfg = LaunchConfig::for_num_elems(n as u32);
+foundation/phase6/gpu_tda.rs:            self.device.launch_builder(kernel)
+foundation/phase6/gpu_tda.rs:                .launch(cfg)?;
+

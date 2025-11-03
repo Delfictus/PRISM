@@ -1,0 +1,195 @@
+=== KERNEL SIGNATURES: thermodynamic.ptx ===
+
+.visible .entry initialize_oscillators_kernel(
+	.param .u64 initialize_oscillators_kernel_param_0,
+	.param .u64 initialize_oscillators_kernel_param_1,
+	.param .u64 initialize_oscillators_kernel_param_2,
+	.param .u32 initialize_oscillators_kernel_param_3,
+	.param .u64 initialize_oscillators_kernel_param_4
+)
+{
+	.local .align 8 .b8 	__local_depot0[48];
+	.reg .b64 	%SP;
+	.reg .b64 	%SPL;
+	.reg .pred 	%p<32>;
+	.reg .f32 	%f<2>;
+	.reg .b32 	%r<566>;
+	.reg .f64 	%fd<131>;
+	.reg .b64 	%rd<49>;
+
+
+	mov.u64 	%SPL, __local_depot0;
+	ld.param.u32 	%r221, [initialize_oscillators_kernel_param_3];
+	add.u64 	%rd1, %SPL, 0;
+	mov.u32 	%r222, %ntid.x;
+	mov.u32 	%r223, %ctaid.x;
+	mov.u32 	%r224, %tid.x;
+	mad.lo.s32 	%r1, %r223, %r222, %r224;
+	setp.ge.s32 	%p1, %r1, %r221;
+	@%p1 bra 	$L__BB0_57;
+
+	ld.param.u64 	%rd47, [initialize_oscillators_kernel_param_4];
+	cvt.s64.s32 	%rd2, %r1;
+	cvt.u32.u64 	%r225, %rd47;
+--
+.visible .entry compute_coupling_forces_kernel(
+	.param .u64 compute_coupling_forces_kernel_param_0,
+	.param .u64 compute_coupling_forces_kernel_param_1,
+	.param .u64 compute_coupling_forces_kernel_param_2,
+	.param .u32 compute_coupling_forces_kernel_param_3,
+	.param .f64 compute_coupling_forces_kernel_param_4
+)
+{
+	.reg .pred 	%p<14>;
+	.reg .b32 	%r<54>;
+	.reg .f64 	%fd<100>;
+	.reg .b64 	%rd<54>;
+
+
+	ld.param.u64 	%rd28, [compute_coupling_forces_kernel_param_0];
+	ld.param.u64 	%rd29, [compute_coupling_forces_kernel_param_1];
+	ld.param.u64 	%rd27, [compute_coupling_forces_kernel_param_2];
+	ld.param.u32 	%r25, [compute_coupling_forces_kernel_param_3];
+	ld.param.f64 	%fd20, [compute_coupling_forces_kernel_param_4];
+	cvta.to.global.u64 	%rd1, %rd28;
+	cvta.to.global.u64 	%rd2, %rd29;
+	mov.u32 	%r26, %ntid.x;
+	mov.u32 	%r27, %ctaid.x;
+	mov.u32 	%r28, %tid.x;
+	mad.lo.s32 	%r1, %r27, %r26, %r28;
+	setp.ge.s32 	%p1, %r1, %r25;
+	@%p1 bra 	$L__BB1_20;
+
+	setp.lt.s32 	%p2, %r1, 1;
+	mov.u32 	%r48, 0;
+	mul.wide.s32 	%rd30, %r1, 8;
+--
+.visible .entry evolve_oscillators_kernel(
+	.param .u64 evolve_oscillators_kernel_param_0,
+	.param .u64 evolve_oscillators_kernel_param_1,
+	.param .u64 evolve_oscillators_kernel_param_2,
+	.param .u64 evolve_oscillators_kernel_param_3,
+	.param .f64 evolve_oscillators_kernel_param_4,
+	.param .f64 evolve_oscillators_kernel_param_5,
+	.param .f64 evolve_oscillators_kernel_param_6,
+	.param .u32 evolve_oscillators_kernel_param_7,
+	.param .u64 evolve_oscillators_kernel_param_8,
+	.param .u32 evolve_oscillators_kernel_param_9
+)
+{
+	.local .align 8 .b8 	__local_depot2[48];
+	.reg .b64 	%SP;
+	.reg .b64 	%SPL;
+	.reg .pred 	%p<58>;
+	.reg .f32 	%f<2>;
+	.reg .b32 	%r<1034>;
+	.reg .f64 	%fd<154>;
+	.reg .b64 	%rd<68>;
+
+
+	mov.u64 	%SPL, __local_depot2;
+	ld.param.u32 	%r416, [evolve_oscillators_kernel_param_7];
+	add.u64 	%rd1, %SPL, 0;
+	mov.u32 	%r417, %ntid.x;
+	mov.u32 	%r418, %ctaid.x;
+	mov.u32 	%r419, %tid.x;
+	mad.lo.s32 	%r1, %r418, %r417, %r419;
+	setp.ge.s32 	%p1, %r1, %r416;
+--
+.visible .entry compute_energy_kernel(
+	.param .u64 compute_energy_kernel_param_0,
+	.param .u64 compute_energy_kernel_param_1,
+	.param .u64 compute_energy_kernel_param_2,
+	.param .u64 compute_energy_kernel_param_3,
+	.param .u32 compute_energy_kernel_param_4,
+	.param .f64 compute_energy_kernel_param_5
+)
+{
+	.reg .pred 	%p<18>;
+	.reg .b32 	%r<69>;
+	.reg .f64 	%fd<109>;
+	.reg .b64 	%rd<58>;
+	// demoted variable
+	.shared .align 8 .b8 _ZZ21compute_energy_kernelE9shared_ke[2048];
+	// demoted variable
+	.shared .align 8 .b8 _ZZ21compute_energy_kernelE9shared_pe[2048];
+	// demoted variable
+	.shared .align 8 .b8 _ZZ21compute_energy_kernelE9shared_ce[2048];
+
+	ld.param.u64 	%rd28, [compute_energy_kernel_param_0];
+	ld.param.u64 	%rd26, [compute_energy_kernel_param_1];
+	ld.param.u64 	%rd29, [compute_energy_kernel_param_2];
+	ld.param.u64 	%rd27, [compute_energy_kernel_param_3];
+	ld.param.u32 	%r33, [compute_energy_kernel_param_4];
+	ld.param.f64 	%fd19, [compute_energy_kernel_param_5];
+	cvta.to.global.u64 	%rd1, %rd29;
+	cvta.to.global.u64 	%rd2, %rd28;
+	mov.u32 	%r1, %ntid.x;
+	mov.u32 	%r34, %ctaid.x;
+	mov.u32 	%r2, %tid.x;
+--
+.visible .entry compute_entropy_kernel(
+	.param .u64 compute_entropy_kernel_param_0,
+	.param .u64 compute_entropy_kernel_param_1,
+	.param .u64 compute_entropy_kernel_param_2,
+	.param .u32 compute_entropy_kernel_param_3,
+	.param .f64 compute_entropy_kernel_param_4
+)
+{
+	.reg .pred 	%p<10>;
+	.reg .f32 	%f<2>;
+	.reg .b32 	%r<42>;
+	.reg .f64 	%fd<73>;
+	.reg .b64 	%rd<11>;
+	// demoted variable
+	.shared .align 8 .b8 _ZZ22compute_entropy_kernelE14shared_entropy[2048];
+
+	ld.param.u64 	%rd1, [compute_entropy_kernel_param_0];
+	ld.param.u64 	%rd2, [compute_entropy_kernel_param_1];
+	ld.param.u64 	%rd3, [compute_entropy_kernel_param_2];
+	ld.param.u32 	%r18, [compute_entropy_kernel_param_3];
+	ld.param.f64 	%fd10, [compute_entropy_kernel_param_4];
+	mov.u32 	%r1, %ntid.x;
+	mov.u32 	%r19, %ctaid.x;
+	mov.u32 	%r2, %tid.x;
+	mad.lo.s32 	%r3, %r19, %r1, %r2;
+	shl.b32 	%r20, %r2, 3;
+	mov.u32 	%r21, _ZZ22compute_entropy_kernelE14shared_entropy;
+	add.s32 	%r4, %r21, %r20;
+	mov.u64 	%rd4, 0;
+	st.shared.u64 	[%r4], %rd4;
+	setp.ge.s32 	%p1, %r3, %r18;
+--
+.visible .entry compute_order_parameter_kernel(
+	.param .u64 compute_order_parameter_kernel_param_0,
+	.param .u64 compute_order_parameter_kernel_param_1,
+	.param .u64 compute_order_parameter_kernel_param_2,
+	.param .u32 compute_order_parameter_kernel_param_3
+)
+{
+	.local .align 4 .b8 	__local_depot5[8];
+	.reg .b64 	%SP;
+	.reg .b64 	%SPL;
+	.reg .pred 	%p<15>;
+	.reg .b32 	%r<43>;
+	.reg .f64 	%fd<92>;
+	.reg .b64 	%rd<22>;
+	// demoted variable
+	.shared .align 8 .b8 _ZZ30compute_order_parameter_kernelE11shared_real[2048];
+	// demoted variable
+	.shared .align 8 .b8 _ZZ30compute_order_parameter_kernelE11shared_imag[2048];
+
+	mov.u64 	%SPL, __local_depot5;
+	cvta.local.u64 	%SP, %SPL;
+	ld.param.u64 	%rd3, [compute_order_parameter_kernel_param_0];
+	ld.param.u64 	%rd4, [compute_order_parameter_kernel_param_1];
+	ld.param.u64 	%rd5, [compute_order_parameter_kernel_param_2];
+	ld.param.u32 	%r16, [compute_order_parameter_kernel_param_3];
+	add.u64 	%rd6, %SP, 0;
+	add.u64 	%rd1, %SPL, 0;
+	add.u64 	%rd7, %SP, 4;
+	add.u64 	%rd2, %SPL, 4;
+	mov.u32 	%r17, %ntid.x;
+	mov.u32 	%r18, %ctaid.x;
+
+TOTAL KERNELS: 6

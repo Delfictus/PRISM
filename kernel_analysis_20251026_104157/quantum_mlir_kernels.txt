@@ -1,0 +1,195 @@
+=== KERNEL SIGNATURES: quantum_mlir.ptx ===
+
+.visible .entry hadamard_gate_kernel(
+	.param .u64 hadamard_gate_kernel_param_0,
+	.param .u32 hadamard_gate_kernel_param_1,
+	.param .u32 hadamard_gate_kernel_param_2
+)
+{
+	.reg .pred 	%p<2>;
+	.reg .b32 	%r<23>;
+	.reg .f64 	%fd<23>;
+	.reg .b64 	%rd<7>;
+
+
+	ld.param.u64 	%rd1, [hadamard_gate_kernel_param_0];
+	ld.param.u32 	%r2, [hadamard_gate_kernel_param_1];
+	ld.param.u32 	%r3, [hadamard_gate_kernel_param_2];
+	mov.u32 	%r4, %ntid.x;
+	mov.u32 	%r5, %ctaid.x;
+	mov.u32 	%r6, %tid.x;
+	mad.lo.s32 	%r1, %r5, %r4, %r6;
+	mov.u32 	%r7, 1;
+	shl.b32 	%r8, %r7, %r3;
+	shr.u32 	%r9, %r8, 31;
+	add.s32 	%r10, %r8, %r9;
+	shr.s32 	%r11, %r10, 1;
+	setp.ge.s32 	%p1, %r1, %r11;
+	@%p1 bra 	$L__BB0_2;
+
+	cvta.to.global.u64 	%rd2, %rd1;
+	shl.b32 	%r13, %r7, %r2;
+	add.s32 	%r14, %r2, 1;
+	shr.s32 	%r15, %r1, %r2;
+--
+.visible .entry cnot_gate_kernel(
+	.param .u64 cnot_gate_kernel_param_0,
+	.param .u32 cnot_gate_kernel_param_1,
+	.param .u32 cnot_gate_kernel_param_2,
+	.param .u32 cnot_gate_kernel_param_3
+)
+{
+	.reg .pred 	%p<4>;
+	.reg .b32 	%r<24>;
+	.reg .f64 	%fd<5>;
+	.reg .b64 	%rd<7>;
+
+
+	ld.param.u64 	%rd1, [cnot_gate_kernel_param_0];
+	ld.param.u32 	%r3, [cnot_gate_kernel_param_1];
+	ld.param.u32 	%r4, [cnot_gate_kernel_param_2];
+	ld.param.u32 	%r5, [cnot_gate_kernel_param_3];
+	mov.u32 	%r6, %ntid.x;
+	mov.u32 	%r7, %ctaid.x;
+	mov.u32 	%r8, %tid.x;
+	mad.lo.s32 	%r1, %r7, %r6, %r8;
+	mov.u32 	%r9, 1;
+	shl.b32 	%r10, %r9, %r5;
+	setp.ge.s32 	%p1, %r1, %r10;
+	@%p1 bra 	$L__BB1_4;
+
+	shl.b32 	%r12, %r9, %r3;
+	and.b32  	%r13, %r12, %r1;
+	setp.eq.s32 	%p2, %r13, 0;
+	@%p2 bra 	$L__BB1_4;
+
+--
+.visible .entry time_evolution_kernel(
+	.param .u64 time_evolution_kernel_param_0,
+	.param .u64 time_evolution_kernel_param_1,
+	.param .f64 time_evolution_kernel_param_2,
+	.param .u32 time_evolution_kernel_param_3,
+	.param .u32 time_evolution_kernel_param_4
+)
+{
+	.local .align 4 .b8 	__local_depot2[8];
+	.reg .b64 	%SP;
+	.reg .b64 	%SPL;
+	.reg .pred 	%p<15>;
+	.reg .b32 	%r<41>;
+	.reg .f64 	%fd<127>;
+	.reg .b64 	%rd<30>;
+
+
+	mov.u64 	%SPL, __local_depot2;
+	cvta.local.u64 	%SP, %SPL;
+	ld.param.u64 	%rd11, [time_evolution_kernel_param_0];
+	ld.param.u64 	%rd10, [time_evolution_kernel_param_1];
+	ld.param.f64 	%fd40, [time_evolution_kernel_param_2];
+	ld.param.u32 	%r14, [time_evolution_kernel_param_3];
+	ld.param.u32 	%r15, [time_evolution_kernel_param_4];
+	cvta.to.global.u64 	%rd1, %rd11;
+	add.u64 	%rd2, %SPL, 0;
+	add.u64 	%rd3, %SPL, 4;
+	mov.u32 	%r16, %ntid.x;
+	mov.u32 	%r17, %ctaid.x;
+	mov.u32 	%r18, %tid.x;
+	mad.lo.s32 	%r1, %r17, %r16, %r18;
+--
+.visible .entry qft_kernel(
+	.param .u64 qft_kernel_param_0,
+	.param .u32 qft_kernel_param_1,
+	.param .u8 qft_kernel_param_2
+)
+{
+	.local .align 4 .b8 	__local_depot3[8];
+	.reg .b64 	%SP;
+	.reg .b64 	%SPL;
+	.reg .pred 	%p<14>;
+	.reg .b16 	%rs<2>;
+	.reg .b32 	%r<51>;
+	.reg .f64 	%fd<124>;
+	.reg .b64 	%rd<17>;
+
+
+	mov.u64 	%SPL, __local_depot3;
+	cvta.local.u64 	%SP, %SPL;
+	ld.param.s8 	%rs1, [qft_kernel_param_2];
+	ld.param.u64 	%rd4, [qft_kernel_param_0];
+	ld.param.u32 	%r16, [qft_kernel_param_1];
+	add.u64 	%rd5, %SP, 0;
+	add.u64 	%rd1, %SPL, 0;
+	add.u64 	%rd6, %SP, 4;
+	add.u64 	%rd2, %SPL, 4;
+	mov.u32 	%r17, %ntid.x;
+	mov.u32 	%r18, %ctaid.x;
+	mov.u32 	%r1, %tid.x;
+	mad.lo.s32 	%r2, %r18, %r17, %r1;
+	mov.u32 	%r19, 1;
+	shl.b32 	%r3, %r19, %r16;
+--
+.visible .entry vqe_ansatz_kernel(
+	.param .u64 vqe_ansatz_kernel_param_0,
+	.param .u64 vqe_ansatz_kernel_param_1,
+	.param .u32 vqe_ansatz_kernel_param_2,
+	.param .u32 vqe_ansatz_kernel_param_3
+)
+{
+	.local .align 4 .b8 	__local_depot4[4];
+	.reg .b64 	%SP;
+	.reg .b64 	%SPL;
+	.reg .pred 	%p<53>;
+	.reg .b32 	%r<181>;
+	.reg .f64 	%fd<210>;
+	.reg .b64 	%rd<51>;
+
+
+	mov.u64 	%SPL, __local_depot4;
+	cvta.local.u64 	%SP, %SPL;
+	ld.param.u64 	%rd13, [vqe_ansatz_kernel_param_0];
+	ld.param.u64 	%rd12, [vqe_ansatz_kernel_param_1];
+	ld.param.u32 	%r40, [vqe_ansatz_kernel_param_2];
+	ld.param.u32 	%r41, [vqe_ansatz_kernel_param_3];
+	cvta.to.global.u64 	%rd1, %rd13;
+	add.u64 	%rd14, %SP, 0;
+	add.u64 	%rd2, %SPL, 0;
+	mov.u32 	%r42, %ntid.x;
+	mov.u32 	%r43, %ctaid.x;
+	mov.u32 	%r44, %tid.x;
+	mad.lo.s32 	%r1, %r43, %r42, %r44;
+	mov.u32 	%r45, 1;
+	shl.b32 	%r46, %r45, %r40;
+--
+.visible .entry measurement_kernel(
+	.param .u64 measurement_kernel_param_0,
+	.param .u64 measurement_kernel_param_1,
+	.param .u32 measurement_kernel_param_2
+)
+{
+	.reg .pred 	%p<2>;
+	.reg .b32 	%r<6>;
+	.reg .f64 	%fd<7>;
+	.reg .b64 	%rd<9>;
+
+
+	ld.param.u64 	%rd1, [measurement_kernel_param_0];
+	ld.param.u64 	%rd2, [measurement_kernel_param_1];
+	ld.param.u32 	%r2, [measurement_kernel_param_2];
+	mov.u32 	%r3, %ctaid.x;
+	mov.u32 	%r4, %ntid.x;
+	mov.u32 	%r5, %tid.x;
+	mad.lo.s32 	%r1, %r3, %r4, %r5;
+	setp.ge.s32 	%p1, %r1, %r2;
+	@%p1 bra 	$L__BB5_2;
+
+	cvta.to.global.u64 	%rd3, %rd1;
+	mul.wide.s32 	%rd4, %r1, 16;
+	add.s64 	%rd5, %rd3, %rd4;
+	ld.global.v2.f64 	{%fd1, %fd2}, [%rd5];
+	mul.f64 	%fd5, %fd2, %fd2;
+	fma.rn.f64 	%fd6, %fd1, %fd1, %fd5;
+	cvta.to.global.u64 	%rd6, %rd2;
+	mul.wide.s32 	%rd7, %r1, 8;
+	add.s64 	%rd8, %rd6, %rd7;
+
+TOTAL KERNELS: 6

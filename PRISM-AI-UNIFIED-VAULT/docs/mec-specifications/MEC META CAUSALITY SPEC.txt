@@ -1,0 +1,210 @@
+MEC_META_CAUSALITY_SPEC.md
+1. Overview
+
+Meta-Causality is the property by which Prism’s MEC substrate modifies its own causal structure — the mapping between internal operations, data flows, and learning rules.
+In classical systems, algorithms evolve outputs; in MEC, algorithms evolve their own causes.
+
+Prism’s causal fabric is expressed as a meta-graph, dynamically reconfigured by evolutionary processes and reinforced by governance-protected feedback loops.
+2. Hierarchical Evolutionary Loops
+
+The evolution mechanism operates through two nested layers of feedback:
+Linner:policy-level learning (RL-based orchestration)
+Linner​:policy-level learning (RL-based orchestration)
+Louter:structural-level evolution (genetic/meta-learning)
+Louter​:structural-level evolution (genetic/meta-learning)
+2.1 Inner Loop (ADP Reinforcement Learning)
+
+The Adaptive Decision Processor (ADP) optimizes module orchestration using policy gradients:
+∇θJ(θ)=Eπθ[∇θlog⁡πθ(a∣s) Qπ(s,a)]
+∇θ​J(θ)=Eπθ​​[∇θ​logπθ​(a∣s)Qπ(s,a)]
+
+where aa is the module selection and ss encodes task features and system telemetry.
+2.2 Outer Loop (Evolution of the ADP Itself)
+
+The ADP becomes a subject of meta-optimization.
+Its architecture, exploration constants, and learning rules are evolved:
+θ(k+1)=θ(k)+μ ∇θJ(θ(k))+ϵk
+θ(k+1)=θ(k)+μ∇θ​J(θ(k))+ϵk​
+
+where μμ is the meta-step size and ϵkϵk​ represents stochastic structural perturbations (mutations).
+
+These mutations are graph-level deltas tested and validated through compliance mechanisms.
+3. Meta-Causal Graph Formalism
+3.1 Definition
+
+Let Gt=(Vt,Et,Wt,Λt)Gt​=(Vt​,Et​,Wt​,Λt​)
+be the causal graph at time tt, where:
+
+    VtVt​: operational nodes (algorithms, modules, transforms)
+
+    EtEt​: directed edges (control/data flow)
+
+    WtWt​: adaptive weights of influence
+
+    ΛtΛt​: meta-parameters controlling transformation rules
+
+Each node vi∈Vtvi​∈Vt​ carries a local state ψi(t)ψi​(t) and a transformation function fifi​.
+The system’s state propagation is:
+ψi(t+1)=fi(ψi(t),∑jWt(eji) ψj(t))
+ψi​(t+1)=fi​(ψi​(t),j∑​Wt​(eji​)ψj​(t))
+3.2 Meta-Causal Update Operator
+
+A mutation or “causal rewrite” is described by:
+Mmeta:Gt→Gt+1
+Mmeta​:Gt​→Gt+1​
+ΔGt=Mmeta(Gt)−Gt
+ΔGt​=Mmeta​(Gt​)−Gt​
+
+Each ΔGtΔGt​ is tested for validity through governance rules C(Gt)C(Gt​).
+4. Algorithmic Implementation (Rust Style)
+
+pub struct CausalGraph {
+    pub nodes: Vec<Node>,
+    pub edges: Vec<Edge>,
+    pub meta_params: MetaParams,
+}
+
+pub struct Node {
+    pub id: Uuid,
+    pub func: Box<dyn Fn(&[f64]) -> f64 + Send + Sync>,
+    pub state: Vec<f64>,
+}
+
+pub struct Edge {
+    pub from: Uuid,
+    pub to: Uuid,
+    pub weight: f64,
+}
+
+pub struct MetaParams {
+    pub mutation_rate: f64,
+    pub graph_temp: f64, // thermodynamic analog
+    pub survival_threshold: f64,
+}
+
+impl CausalGraph {
+    pub fn mutate(&mut self) {
+        if rand::random::<f64>() < self.meta_params.mutation_rate {
+            self.edges.iter_mut().for_each(|e| {
+                e.weight += gaussian_noise(0.0, 0.05);
+            });
+        }
+    }
+}
+
+Each mutation changes edge weights, rewires nodes, or replaces functions with new generative code.
+Code-level mutations are handled via macro templates validated through governance gates.
+5. Graph Reconfiguration Dynamics
+5.1 Mutation Energy Functional
+Emut=α∥ΔWt∥2+βH(Gt)
+Emut​=α∥ΔWt​∥2+βH(Gt​)
+
+    ∥ΔWt∥2∥ΔWt​∥2: magnitude of structural change
+
+    H(Gt)H(Gt​): entropy term encouraging diversity
+
+Accepted mutations minimize EmutEmut​ while maintaining compliance.
+5.2 Stochastic Graph Transition
+P(Gt+1∣Gt)∝exp⁡(−Emut(Gt→Gt+1)/Tt)
+P(Gt+1​∣Gt​)∝exp(−Emut​(Gt​→Gt+1​)/Tt​)
+
+TtTt​ is an adaptive “graph temperature” controlling exploration.
+6. Code-Level Self-Rewriting
+6.1 Macro-Based Genetic Programming
+
+The system maintains a registry of code templates for modules, represented as Rust macros:
+
+macro_rules! mutate_function {
+    ($fn_name:ident, $param:expr) => {
+        fn $fn_name(x: f64) -> f64 {
+            x.tanh() * (1.0 + $param * (rand::random::<f64>() - 0.5))
+        }
+    };
+}
+
+The meta-evolution engine periodically compiles new variants via procedural macros and dynamically loads them using libloading.
+This allows Prism to evolve new internal functions at runtime.
+6.2 Validation Pipeline
+
+Every generated variant passes:
+
+    Unit test suite
+
+    Compliance benchmarking
+
+    Performance regression check
+
+    Hash-based blockchain commit
+
+If all pass, the variant replaces the prior version.
+7. Meta-Controller Dynamics
+7.1 Evolution Equation
+θouter(k+1)=θouter(k)+ηouter∂Jmeta∂θouter+ζ(k)
+θouter(k+1)​=θouter(k)​+ηouter​∂θouter​∂Jmeta​​+ζ(k)
+
+ζ(k)ζ(k) adds stochastic exploration (meta-noise).
+The loss JmetaJmeta​ reflects the improvement of lower layers across epochs.
+7.2 Structural Learning Reward
+Rmeta=ΔPerf−λ ΔEnergy
+Rmeta​=ΔPerf−λΔEnergy
+
+Reward increases with performance gain, penalized by energetic cost.
+8. Blockchain-Protected Evolution Trail
+
+Each structural rewrite is serialized as a governance event:
+
+struct MetaCausalEvent {
+    hash: [u8; 32],
+    delta_energy: f64,
+    delta_perf: f64,
+    validation_hash: [u8; 32],
+}
+
+The cumulative evolution history forms a Merkle DAG, guaranteeing traceability and reversibility.
+9. Visualization: Causal Graph Flow
+
+[Module: Thermo]──┐
+                  │ (mutated edges)
+[Module: Quantum]─┼─>[Module: InfoGeo]
+                  │
+[Module: SNN]─────┘
+        ↓
+[MetaController]
+        ↓
+[Governance Chain Ledger]
+
+This diagram depicts the causal structure being rewritten dynamically,
+with the governance chain acting as both constraint and record.
+10. Safety Envelope
+
+    No mutation is executed outside the sandbox environment.
+
+    Only validated graphs are promoted to production.
+
+    Rollback triggers if:
+
+        Performance < baseline
+
+        Governance validation fails
+
+        Energy drift exceeds tolerance
+
+11. Summary
+
+The Meta-Causality layer gives Prism-AI its ability to:
+
+    Rewrite its own orchestration topology
+
+    Discover novel algorithmic pathways
+
+    Balance innovation against safety through blockchain-tracked governance
+
+Formally:
+Gt+1=SafeMutate(Gt,Rmeta,C)
+Gt+1​=SafeMutate(Gt​,Rmeta​,C)
+where C ensures compliance and reversibility.
+where C ensures compliance and reversibility.
+
+This transforms Prism from a fixed learner into an autoevolving algorithmic ecosystem.
+
+End of MEC_META_CAUSALITY_SPEC.md

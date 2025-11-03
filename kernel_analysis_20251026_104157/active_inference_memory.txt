@@ -1,0 +1,16 @@
+=== MEMORY PATTERN ANALYSIS: active_inference.ptx ===
+
+GLOBAL MEMORY OPERATIONS:
+  ld.global: 41
+  st.global: 10
+
+SHARED MEMORY USAGE:
+  .shared declarations: 5
+  ld.shared: 3
+  st.shared: 2
+
+REGISTER FILE USAGE:
+  Register declarations: 0
+
+FUSION LIKELIHOOD SCORE:
+  VERDICT: Likely UNFUSED kernel (score: 0/5)

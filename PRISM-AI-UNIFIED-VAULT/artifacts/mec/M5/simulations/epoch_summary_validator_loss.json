@@ -1,0 +1,174 @@
+{
+  "epoch_count": 5,
+  "epochs": [
+    {
+      "aggregated_delta": 57,
+      "aligned_updates": [
+        {
+          "anchor_hash": "a05cc377f6f936d3",
+          "delta_score": 11,
+          "ledger_height": 1,
+          "node_id": "edge-e"
+        },
+        {
+          "anchor_hash": "70365df918449daa",
+          "delta_score": 19,
+          "ledger_height": 1,
+          "node_id": "validator-a"
+        },
+        {
+          "anchor_hash": "619c59d50db1f627",
+          "delta_score": 12,
+          "ledger_height": 1,
+          "node_id": "validator-b"
+        },
+        {
+          "anchor_hash": "4879fd163a7212c6",
+          "delta_score": 15,
+          "ledger_height": 1,
+          "node_id": "validator-c"
+        }
+      ],
+      "epoch": 20,
+      "ledger_merkle": "d27d94fce6fc6f41",
+      "quorum_reached": true,
+      "signature": "d27d94fce6fc6f41"
+    },
+    {
+      "aggregated_delta": 53,
+      "aligned_updates": [
+        {
+          "anchor_hash": "a7cd7777fad75e15",
+          "delta_score": 10,
+          "ledger_height": 2,
+          "node_id": "edge-e"
+        },
+        {
+          "anchor_hash": "672d99f9130b8e70",
+          "delta_score": 18,
+          "ledger_height": 2,
+          "node_id": "validator-a"
+        },
+        {
+          "anchor_hash": "6a896dd512d31299",
+          "delta_score": 11,
+          "ledger_height": 2,
+          "node_id": "validator-b"
+        },
+        {
+          "anchor_hash": "3f715916353939ec",
+          "delta_score": 14,
+          "ledger_height": 2,
+          "node_id": "validator-c"
+        }
+      ],
+      "epoch": 21,
+      "ledger_merkle": "146057527073d846",
+      "quorum_reached": true,
+      "signature": "146057527073d846"
+    },
+    {
+      "aggregated_delta": 49,
+      "aligned_updates": [
+        {
+          "anchor_hash": "8e740377eca9be4b",
+          "delta_score": 9,
+          "ledger_height": 3,
+          "node_id": "edge-e"
+        },
+        {
+          "anchor_hash": "823a2df922aaf91a",
+          "delta_score": 17,
+          "ledger_height": 3,
+          "node_id": "validator-a"
+        },
+        {
+          "anchor_hash": "513079d504a64c4f",
+          "delta_score": 10,
+          "ledger_height": 3,
+          "node_id": "validator-b"
+        },
+        {
+          "anchor_hash": "5a7dcd1644d86e36",
+          "delta_score": 13,
+          "ledger_height": 3,
+          "node_id": "validator-c"
+        }
+      ],
+      "epoch": 22,
+      "ledger_merkle": "661e4d17d6c9f207",
+      "quorum_reached": true,
+      "signature": "661e4d17d6c9f207"
+    },
+    {
+      "aggregated_delta": 45,
+      "aligned_updates": [
+        {
+          "anchor_hash": "977ca377f1e29059",
+          "delta_score": 8,
+          "ledger_height": 4,
+          "node_id": "edge-e"
+        },
+        {
+          "anchor_hash": "7915fdf91d5a6aa4",
+          "delta_score": 16,
+          "ledger_height": 4,
+          "node_id": "validator-a"
+        },
+        {
+          "anchor_hash": "5a3921d509df2bf5",
+          "delta_score": 9,
+          "ledger_height": 4,
+          "node_id": "validator-b"
+        },
+        {
+          "anchor_hash": "519035163fb67178",
+          "delta_score": 12,
+          "ledger_height": 4,
+          "node_id": "validator-c"
+        }
+      ],
+      "epoch": 23,
+      "ledger_merkle": "7aba6cb29e522eab",
+      "quorum_reached": true,
+      "signature": "7aba6cb29e522eab"
+    },
+    {
+      "aggregated_delta": 41,
+      "aligned_updates": [
+        {
+          "anchor_hash": "7c70b377e2443c5b",
+          "delta_score": 7,
+          "ledger_height": 5,
+          "node_id": "edge-e"
+        },
+        {
+          "anchor_hash": "4dc6b5f904d2a5fa",
+          "delta_score": 15,
+          "ledger_height": 5,
+          "node_id": "validator-a"
+        },
+        {
+          "anchor_hash": "858869d52266f09f",
+          "delta_score": 8,
+          "ledger_height": 5,
+          "node_id": "validator-b"
+        },
+        {
+          "anchor_hash": "6ae9a5164de40a76",
+          "delta_score": 11,
+          "ledger_height": 5,
+          "node_id": "validator-c"
+        }
+      ],
+      "epoch": 24,
+      "ledger_merkle": "fab872019ed59d8e",
+      "quorum_reached": true,
+      "signature": "fab872019ed59d8e"
+    }
+  ],
+  "generated_at": "2025-10-21T20:18:44.478042426+00:00",
+  "label": "validator_loss",
+  "scenario": "validator-loss",
+  "summary_signature": "734ba8ed141920c3"
+}

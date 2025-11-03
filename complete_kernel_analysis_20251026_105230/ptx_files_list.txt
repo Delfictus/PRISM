@@ -1,0 +1,12 @@
+./foundation/kernels/cuda/matrix_ops.ptx
+./foundation/kernels/ptx/active_inference.ptx
+./foundation/kernels/ptx/double_double.ptx
+./foundation/kernels/ptx/ksg_kernels.ptx
+./foundation/kernels/ptx/neuromorphic_gemv.ptx
+./foundation/kernels/ptx/parallel_coloring.ptx
+./foundation/kernels/ptx/pimc_kernels.ptx
+./foundation/kernels/ptx/policy_evaluation.ptx
+./foundation/kernels/ptx/quantum_evolution.ptx
+./foundation/kernels/ptx/quantum_mlir.ptx
+./foundation/kernels/ptx/thermodynamic.ptx
+./foundation/kernels/ptx/transfer_entropy.ptx
