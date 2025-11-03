@@ -131,8 +131,8 @@ __global__ void sparse_parallel_coloring_csr(
         // Find used neighbor colors
         // IMPORTANT: Only check neighbors that have already been colored
         // (i.e., those that appear earlier in the vertex_order)
-        unsigned int used_colors_low = 0; // Bitset for colors 0-31
-        unsigned int used_colors_high = 0; // Bitset for colors 32-63
+        unsigned long long used_colors_low = 0;  // 64-bit mask for colors 0-63
+        unsigned long long used_colors_high = 0; // 64-bit mask for colors 64-127
 
         int start = row_ptr[v];
         int end = row_ptr[v + 1];
@@ -145,28 +145,28 @@ __global__ void sparse_parallel_coloring_csr(
             if (vertex_position[neighbor] < i) {
                 int neighbor_color = my_coloring[neighbor];
 
-                if (neighbor_color >= 0 && neighbor_color < 32) {
-                    used_colors_low |= (1u << neighbor_color);
-                } else if (neighbor_color >= 32 && neighbor_color < 64) {
-                    used_colors_high |= (1u << (neighbor_color - 32));
+                if (neighbor_color >= 0 && neighbor_color < 64) {
+                    used_colors_low |= (1ull << neighbor_color);
+                } else if (neighbor_color >= 64 && neighbor_color < 128) {
+                    used_colors_high |= (1ull << (neighbor_color - 64));
                 }
             }
         }
 
-        // Assign smallest available color
-        int assigned_color = __ffs(~used_colors_low) - 1; // Find first free color in 0-31
+        // Assign smallest available color using 64-bit find-first-set
+        int assigned_color = __ffsll(~used_colors_low) - 1; // Find first free color in 0-63
 
-        if (assigned_color < 0 || assigned_color >= 32) {
-            // Check colors 32-63
-            assigned_color = __ffs(~used_colors_high) - 1;
-            if (assigned_color >= 0 && assigned_color < 32) {
-                assigned_color += 32;
+        if (assigned_color < 0 || assigned_color >= 64) {
+            // Check colors 64-127
+            assigned_color = __ffsll(~used_colors_high) - 1;
+            if (assigned_color >= 0 && assigned_color < 64) {
+                assigned_color += 64;
             } else {
-                // Fallback: linear search for colors >= 64
-                assigned_color = 64;
+                // Fallback: linear search for colors >= 128
+                assigned_color = 128;
                 bool found = false;
 
-                for (int c = 64; c < max_colors; c++) {
+                for (int c = 128; c < max_colors; c++) {
                     bool color_available = true;
 
                     for (int edge_idx = start; edge_idx < end; edge_idx++) {
@@ -190,6 +190,11 @@ __global__ void sparse_parallel_coloring_csr(
                     assigned_color = max_colors; // Overflow - should not happen in valid graph
                 }
             }
+        }
+
+        // Log mask configuration once per kernel
+        if (threadIdx.x == 0 && blockIdx.x == 0 && attempt_id == 0 && i == 0) {
+            printf("[GPU][KERNEL] Mask strategy: dual-u64 width=128\n");
         }
 
         my_coloring[v] = assigned_color;
@@ -301,9 +306,9 @@ __global__ void dense_parallel_coloring_tensor(
     for (int i = 0; i < n; i++) {
         int v = vertex_order[i];
 
-        // Find used neighbor colors using bitsets for first 64 colors
-        unsigned int used_colors_low = 0; // Colors 0-31
-        unsigned int used_colors_high = 0; // Colors 32-63
+        // Find used neighbor colors using 64-bit masks
+        unsigned long long used_colors_low = 0;  // Colors 0-63
+        unsigned long long used_colors_high = 0; // Colors 64-127
 
         for (int u = 0; u < n; u++) {
             if (adjacency[v * n + u] > 0.5f) {

@@ -117,15 +117,24 @@ impl QuantumColoringSolver {
         let target_min = bounds.lower.max(target_colors);  // Don't go below TDA bound or original target
 
         while current_target > target_min {
-            // Reduce target by 5% or at least 1 color
-            let new_target = ((current_target as f64 * 0.95).floor() as usize).max(current_target - 5);
+            // Reduce target by 5% or at least 1 color, but NEVER go more than 2 colors
+            // below best_chromatic to avoid re-triggering "No colors available" errors
+            let reduction = ((current_target as f64 * 0.05).floor() as usize).min(5).max(1);
+            let new_target = current_target.saturating_sub(reduction);
             let new_target = new_target.max(target_min);
 
+            // Safety margin: Don't tighten more than 2 colors below current best
+            let safe_target = best_chromatic.saturating_sub(2);
+            let new_target = new_target.max(safe_target);
+
             if new_target >= current_target {
+                println!("[QUANTUM-COLORING] Target {} cannot be reduced further (safe_target: {}, target_min: {})",
+                         current_target, safe_target, target_min);
                 break;  // Can't reduce further
             }
 
-            println!("[QUANTUM-COLORING] Attempting {} colors (from {})...", new_target, current_target);
+            println!("[QUANTUM-COLORING] Attempting {} colors (from {}, safe margin: {} - 2 = {})...",
+                     new_target, current_target, best_chromatic, safe_target);
 
             // Create QUBO with color penalty to prefer lower colors
             let color_penalty_weight = 0.1;  // Small penalty to prefer lower-numbered colors
@@ -326,7 +335,17 @@ impl QuantumColoringSolver {
         let mut current_target = target_colors;
         const MAX_RETRIES: usize = 10;
 
+        println!("[QUANTUM-COLORING][DIAGNOSTICS] Starting adaptive initial solution");
+        println!("[QUANTUM-COLORING][DIAGNOSTICS]   Graph: {} vertices, {} edges",
+                 graph.num_vertices, graph.num_edges);
+        println!("[QUANTUM-COLORING][DIAGNOSTICS]   Target range: {} → {}", target_colors, max_colors);
+
         for retry in 0..MAX_RETRIES {
+            println!("[QUANTUM-COLORING][DIAGNOSTICS] Attempt {}/{}: Trying {} colors",
+                     retry + 1, MAX_RETRIES, current_target);
+            println!("{{\"event\":\"quantum_retry\",\"attempt\":{},\"max_attempts\":{},\"target_colors\":{}}}",
+                     retry + 1, MAX_RETRIES, current_target);
+
             match self.phase_guided_initial_solution(
                 graph,
                 _phase_field,
@@ -338,28 +357,40 @@ impl QuantumColoringSolver {
                         println!("[QUANTUM-COLORING] Relaxed target from {} to {} colors (retry {})",
                                  target_colors, current_target, retry);
                     }
+                    println!("[QUANTUM-COLORING][DIAGNOSTICS] ✅ Success: {} colors, {} conflicts, quality {:.3}",
+                             solution.chromatic_number, solution.conflicts, solution.quality_score);
+                    println!("{{\"event\":\"quantum_success\",\"attempt\":{},\"colors\":{},\"conflicts\":{}}}",
+                             retry + 1, solution.chromatic_number, solution.conflicts);
                     return Ok((solution, current_target));
                 }
-                Err(_) => {
+                Err(e) => {
+                    println!("[QUANTUM-COLORING][DIAGNOSTICS] ❌ Failed: {:?}", e);
+                    println!("{{\"event\":\"quantum_failed\",\"attempt\":{},\"error\":\"{}\"}}",
+                             retry + 1, e);
                     // Increase target by 20%
                     let new_target = ((current_target as f64 * 1.2).ceil() as usize).min(max_colors);
                     if new_target == current_target {
                         // Can't increase anymore, use max_colors
                         current_target = max_colors;
+                        println!("[QUANTUM-COLORING][DIAGNOSTICS]   Maxed out, using max_colors = {}", max_colors);
                     } else {
                         current_target = new_target;
+                        println!("[QUANTUM-COLORING][DIAGNOSTICS]   Increased target to {}", current_target);
                     }
                 }
             }
         }
 
         // Final attempt with max_colors
+        println!("[QUANTUM-COLORING][DIAGNOSTICS] Final attempt with max_colors = {}", max_colors);
         let solution = self.phase_guided_initial_solution(
             graph,
             _phase_field,
             kuramoto_state,
             max_colors,
         )?;
+        println!("[QUANTUM-COLORING][DIAGNOSTICS] Final solution: {} colors, {} conflicts",
+                 solution.chromatic_number, solution.conflicts);
         Ok((solution, max_colors))
     }
 
@@ -396,7 +427,23 @@ impl QuantumColoringSolver {
             // Find first available color
             let color = (0..max_colors)
                 .find(|c| !forbidden.contains(c))
-                .ok_or_else(|| PRCTError::ColoringFailed("No colors available".into()))?;
+                .ok_or_else(|| {
+                    // Enhanced diagnostics before error
+                    let degree = (0..n).filter(|&u| adjacency[[vertex, u]]).count();
+                    let colored_neighbors = forbidden.len();
+                    println!("[QUANTUM-COLORING][ERROR] Vertex {} failed to find color:", vertex);
+                    println!("[QUANTUM-COLORING][ERROR]   Degree: {}", degree);
+                    println!("[QUANTUM-COLORING][ERROR]   Colored neighbors: {}", colored_neighbors);
+                    println!("[QUANTUM-COLORING][ERROR]   Forbidden colors: {} (max_colors: {})",
+                             forbidden.len(), max_colors);
+                    if forbidden.len() <= 20 {
+                        println!("[QUANTUM-COLORING][ERROR]   Forbidden set: {:?}", forbidden);
+                    }
+                    PRCTError::ColoringFailed(format!(
+                        "No colors available for vertex {} (degree {}, forbidden {}/{})",
+                        vertex, degree, forbidden.len(), max_colors
+                    ))
+                })?;
 
             coloring[vertex] = color;
         }

@@ -147,8 +147,30 @@ impl GpuColoringEngine {
             vec![1.0f32; n * n]
         };
 
-        // Select strategy based on density
-        let result = if density < 0.40 {
+        // Configurable selection logic (hardcoded for now, will be wired to config)
+        let threshold = 0.40;
+        let prefer_sparse = false;
+        let mask_width = 128;  // Using dual u64 masks
+
+        let use_sparse = if prefer_sparse {
+            true
+        } else {
+            density < threshold
+        };
+
+        // Enhanced logging as per WR requirements
+        let mask_strategy = if mask_width == 64 { "single-u64" } else { "dual-u64" };
+        println!("[GPU][COLORING] Selection: dense={} density={:.3} threshold={:.2} prefer_sparse={} mask={} width={}",
+                 !use_sparse, density, threshold, prefer_sparse, mask_strategy, mask_width);
+
+        // One-time startup confirmation
+        static ONCE: std::sync::Once = std::sync::Once::new();
+        ONCE.call_once(|| {
+            println!("[GPU][COLORING] Dynamic workspace enabled; no shared-mem vertex cap");
+        });
+
+        // Select strategy
+        let result = if use_sparse {
             println!("[GPU] Using SPARSE kernel (CSR format)");
             self.color_sparse(adjacency, &coherence_vec, num_attempts, temperature, max_colors)?
         } else {
@@ -196,6 +218,14 @@ impl GpuColoringEngine {
         // Each array needs n elements, so 3*n per attempt
         let workspace_size = n * 3 * num_attempts;
         let mut workspace_gpu: CudaSlice<f32> = device.alloc_zeros(workspace_size)?;
+
+        // Verify workspace allocation
+        if workspace_size == 0 {
+            return Err(anyhow!("Invalid workspace size: n={} attempts={}", n, num_attempts));
+        }
+
+        println!("[GPU][COLORING] Workspace allocated: {} floats ({:.2} MB)",
+                 workspace_size, (workspace_size * 4) as f64 / (1024.0 * 1024.0));
 
         // Launch configuration
         let threads_per_block = 256;
@@ -291,6 +321,14 @@ impl GpuColoringEngine {
         // Each array needs n elements, so 3*n per attempt
         let workspace_size = n * 3 * num_attempts;
         let mut workspace_gpu: CudaSlice<f32> = device.alloc_zeros(workspace_size)?;
+
+        // Verify workspace allocation
+        if workspace_size == 0 {
+            return Err(anyhow!("Invalid workspace size: n={} attempts={}", n, num_attempts));
+        }
+
+        println!("[GPU][COLORING] Workspace allocated: {} floats ({:.2} MB)",
+                 workspace_size, (workspace_size * 4) as f64 / (1024.0 * 1024.0));
 
         // Launch configuration
         let threads_per_block = 256;
