@@ -45,7 +45,7 @@ cudarc = { version = "0.9", features = ["std"] }
 
 # PRCT Algorithm (local dependency)
 prct-core = { path = "foundation/prct-core" }
-shared-types = { path = "foundation/shared-types" }
+shared-types = { path = "foundation/shared-types", features = ["std"] }
 quantum-engine = { path = "foundation/quantum" }
 neuromorphic-engine = { path = "foundation/neuromorphic" }
 
@@ -66,6 +66,7 @@ reqwest = { version = "0.11", features = ["blocking", "json"] }
 dashmap = "6.0"
 parking_lot = "0.12"
 toml = "0.8"
+toml_edit = "0.22"
 neuromorphic_engine = { path = "foundation/neuromorphic", package = "neuromorphic-engine" }
 quantum_engine = { path = "foundation/quantum", package = "quantum-engine" }
 futures = "0.3"
@@ -110,6 +111,10 @@ path = "src/bin/meta_reflexive_snapshot.rs"
 [[bin]]
 name = "federated-sim"
 path = "src/bin/federated_sim.rs"
+
+[[bin]]
+name = "prism-config"
+path = "src/bin/prism_config.rs"
 
 # Examples
 [[example]]

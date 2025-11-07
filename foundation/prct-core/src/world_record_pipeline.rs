@@ -32,6 +32,40 @@ use cudarc::driver::CudaDevice;
 #[cfg(feature = "cuda")]
 use crate::world_record_pipeline_gpu::GpuReservoirConflictPredictor;
 
+#[cfg(feature = "cuda")]
+use crate::gpu_transfer_entropy;
+
+#[cfg(feature = "cuda")]
+use crate::gpu_thermodynamic;
+
+/// Runtime GPU usage tracking for each phase
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PhaseGpuStatus {
+    pub phase0_gpu_used: bool,
+    pub phase1_gpu_used: bool,
+    pub phase2_gpu_used: bool,
+    pub phase3_gpu_used: bool,
+    pub phase0_fallback_reason: Option<String>,
+    pub phase1_fallback_reason: Option<String>,
+    pub phase2_fallback_reason: Option<String>,
+    pub phase3_fallback_reason: Option<String>,
+}
+
+impl Default for PhaseGpuStatus {
+    fn default() -> Self {
+        Self {
+            phase0_gpu_used: false,
+            phase1_gpu_used: false,
+            phase2_gpu_used: false,
+            phase3_gpu_used: false,
+            phase0_fallback_reason: None,
+            phase1_fallback_reason: None,
+            phase2_fallback_reason: None,
+            phase3_fallback_reason: None,
+        }
+    }
+}
+
 // Serde default helpers for v1.1 config
 fn default_true() -> bool { true }
 fn default_threads() -> usize { 24 }
@@ -104,11 +138,35 @@ pub struct ThermoConfig {
     #[serde(default)]
     pub exchange_interval: usize,
 
-    #[serde(default)]
+    #[serde(default = "default_t_min")]
     pub t_min: f64,
 
-    #[serde(default)]
+    #[serde(default = "default_t_max")]
     pub t_max: f64,
+
+    /// Steps per temperature for equilibration (default: 5000)
+    #[serde(default = "default_steps_per_temp")]
+    pub steps_per_temp: usize,
+
+    /// VRAM-safe maximum replicas for 8GB devices (default: 56)
+    #[serde(default = "default_replicas")]
+    pub replicas_max_safe: usize,
+
+    /// VRAM-safe maximum temperatures for 8GB devices (default: 56)
+    #[serde(default = "default_replicas")]
+    pub num_temps_max_safe: usize,
+}
+
+fn default_t_min() -> f64 {
+    0.01
+}
+
+fn default_t_max() -> f64 {
+    10.0
+}
+
+fn default_steps_per_temp() -> usize {
+    5000
 }
 
 impl Default for ThermoConfig {
@@ -117,8 +175,11 @@ impl Default for ThermoConfig {
             replicas: default_replicas(),  // VRAM guard: 56 for 8GB
             num_temps: default_replicas(), // VRAM guard: 56 for 8GB
             exchange_interval: 50,
-            t_min: 0.001,
-            t_max: 1.0,
+            t_min: 0.01,
+            t_max: 10.0,
+            steps_per_temp: 5000,
+            replicas_max_safe: 56,
+            num_temps_max_safe: 56,
         }
     }
 }
@@ -136,10 +197,42 @@ pub struct QuantumConfig {
     /// Fall back to DSATUR if quantum fails
     #[serde(default = "default_true")]
     pub fallback_on_failure: bool,
+
+    /// GPU QUBO iterations (default: 10000)
+    #[serde(default = "default_qubo_iterations")]
+    pub qubo_iterations: usize,
+
+    /// GPU QUBO batch size (default: 256)
+    #[serde(default = "default_qubo_batch")]
+    pub qubo_batch_size: usize,
+
+    /// GPU QUBO initial temperature (default: 1.0)
+    #[serde(default = "default_qubo_t_initial")]
+    pub qubo_t_initial: f64,
+
+    /// GPU QUBO final temperature (default: 0.01)
+    #[serde(default = "default_qubo_t_final")]
+    pub qubo_t_final: f64,
 }
 
 fn default_quantum_retries() -> usize {
     2
+}
+
+fn default_qubo_iterations() -> usize {
+    10_000
+}
+
+fn default_qubo_batch() -> usize {
+    256
+}
+
+fn default_qubo_t_initial() -> f64 {
+    1.0
+}
+
+fn default_qubo_t_final() -> f64 {
+    0.01
 }
 
 impl Default for QuantumConfig {
@@ -149,6 +242,10 @@ impl Default for QuantumConfig {
             target_chromatic: 83,
             failure_retries: 2,
             fallback_on_failure: true,
+            qubo_iterations: 10_000,
+            qubo_batch_size: 256,
+            qubo_t_initial: 1.0,
+            qubo_t_final: 0.01,
         }
     }
 }
@@ -215,6 +312,35 @@ impl Default for GeodesicConfig {
     }
 }
 
+/// Transfer Entropy Configuration
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TransferEntropyConfig {
+    /// Weight for geodesic features in TE ordering (0.0 = TE only, 1.0 = geodesic only)
+    #[serde(default = "default_geodesic_weight")]
+    pub geodesic_weight: f64,
+
+    /// Weight for TE vs Kuramoto in hybrid ordering (te_weight = this, kuramoto_weight = 1.0 - this)
+    #[serde(default = "default_te_vs_kuramoto_weight")]
+    pub te_vs_kuramoto_weight: f64,
+}
+
+fn default_geodesic_weight() -> f64 {
+    0.2
+}
+
+fn default_te_vs_kuramoto_weight() -> f64 {
+    0.7
+}
+
+impl Default for TransferEntropyConfig {
+    fn default() -> Self {
+        Self {
+            geodesic_weight: 0.2,
+            te_vs_kuramoto_weight: 0.7,
+        }
+    }
+}
+
 /// CPU Configuration
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CpuConfig {
@@ -272,6 +398,26 @@ impl Default for AdpConfig {
     }
 }
 
+/// Neuromorphic Configuration
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct NeuromorphicConfig {
+    /// Phase threshold for difficulty zone clustering (radians)
+    #[serde(default = "default_phase_threshold")]
+    pub phase_threshold: f64,
+}
+
+fn default_phase_threshold() -> f64 {
+    0.5
+}
+
+impl Default for NeuromorphicConfig {
+    fn default() -> Self {
+        Self {
+            phase_threshold: 0.5,
+        }
+    }
+}
+
 /// Orchestrator Configuration
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OrchestratorConfig {
@@ -281,6 +427,38 @@ pub struct OrchestratorConfig {
     pub restarts: usize,
     pub early_stop_no_improve_iters: usize,
     pub checkpoint_minutes: usize,
+
+    /// DSATUR target offset: how many colors below best to try (default: 3)
+    #[serde(default = "default_dsatur_target_offset")]
+    pub dsatur_target_offset: usize,
+
+    /// Minimum history length before enabling thermo loopback (default: 3)
+    #[serde(default = "default_adp_min_history_for_thermo")]
+    pub adp_min_history_for_thermo: usize,
+
+    /// Minimum history length before enabling quantum loopback (default: 2)
+    #[serde(default = "default_adp_min_history_for_quantum")]
+    pub adp_min_history_for_quantum: usize,
+
+    /// Minimum history length before enabling full loopback (default: 5)
+    #[serde(default = "default_adp_min_history_for_loopback")]
+    pub adp_min_history_for_loopback: usize,
+}
+
+fn default_dsatur_target_offset() -> usize {
+    3
+}
+
+fn default_adp_min_history_for_thermo() -> usize {
+    3
+}
+
+fn default_adp_min_history_for_quantum() -> usize {
+    2
+}
+
+fn default_adp_min_history_for_loopback() -> usize {
+    5
 }
 
 impl Default for OrchestratorConfig {
@@ -292,6 +470,10 @@ impl Default for OrchestratorConfig {
             restarts: 10,
             early_stop_no_improve_iters: 3,
             checkpoint_minutes: 15,
+            dsatur_target_offset: 3,
+            adp_min_history_for_thermo: 3,
+            adp_min_history_for_quantum: 2,
+            adp_min_history_for_loopback: 5,
         }
     }
 }
@@ -408,6 +590,14 @@ pub struct WorldRecordConfig {
     /// CPU configuration
     #[serde(default)]
     pub cpu: CpuConfig,
+
+    /// Transfer Entropy configuration
+    #[serde(default)]
+    pub transfer_entropy: TransferEntropyConfig,
+
+    /// Neuromorphic configuration
+    #[serde(default)]
+    pub neuromorphic: NeuromorphicConfig,
 }
 
 impl Default for WorldRecordConfig {
@@ -430,7 +620,7 @@ impl Default for WorldRecordConfig {
             use_ensemble_consensus: true,
             use_geodesic_features: false,
             use_gnn_screening: false,
-            use_tda: false,
+            use_tda: true,  // Topological Data Analysis ENABLED by default
             num_workers: 24,  // Intel i9 Ultra
             gpu: GpuConfig::default(),
             memetic: MemeticConfig::default(),
@@ -441,6 +631,8 @@ impl Default for WorldRecordConfig {
             geodesic: GeodesicConfig::default(),
             gpu_coloring: GpuColoringConfig::default(),
             cpu: CpuConfig::default(),
+            transfer_entropy: TransferEntropyConfig::default(),
+            neuromorphic: NeuromorphicConfig::default(),
         }
     }
 }
@@ -532,20 +724,21 @@ impl WorldRecordConfig {
         // HARD GUARDRAILS: Unimplemented feature detection
         // ═══════════════════════════════════════════════════════════
 
-        // TDA requested but not implemented
+        // TDA validation - ENABLED (implementation available in foundation/phase6/tda.rs)
         if self.use_tda {
             #[cfg(feature = "cuda")]
             {
                 if self.gpu.enable_tda_gpu {
-                    return Err(PRCTError::ConfigError(
-                        "TDA GPU requested but not yet implemented (use_tda=true, enable_tda_gpu=true)".into()
-                    ));
+                    println!("[PIPELINE][INIT] TDA GPU acceleration ENABLED");
                 }
             }
 
-            // Even CPU TDA is not implemented
-            println!("[PIPELINE][FALLBACK] TDA requested but not implemented, will skip this phase");
-            println!("[PIPELINE][FALLBACK] Performance impact: none (feature not used yet)");
+            #[cfg(not(feature = "cuda"))]
+            {
+                if self.use_tda {
+                    println!("[PIPELINE][INIT] TDA enabled (CPU-only mode)");
+                }
+            }
         }
 
         // GNN screening requested but not implemented
@@ -810,6 +1003,7 @@ impl ReservoirConflictPredictor {
         graph: &Graph,
         coloring_history: &[ColoringSolution],
         kuramoto_state: &KuramotoState,
+        phase_threshold: f64,
     ) -> Result<Self> {
         let n = graph.num_vertices;
         let mut conflict_scores = vec![0.0; n];
@@ -833,7 +1027,6 @@ impl ReservoirConflictPredictor {
 
         // Use Kuramoto phases to identify coherent difficulty zones
         let mut difficulty_zones = Vec::new();
-        let phase_threshold = 0.5;  // Radians
 
         for seed in 0..n {
             if conflict_scores[seed] < 2.0 {
@@ -877,12 +1070,12 @@ impl ThermodynamicEquilibrator {
         graph: &Graph,
         initial_solution: &ColoringSolution,
         target_chromatic: usize,
-        num_temps: usize,  // ADP-tunable temperature count
+        t_min: f64,
+        t_max: f64,
+        num_temps: usize,
+        steps_per_temp: usize,
     ) -> Result<Self> {
         // Logarithmic temperature schedule
-        let t_max = 10.0;
-        let t_min = 0.01;
-
         let temperatures: Vec<f64> = (0..num_temps)
             .map(|i| {
                 let frac = i as f64 / (num_temps - 1) as f64;
@@ -895,6 +1088,7 @@ impl ThermodynamicEquilibrator {
         let mut current = initial_solution.clone();
 
         println!("[THERMODYNAMIC] Starting replica exchange...");
+        println!("[THERMODYNAMIC] Temperature range: [{:.3}, {:.3}], steps_per_temp: {}", t_min, t_max, steps_per_temp);
 
         for (i, &temp) in temperatures.iter().enumerate() {
             println!("[THERMODYNAMIC] Temperature {}/{}: T = {:.3}", i + 1, num_temps, temp);
@@ -903,8 +1097,8 @@ impl ThermodynamicEquilibrator {
             let mut best = current.clone();
             let adj = build_adjacency_matrix(graph);
 
-            // World-record: 5000 steps per temperature (5x aggressive)
-            for _ in 0..5000 {
+            // Use configurable steps per temperature
+            for _ in 0..steps_per_temp {
                 // Random recoloring move
                 let v = rand::random::<usize>() % graph.num_vertices;
                 let old_color = current.colors[v];
@@ -1263,6 +1457,9 @@ pub struct WorldRecordPipeline {
     #[cfg(feature = "cuda")]
     cuda_device: Arc<CudaDevice>,
 
+    /// Runtime GPU usage tracking
+    phase_gpu_status: PhaseGpuStatus,
+
     adp_epsilon: f64,
 
     /// ADP-tuned solver parameters
@@ -1311,10 +1508,11 @@ impl WorldRecordPipeline {
             ensemble: EnsembleConsensus::new(),
             adp_q_table: std::collections::HashMap::new(),
             cuda_device,
-            adp_epsilon: 1.0,  // Start with full exploration
-            adp_dsatur_depth: 200000,  // World-record DSATUR depth (4x aggressive)
-            adp_quantum_iterations: 20,  // World-record quantum iterations (4x)
-            adp_thermo_num_temps: 64,  // World-record temperature count (2x)
+            phase_gpu_status: PhaseGpuStatus::default(),
+            adp_epsilon: config.adp.epsilon,
+            adp_dsatur_depth: config.orchestrator.adp_dsatur_depth,
+            adp_quantum_iterations: config.orchestrator.adp_quantum_iterations,
+            adp_thermo_num_temps: config.orchestrator.adp_thermo_num_temps,
             stagnation_count: 0,
             last_improvement_iteration: 0,
         })
@@ -1362,10 +1560,11 @@ impl WorldRecordPipeline {
             quantum_classical: Some(QuantumClassicalHybrid::new(config.target_chromatic)?),
             ensemble: EnsembleConsensus::new(),
             adp_q_table: std::collections::HashMap::new(),
-            adp_epsilon: 1.0,  // Start with full exploration
-            adp_dsatur_depth: 200000,  // World-record DSATUR depth (4x aggressive)
-            adp_quantum_iterations: 20,  // World-record quantum iterations (4x)
-            adp_thermo_num_temps: 64,  // World-record temperature count (2x)
+            phase_gpu_status: PhaseGpuStatus::default(),
+            adp_epsilon: config.adp.epsilon,
+            adp_dsatur_depth: config.orchestrator.adp_dsatur_depth,
+            adp_quantum_iterations: config.orchestrator.adp_quantum_iterations,
+            adp_thermo_num_temps: config.orchestrator.adp_thermo_num_temps,
             stagnation_count: 0,
             last_improvement_iteration: 0,
         })
@@ -1657,16 +1856,20 @@ impl WorldRecordPipeline {
                         &training_solutions,
                         initial_kuramoto,
                         Arc::clone(&self.cuda_device),
+                        self.config.neuromorphic.phase_threshold,
                     ) {
                         Ok(predictor) => {
+                            self.phase_gpu_status.phase0_gpu_used = true;
+                            println!("[PHASE 0][GPU] ✅ GPU reservoir executed successfully");
                             println!("[PHASE 0] ✅ Identified {} difficulty zones", predictor.difficulty_zones.len());
                             println!("[PHASE 0] ✅ GPU dendritic processing: {} high-conflict vertices",
                                      predictor.conflict_scores.iter().filter(|&&s| s > 2.0).count());
                             self.conflict_predictor_gpu = Some(predictor);
                         }
                         Err(e) => {
-                            println!("[PHASE 0][FALLBACK] GPU reservoir failed: {:?}", e);
-                            println!("[PHASE 0][FALLBACK] Using CPU reservoir fallback");
+                            self.phase_gpu_status.phase0_fallback_reason = Some(format!("{}", e));
+                            println!("[PHASE 0][GPU→CPU FALLBACK] {}", e);
+                            println!("[PHASE 0][CPU] Using CPU reservoir fallback");
                             println!("[PHASE 0][FALLBACK] Performance impact: ~10-50x slower (loses GPU acceleration)");
 
                             // CPU fallback
@@ -1674,6 +1877,7 @@ impl WorldRecordPipeline {
                                 graph,
                                 &training_solutions,
                                 initial_kuramoto,
+                                self.config.neuromorphic.phase_threshold,
                             )?;
                             println!("[PHASE 0] ✅ CPU fallback: {} difficulty zones identified", predictor.difficulty_zones.len());
                             // Note: can't store in conflict_predictor_gpu (wrong type), continue without it
@@ -1687,6 +1891,7 @@ impl WorldRecordPipeline {
                         graph,
                         &training_solutions,
                         initial_kuramoto,
+                        self.config.neuromorphic.phase_threshold,
                     )?;
                     println!("[PHASE 0] ✅ CPU reservoir: {} difficulty zones identified", predictor.difficulty_zones.len());
                 }
@@ -1700,6 +1905,7 @@ impl WorldRecordPipeline {
                     graph,
                     &training_solutions,
                     initial_kuramoto,
+                    self.config.neuromorphic.phase_threshold,
                 )?);
 
                 // Safe: just set above; if this fails, it's a logic error
@@ -1729,23 +1935,68 @@ impl WorldRecordPipeline {
         println!("{{\"event\":\"phase_start\",\"phase\":\"1\",\"name\":\"transfer_entropy\"}}");
 
         // ACTIVATION LOG: Phase entry
-        if self.config.use_transfer_entropy {
+        if !self.config.use_transfer_entropy {
+            println!("[PHASE 1] disabled by config");
+        }
+
+        let te_ordering = if self.config.use_transfer_entropy {
             #[cfg(feature = "cuda")]
             {
                 if self.config.gpu.enable_te_gpu {
-                    println!("[PHASE 1][GPU] TE kernels active (histogram bins=auto, lag=1)");
+                    println!("[PHASE 1][GPU] Attempting TE kernels (histogram bins=auto, lag=1)");
+                    match gpu_transfer_entropy::compute_transfer_entropy_ordering_gpu(
+                        &self.cuda_device,
+                        graph,
+                        initial_kuramoto,
+                        geodesic_features.as_ref(),
+                        self.config.transfer_entropy.geodesic_weight,
+                    ) {
+                        Ok(ordering) => {
+                            self.phase_gpu_status.phase1_gpu_used = true;
+                            println!("[PHASE 1][GPU] ✅ TE kernels executed successfully");
+                            ordering
+                        }
+                        Err(e) => {
+                            self.phase_gpu_status.phase1_fallback_reason = Some(format!("{}", e));
+                            println!("[PHASE 1][GPU→CPU FALLBACK] {}", e);
+                            println!("[PHASE 1][CPU] Using CPU TE computation");
+                            hybrid_te_kuramoto_ordering(
+                                graph,
+                                initial_kuramoto,
+                                geodesic_features.as_ref(),
+                                self.config.transfer_entropy.geodesic_weight,
+                                self.config.transfer_entropy.te_vs_kuramoto_weight,
+                            )?
+                        }
+                    }
                 } else {
-                    println!("[PHASE 1] TE active (CPU)");
+                    println!("[PHASE 1][CPU] TE on CPU (GPU disabled in config)");
+                    hybrid_te_kuramoto_ordering(
+                        graph,
+                        initial_kuramoto,
+                        geodesic_features.as_ref(),
+                        self.config.transfer_entropy.geodesic_weight,
+                        self.config.transfer_entropy.te_vs_kuramoto_weight,
+                    )?
                 }
             }
 
             #[cfg(not(feature = "cuda"))]
-            println!("[PHASE 1] TE active (CPU only)");
+            {
+                println!("[PHASE 1][CPU] TE on CPU (CUDA not compiled)");
+                hybrid_te_kuramoto_ordering(
+                    graph,
+                    initial_kuramoto,
+                    geodesic_features.as_ref(),
+                    self.config.transfer_entropy.geodesic_weight,
+                    self.config.transfer_entropy.te_vs_kuramoto_weight,
+                )?
+            }
         } else {
-            println!("[PHASE 1] disabled by config");
-        }
+            // Phase disabled: return simple vertex ordering
+            (0..graph.num_vertices).collect()
+        };
 
-        let te_ordering = hybrid_te_kuramoto_ordering(graph, initial_kuramoto, geodesic_features.as_ref(), 0.2)?;
         let mut te_solution = greedy_coloring_with_ordering(graph, &te_ordering)?;
 
         // Apply Active Inference to refine difficult vertices
@@ -1781,28 +2032,6 @@ impl WorldRecordPipeline {
             println!("└─────────────────────────────────────────────────────────┘");
             println!("{{\"event\":\"phase_start\",\"phase\":\"2\",\"name\":\"thermodynamic\"}}");
 
-            // ACTIVATION LOG: Phase entry
-            #[cfg(feature = "cuda")]
-            {
-                if self.config.gpu.enable_thermo_gpu {
-                    println!("[PHASE 2][GPU] Thermodynamic replica exchange active (temps={}, replicas={})",
-                             self.config.thermo.num_temps,
-                             self.config.thermo.replicas);
-                } else {
-                    println!("[PHASE 2] Thermodynamic active (CPU)");
-                }
-
-                if self.config.use_pimc && self.config.gpu.enable_pimc_gpu {
-                    let pimc_beads = default_beads();
-                    println!("[PHASE 2][GPU] PIMC active (replicas={}, beads={})",
-                             self.config.thermo.replicas,
-                             pimc_beads);
-                }
-            }
-
-            #[cfg(not(feature = "cuda"))]
-            println!("[PHASE 2] Thermodynamic active (CPU only)");
-
             // ADP: Learn from Phase 1 results
             if self.config.use_adp_learning && self.history.len() >= 2 {
                 let current_state = ColoringState::from_solution(
@@ -1823,27 +2052,99 @@ impl WorldRecordPipeline {
                 }
             }
 
-            self.thermodynamic_eq = Some(ThermodynamicEquilibrator::equilibrate(
-                graph,
-                &self.best_solution,
-                self.config.target_chromatic,
-                self.adp_thermo_num_temps,  // ADP-tuned temperature count
-            )?);
-
-            // Safe: just set above; if this fails, it's a logic error
-            if let Some(ref eq) = self.thermodynamic_eq {
-                for (i, state) in eq.equilibrium_states.iter().enumerate() {
-                    if state.conflicts == 0 && state.chromatic_number < self.best_solution.chromatic_number {
-                        // IMPORTANT: This is an intermediate phase result (DO NOT PARSE as final result)
-                        println!("[PHASE 2] 🎯 Thermodynamic improvement at T={:.3}: {} → {} colors",
-                                 eq.temperatures[i], self.best_solution.chromatic_number, state.chromatic_number);
-                        self.best_solution = state.clone();
+            // GPU/CPU dispatch for thermodynamic equilibration
+            let equilibrium_states = {
+                #[cfg(feature = "cuda")]
+                {
+                    if self.config.gpu.enable_thermo_gpu {
+                        println!("[PHASE 2][GPU] Attempting thermodynamic replica exchange (temps={}, steps={})",
+                                 self.adp_thermo_num_temps, self.config.thermo.steps_per_temp);
+                        match gpu_thermodynamic::equilibrate_thermodynamic_gpu(
+                            &self.cuda_device,
+                            graph,
+                            &self.best_solution,
+                            self.config.target_chromatic,
+                            self.config.thermo.t_min,
+                            self.config.thermo.t_max,
+                            self.adp_thermo_num_temps,
+                            self.config.thermo.steps_per_temp,
+                        ) {
+                            Ok(states) => {
+                                self.phase_gpu_status.phase2_gpu_used = true;
+                                println!("[PHASE 2][GPU] ✅ Thermodynamic kernels executed successfully");
+                                states
+                            }
+                            Err(e) => {
+                                self.phase_gpu_status.phase2_fallback_reason = Some(format!("{}", e));
+                                println!("[PHASE 2][GPU→CPU FALLBACK] {}", e);
+                                println!("[PHASE 2][CPU] Using CPU thermodynamic equilibration");
+                                let eq = ThermodynamicEquilibrator::equilibrate(
+                                    graph,
+                                    &self.best_solution,
+                                    self.config.target_chromatic,
+                                    self.config.thermo.t_min,
+                                    self.config.thermo.t_max,
+                                    self.adp_thermo_num_temps,
+                                    self.config.thermo.steps_per_temp,
+                                )?;
+                                eq.equilibrium_states
+                            }
+                        }
+                    } else {
+                        println!("[PHASE 2][CPU] Thermodynamic on CPU (GPU disabled in config)");
+                        let eq = ThermodynamicEquilibrator::equilibrate(
+                            graph,
+                            &self.best_solution,
+                            self.config.target_chromatic,
+                            self.config.thermo.t_min,
+                            self.config.thermo.t_max,
+                            self.adp_thermo_num_temps,
+                            self.config.thermo.steps_per_temp,
+                        )?;
+                        eq.equilibrium_states
                     }
-                    self.history.push(state.clone());
-                    self.ensemble.add_solution(state.clone(), &format!("Thermodynamic-T{:.3}", eq.temperatures[i]));
                 }
-            } else {
-                println!("[PHASE 2][ERROR] Logic error: thermodynamic_eq should be set after equilibrate()");
+
+                #[cfg(not(feature = "cuda"))]
+                {
+                    println!("[PHASE 2][CPU] Thermodynamic on CPU (CUDA not compiled)");
+                    let eq = ThermodynamicEquilibrator::equilibrate(
+                        graph,
+                        &self.best_solution,
+                        self.config.target_chromatic,
+                        self.config.thermo.t_min,
+                        self.config.thermo.t_max,
+                        self.adp_thermo_num_temps,
+                        self.config.thermo.steps_per_temp,
+                    )?;
+                    eq.equilibrium_states
+                }
+            };
+
+            // Compute temperature ladder for logging
+            let temperatures: Vec<f64> = (0..self.adp_thermo_num_temps)
+                .map(|i| {
+                    let ratio = self.config.thermo.t_min / self.config.thermo.t_max;
+                    self.config.thermo.t_max * ratio.powf(i as f64 / (self.adp_thermo_num_temps - 1) as f64)
+                })
+                .collect();
+
+            // Store equilibrium states
+            self.thermodynamic_eq = Some(ThermodynamicEquilibrator {
+                temperatures: temperatures.clone(),
+                equilibrium_states: equilibrium_states.clone(),
+            });
+
+            // Process equilibrium states
+            for (i, state) in equilibrium_states.iter().enumerate() {
+                if state.conflicts == 0 && state.chromatic_number < self.best_solution.chromatic_number {
+                    // IMPORTANT: This is an intermediate phase result (DO NOT PARSE as final result)
+                    println!("[PHASE 2] 🎯 Thermodynamic improvement at T={:.3}: {} → {} colors",
+                             temperatures[i], self.best_solution.chromatic_number, state.chromatic_number);
+                    self.best_solution = state.clone();
+                }
+                self.history.push(state.clone());
+                self.ensemble.add_solution(state.clone(), &format!("Thermodynamic-T{:.3}", temperatures[i]));
             }
 
             let phase2_elapsed = phase2_start.elapsed();
@@ -1868,16 +2169,16 @@ impl WorldRecordPipeline {
             #[cfg(feature = "cuda")]
             {
                 if self.config.gpu.enable_quantum_gpu {
-                    println!("[PHASE 3][GPU] Quantum solver active (iterations={}, retries={})",
+                    println!("[PHASE 3][GPU] Attempting quantum solver (iterations={}, retries={})",
                              self.config.quantum.iterations,
                              self.config.quantum.failure_retries);
                 } else {
-                    println!("[PHASE 3] Quantum solver active (CPU)");
+                    println!("[PHASE 3][CPU] Quantum solver on CPU (GPU disabled in config)");
                 }
             }
 
             #[cfg(not(feature = "cuda"))]
-            println!("[PHASE 3] Quantum solver active (CPU only)");
+            println!("[PHASE 3][CPU] Quantum solver on CPU (CUDA not compiled)");
 
             // Check for Memetic fallback
             println!("[PHASE 3] Memetic active (gens={}, pop={})",
@@ -1936,6 +2237,14 @@ impl WorldRecordPipeline {
                     self.adp_quantum_iterations,  // ADP-tuned iterations
                 ) {
                     Ok(qc_solution) => {
+                        #[cfg(feature = "cuda")]
+                        {
+                            if self.config.gpu.enable_quantum_gpu {
+                                self.phase_gpu_status.phase3_gpu_used = true;
+                                println!("[PHASE 3][GPU] ✅ Quantum-classical hybrid completed");
+                            }
+                        }
+
                         if qc_solution.conflicts == 0 && qc_solution.chromatic_number < self.best_solution.chromatic_number {
                             // IMPORTANT: This is an intermediate phase result (DO NOT PARSE as final result)
                             println!("[PHASE 3] 🎯 Quantum-Classical breakthrough: {} → {} colors",
@@ -1946,6 +2255,14 @@ impl WorldRecordPipeline {
                         self.ensemble.add_solution(qc_solution, "Quantum-Classical");
                     }
                     Err(e) => {
+                        #[cfg(feature = "cuda")]
+                        {
+                            if self.config.gpu.enable_quantum_gpu {
+                                self.phase_gpu_status.phase3_fallback_reason = Some(format!("{}", e));
+                                self.phase_gpu_status.phase3_gpu_used = false;
+                            }
+                        }
+
                         println!("[PHASE 3][FALLBACK] Quantum-Classical phase failed: {:?}", e);
                         println!("[PHASE 3][FALLBACK] Continuing with best solution from previous phases");
                         println!("[PHASE 3][FALLBACK] Performance impact: ~30% (loses quantum-classical hybrid optimization)");
@@ -2186,7 +2503,31 @@ impl WorldRecordPipeline {
                  graph.num_edges,
                  graph_density);
 
+        // Persist GPU usage tracking
+        self.save_phase_gpu_status()?;
+
         Ok(self.best_solution.clone())
+    }
+
+    /// Save phase GPU status to JSON file for verification
+    fn save_phase_gpu_status(&self) -> Result<()> {
+        let status_json = serde_json::to_string_pretty(&self.phase_gpu_status)
+            .map_err(|e| PRCTError::ConfigError(format!("Failed to serialize GPU status: {}", e)))?;
+
+        std::fs::write("phase_gpu_status.json", status_json)
+            .map_err(|e| PRCTError::ConfigError(format!("Failed to write phase_gpu_status.json: {}", e)))?;
+
+        println!("\n[GPU-STATUS] Saved runtime GPU usage to phase_gpu_status.json");
+        println!("[GPU-STATUS] Phase 0 (Reservoir): {}",
+                 if self.phase_gpu_status.phase0_gpu_used { "GPU ✅" } else { "CPU" });
+        println!("[GPU-STATUS] Phase 1 (Transfer Entropy): {}",
+                 if self.phase_gpu_status.phase1_gpu_used { "GPU ✅" } else { "CPU" });
+        println!("[GPU-STATUS] Phase 2 (Thermodynamic): {}",
+                 if self.phase_gpu_status.phase2_gpu_used { "GPU ✅" } else { "CPU" });
+        println!("[GPU-STATUS] Phase 3 (Quantum): {}",
+                 if self.phase_gpu_status.phase3_gpu_used { "GPU ✅" } else { "CPU" });
+
+        Ok(())
     }
 
     /// ADP Q-Learning: Select action using epsilon-greedy

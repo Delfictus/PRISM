@@ -38,121 +38,104 @@ extern "C" __global__ void initialize_oscillators_kernel(
     phases[idx] = curand_uniform_double(&state) * 2.0 * PI;
 }
 
-// Kernel 2: Compute coupling forces
+// Kernel 2: Compute coupling forces (SPARSE EDGE LIST VERSION)
+// Uses edge list representation for O(E) complexity instead of O(V²)
 extern "C" __global__ void compute_coupling_forces_kernel(
-    const double* positions,      // Current positions
-    const double* coupling_matrix, // Coupling strengths [n x n]
-    double* forces,                // Output: coupling forces
-    int n_oscillators,
-    double coupling_strength
+    const float* phases,           // Current phases (f32 as per Rust code)
+    const unsigned int* edge_u,    // Edge source vertices
+    const unsigned int* edge_v,    // Edge target vertices
+    const float* edge_w,           // Edge weights
+    int n_edges,                   // Number of edges
+    int n_vertices,                // Number of vertices
+    float coupling_strength,       // Global coupling strength
+    float* forces                  // Output: coupling forces
 ) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= n_oscillators) return;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= n_vertices) return;
 
-    double force = 0.0;
+    float force = 0.0;
 
-    // Sum coupling forces from all other oscillators
-    for (int j = 0; j < n_oscillators; j++) {
-        if (i != j) {
-            double coupling = coupling_matrix[i * n_oscillators + j];
-            double displacement = positions[i] - positions[j];
-            force -= coupling_strength * coupling * displacement;
+    // Sum coupling forces from edges connected to this vertex
+    // This is O(E) total across all threads, much better than O(V²)
+    for (int e = 0; e < n_edges; e++) {
+        unsigned int u = edge_u[e];
+        unsigned int v = edge_v[e];
+        float weight = edge_w[e];
+
+        if (u == idx) {
+            // Edge from idx to v: force depends on phase difference
+            float phase_diff = phases[idx] - phases[v];
+            force -= coupling_strength * weight * sin(phase_diff);
+        } else if (v == idx) {
+            // Edge from u to idx: force depends on phase difference
+            float phase_diff = phases[idx] - phases[u];
+            force -= coupling_strength * weight * sin(phase_diff);
         }
     }
 
-    forces[i] = force;
+    forces[idx] = force;
 }
 
-// Kernel 3: Evolve oscillators (Langevin dynamics)
+// Kernel 3: Evolve oscillators (Langevin dynamics) - FLOAT VERSION
 extern "C" __global__ void evolve_oscillators_kernel(
-    double* positions,           // Positions (updated in-place)
-    double* velocities,          // Velocities (updated in-place)
-    double* phases,              // Phases (updated in-place)
-    const double* forces,        // Coupling forces
-    double dt,                   // Time step
-    double damping,              // Damping coefficient γ
-    double temperature,          // Temperature T
+    float* phases,               // Phases (updated in-place) - f32
+    float* velocities,           // Velocities (updated in-place) - f32
+    const float* forces,         // Coupling forces - f32
     int n_oscillators,
-    unsigned long long seed,
-    int iteration
+    float dt,                    // Time step
+    float temperature            // Temperature T
 ) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= n_oscillators) return;
 
-    // Initialize cuRAND for thermal noise
-    curandState state;
-    curand_init(seed, idx, iteration, &state);
+    float phi = phases[idx];
+    float v = velocities[idx];
+    float force = forces[idx];
 
-    double x = positions[idx];
-    double v = velocities[idx];
-    double phi = phases[idx];
+    // Simple velocity update with damping
+    float damping = 0.1f;
+    v += (force - damping * v) * dt;
 
-    // Thermal noise: √(2γkT) * η(t)
-    // In natural units, k_B = 1
-    double noise_amplitude = sqrt(2.0 * damping * temperature);
-    double noise = curand_normal_double(&state) * noise_amplitude;
-
-    // Langevin equation: dv/dt = force - γv + noise
-    double acc = forces[idx] - damping * v + noise;
-
-    // Velocity Verlet integration
-    v += acc * dt;
-    x += v * dt;
-
-    // Update phase based on velocity (ω = v / radius, simplified to v)
+    // Update phase based on velocity
     phi += v * dt;
 
     // Keep phase in [-π, π]
-    while (phi > PI) phi -= 2.0 * PI;
-    while (phi < -PI) phi += 2.0 * PI;
+    while (phi > PI) phi -= 2.0f * PI;
+    while (phi < -PI) phi += 2.0f * PI;
 
     // Write back
-    positions[idx] = x;
-    velocities[idx] = v;
     phases[idx] = phi;
+    velocities[idx] = v;
 }
 
-// Kernel 4: Compute total energy
+// Kernel 4: Compute total energy (SPARSE EDGE LIST VERSION)
 extern "C" __global__ void compute_energy_kernel(
-    const double* positions,
-    const double* velocities,
-    const double* coupling_matrix,
-    double* energy_components,    // Output: [kinetic, potential, coupling]
-    int n_oscillators,
-    double coupling_strength
+    const float* phases,           // Current phases
+    const unsigned int* edge_u,    // Edge source vertices
+    const unsigned int* edge_v,    // Edge target vertices
+    const float* edge_w,           // Edge weights
+    int n_edges,                   // Number of edges
+    int n_vertices,                // Number of vertices
+    float* energy_result           // Output: total energy (single value)
 ) {
-    __shared__ double shared_ke[256];
-    __shared__ double shared_pe[256];
-    __shared__ double shared_ce[256];
+    __shared__ float shared_energy[256];
 
     int tid = threadIdx.x;
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     // Initialize shared memory
-    shared_ke[tid] = 0.0;
-    shared_pe[tid] = 0.0;
-    shared_ce[tid] = 0.0;
+    shared_energy[tid] = 0.0f;
 
-    if (idx < n_oscillators) {
-        double v = velocities[idx];
-        double x = positions[idx];
+    // Each thread computes energy for a subset of edges
+    if (idx < n_edges) {
+        unsigned int u = edge_u[idx];
+        unsigned int v = edge_v[idx];
+        float weight = edge_w[idx];
 
-        // Kinetic energy: (1/2) * m * v²  (m = 1)
-        shared_ke[tid] = 0.5 * v * v;
-
-        // Potential energy: (1/2) * k * x²  (k = 1, harmonic oscillator)
-        shared_pe[tid] = 0.5 * x * x;
-
-        // Coupling energy: (1/2) * Σ_j coupling[i][j] * (x[i] - x[j])²
-        double coupling_energy = 0.0;
-        for (int j = 0; j < n_oscillators; j++) {
-            if (idx != j) {
-                double coupling = coupling_matrix[idx * n_oscillators + j];
-                double dx = x - positions[j];
-                coupling_energy += coupling * dx * dx;
-            }
-        }
-        shared_ce[tid] = 0.5 * coupling_strength * coupling_energy;
+        // Kuramoto coupling energy: E = -K * cos(θ_i - θ_j)
+        float phase_diff = phases[u] - phases[v];
+        float edge_energy = -weight * cosf(phase_diff);
+        shared_energy[tid] = edge_energy;
     }
 
     __syncthreads();
@@ -160,18 +143,14 @@ extern "C" __global__ void compute_energy_kernel(
     // Reduction: sum energies
     for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
-            shared_ke[tid] += shared_ke[tid + stride];
-            shared_pe[tid] += shared_pe[tid + stride];
-            shared_ce[tid] += shared_ce[tid + stride];
+            shared_energy[tid] += shared_energy[tid + stride];
         }
         __syncthreads();
     }
 
     // Block result
     if (tid == 0) {
-        atomicAdd(&energy_components[0], shared_ke[0]); // Kinetic
-        atomicAdd(&energy_components[1], shared_pe[0]); // Potential
-        atomicAdd(&energy_components[2], shared_ce[0]); // Coupling
+        atomicAdd(energy_result, shared_energy[0]);
     }
 }
 

@@ -96,3 +96,23 @@ pub mod config_io;
 pub mod world_record_pipeline_gpu;
 #[cfg(feature = "cuda")]
 pub use world_record_pipeline_gpu::GpuReservoirConflictPredictor;
+
+#[cfg(feature = "cuda")]
+pub mod gpu_transfer_entropy;
+#[cfg(feature = "cuda")]
+pub use gpu_transfer_entropy::compute_transfer_entropy_ordering_gpu;
+
+#[cfg(feature = "cuda")]
+pub mod gpu_thermodynamic;
+#[cfg(feature = "cuda")]
+pub use gpu_thermodynamic::equilibrate_thermodynamic_gpu;
+
+#[cfg(feature = "cuda")]
+pub mod gpu_active_inference;
+#[cfg(feature = "cuda")]
+pub use gpu_active_inference::{active_inference_policy_gpu, ActiveInferencePolicy as GpuActiveInferencePolicy};
+
+#[cfg(feature = "cuda")]
+pub mod gpu_quantum_annealing;
+#[cfg(feature = "cuda")]
+pub use gpu_quantum_annealing::{gpu_qubo_simulated_annealing, qubo_solution_to_coloring, GpuQuboSolver};

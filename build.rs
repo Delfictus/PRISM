@@ -7,6 +7,10 @@ fn main() {
     println!("cargo:rerun-if-changed=foundation/cuda/adaptive_coloring.cu");
     println!("cargo:rerun-if-changed=foundation/cuda/prct_kernels.cu");
     println!("cargo:rerun-if-changed=foundation/kernels/neuromorphic_gemv.cu");
+    println!("cargo:rerun-if-changed=foundation/kernels/transfer_entropy.cu");
+    println!("cargo:rerun-if-changed=foundation/kernels/thermodynamic.cu");
+    println!("cargo:rerun-if-changed=foundation/kernels/quantum_evolution.cu");
+    println!("cargo:rerun-if-changed=foundation/kernels/active_inference.cu");
 
     // Only compile CUDA if cuda feature is enabled
     if env::var("CARGO_FEATURE_CUDA").is_ok() {
@@ -62,10 +66,44 @@ fn compile_cuda_kernels() {
         "neuromorphic_gemv.ptx",
     );
 
+    // Compile transfer_entropy.cu (Phase 1: TE ordering)
+    compile_cu_file(
+        &nvcc,
+        &ptx_dir,
+        "foundation/kernels/transfer_entropy.cu",
+        "transfer_entropy.ptx",
+    );
+
+    // Compile thermodynamic.cu (Phase 2: Thermodynamic equilibration)
+    compile_cu_file(
+        &nvcc,
+        &ptx_dir,
+        "foundation/kernels/thermodynamic.cu",
+        "thermodynamic.ptx",
+    );
+
+    // Compile quantum_evolution.cu (Phase 3: Quantum-classical hybrid)
+    compile_cu_file(
+        &nvcc,
+        &ptx_dir,
+        "foundation/kernels/quantum_evolution.cu",
+        "quantum_evolution.ptx",
+    );
+
+    // Compile active_inference.cu (Phase 1: Active inference policy)
+    compile_cu_file(
+        &nvcc,
+        &ptx_dir,
+        "foundation/kernels/active_inference.cu",
+        "active_inference.ptx",
+    );
+
     // Link CUDA runtime libraries
     println!("cargo:rustc-link-search=native=/usr/local/cuda/lib64");
     println!("cargo:rustc-link-lib=cudart");
     println!("cargo:rustc-link-lib=curand");
+    println!("cargo:rustc-link-lib=cufft");
+    println!("cargo:rustc-link-lib=cublas");
 }
 
 fn compile_cu_file(nvcc: &str, ptx_dir: &PathBuf, src_path: &str, output_name: &str) {
