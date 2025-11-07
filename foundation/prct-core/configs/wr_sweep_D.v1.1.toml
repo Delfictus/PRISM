@@ -15,12 +15,13 @@ work_steal = true
 parallel_io = true
 
 [initial_coloring]
-strategy = "greedy"  # Options: greedy, spectral, community, randomized
+strategy = "spectral"  # Higher-quality seed for lower starting chromatic
 
 [gpu]
 device_id = 0
-streams = 1
-batch_size = 1024
+streams = 4              # Parallel stream scheduler for phase overlap
+stream_mode = "parallel" # Enable concurrent phase execution
+batch_size = 4096        # Larger batches to saturate GPU
 enable_reservoir_gpu = true
 enable_te_gpu = true
 enable_statmech_gpu = true
@@ -46,8 +47,8 @@ restarts = 8
 early_stop_no_improve_iters = 5
 checkpoint_minutes = 15
 adp_dsatur_depth = 50000
-adp_quantum_iterations = 30
-adp_thermo_num_temps = 48
+adp_quantum_iterations = 45  # Match increased quantum iterations
+adp_thermo_num_temps = 56    # Match increased thermo temps
 
 [neuromorphic]
 enabled = true
@@ -63,29 +64,30 @@ ai_weight = 0.40
 tie_break = "quantum_then_thermo"
 
 [quantum]
-iterations = 6
+iterations = 45          # Crank up for real GPU annealer
 target_chromatic = 83
-depth = 6
-attempts = 256
-beta = 0.9
-temperature = 1.0
+depth = 8                # Deeper exploration
+attempts = 512           # More attempts for escape
+beta = 0.95              # Stronger quantum effects
+temperature = 0.7        # Lower temp for tighter annealing
 
 [memetic]
-population_size = 256
+population_size = 320    # Heavier population for finishing polish
 elite_size = 8
-generations = 800
-mutation_rate = 0.05
+generations = 1200       # More generations for thorough refinement
+mutation_rate = 0.09     # Higher mutation for escape
 tournament_size = 3
-local_search_depth = 5000
+local_search_depth = 20000  # Deep local search for final pass
 use_tsp_guidance = true
 tsp_weight = 0.20
 
 [thermo]
-replicas = 48
-num_temps = 48
+replicas = 56            # Push harder to avoid Phase 2 stalls
+num_temps = 56           # More temperature points for better coverage
 exchange_interval = 20
-t_min = 0.01
-t_max = 10.0
+t_min = 0.0005           # Much lower min for fine-grained annealing
+t_max = 15.0             # Higher max for aggressive exploration
+steps_per_temp = 8000    # More steps per temperature
 batch_size = 1000
 damping = 0.02
 schedule = "geometric"
@@ -103,3 +105,13 @@ epsilon_decay = 0.995
 epsilon_min = 0.05
 alpha = 0.1
 gamma = 0.95
+
+[iterative]
+enabled = true           # Enable multi-pass loopback with best solution
+max_passes = 3           # Up to 3 full pipeline passes
+min_delta = 1            # Stop if improvement < 1 color
+
+[hypertune]
+enabled = true           # Enable telemetry-driven ADP parameter tuning
+stall_threshold = 100
+efficiency_threshold = 0.5
