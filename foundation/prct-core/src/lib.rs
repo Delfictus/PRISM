@@ -108,6 +108,11 @@ pub mod gpu_thermodynamic;
 pub use gpu_thermodynamic::equilibrate_thermodynamic_gpu;
 
 #[cfg(feature = "cuda")]
+pub mod gpu_thermodynamic_multi;
+#[cfg(feature = "cuda")]
+pub use gpu_thermodynamic_multi::equilibrate_thermodynamic_multi_gpu;
+
+#[cfg(feature = "cuda")]
 pub mod gpu_active_inference;
 #[cfg(feature = "cuda")]
 pub use gpu_active_inference::{active_inference_policy_gpu, ActiveInferencePolicy as GpuActiveInferencePolicy};
@@ -117,11 +122,16 @@ pub mod gpu_quantum_annealing;
 #[cfg(feature = "cuda")]
 pub use gpu_quantum_annealing::{gpu_qubo_simulated_annealing, qubo_solution_to_coloring, GpuQuboSolver};
 
+#[cfg(feature = "cuda")]
+pub mod gpu_quantum_multi;
+#[cfg(feature = "cuda")]
+pub use gpu_quantum_multi::{quantum_annealing_multi_gpu, extract_coloring_from_qubo};
+
 // GPU stream management and telemetry
 #[cfg(feature = "cuda")]
 pub mod gpu;
 #[cfg(feature = "cuda")]
-pub use gpu::{PipelineGpuState, CudaStreamPool, EventRegistry};
+pub use gpu::{PipelineGpuState, CudaStreamPool, EventRegistry, MultiGpuDevicePool};
 
 pub mod telemetry;
 pub use telemetry::{RunMetric, PhaseName, PhaseExecMode, TelemetryHandle};

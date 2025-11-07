@@ -10,6 +10,7 @@ use std::collections::HashMap;
 
 /// Sparse QUBO matrix in Coordinate (COO) format
 /// Stores only non-zero entries
+#[derive(Clone)]
 pub struct SparseQUBO {
     /// Non-zero entries: (row, col, value)
     entries: Vec<(usize, usize, f64)>,

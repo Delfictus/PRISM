@@ -73,8 +73,8 @@ impl Default for PhaseGpuStatus {
 fn default_true() -> bool { true }
 fn default_threads() -> usize { 24 }
 fn default_streams() -> usize { 4 }
-fn default_replicas() -> usize { 56 }  // VRAM guard for 8GB
-fn default_beads() -> usize { 64 }     // VRAM guard for 8GB (future PIMC)
+fn default_replicas() -> usize { 256 }  // Scaled for B200 GPUs (distributed across multi-GPU)
+fn default_beads() -> usize { 256 }     // Scaled for B200 GPUs (future PIMC)
 fn default_batch_size() -> usize { 1024 }
 fn default_stream_mode() -> StreamMode { StreamMode::Sequential }
 
@@ -87,6 +87,42 @@ pub enum StreamMode {
 
     /// Phases use separate streams (parallel execution)
     Parallel,
+}
+
+/// Multi-GPU Configuration for distributed computation
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct MultiGpuConfig {
+    /// Enable multi-GPU distributed execution
+    pub enabled: bool,
+
+    /// Number of GPUs to use
+    pub num_gpus: usize,
+
+    /// Device IDs to use (e.g., [0, 1, 2, 3, 4, 5, 6, 7])
+    pub devices: Vec<usize>,
+
+    /// Enable peer-to-peer memory access between GPUs
+    pub enable_peer_access: bool,
+
+    /// Enable NCCL for collective operations (experimental)
+    pub enable_nccl: bool,
+
+    /// Distribution strategy: "distributed_phases" or "independent_instances"
+    pub strategy: String,
+}
+
+impl Default for MultiGpuConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            num_gpus: 1,
+            devices: vec![0],
+            enable_peer_access: false,
+            enable_nccl: false,
+            strategy: "distributed_phases".to_string(),
+        }
+    }
 }
 
 /// GPU Configuration
@@ -589,6 +625,10 @@ pub struct WorldRecordConfig {
     #[serde(default = "default_threads")]
     pub num_workers: usize,
 
+    /// Multi-GPU configuration
+    #[serde(default)]
+    pub multi_gpu: MultiGpuConfig,
+
     /// GPU configuration
     #[serde(default)]
     pub gpu: GpuConfig,
@@ -660,6 +700,7 @@ impl Default for WorldRecordConfig {
             use_gnn_screening: false,
             use_tda: true,  // Topological Data Analysis ENABLED by default
             num_workers: 24,  // Intel i9 Ultra
+            multi_gpu: MultiGpuConfig::default(),
             gpu: GpuConfig::default(),
             memetic: MemeticConfig::default(),
             thermo: ThermoConfig::default(),
@@ -725,22 +766,11 @@ impl WorldRecordConfig {
             return Err(PRCTError::ColoringFailed("cpu.threads must be in [1, 1024]".to_string()));
         }
 
-        // VRAM guards for 8GB GPU devices
-        if self.thermo.replicas > 56 {
-            eprintln!("[VRAM][GUARD] thermo.replicas {} exceeds safe limit for 8GB devices (max 56)", self.thermo.replicas);
-            return Err(PRCTError::ColoringFailed(format!(
-                "thermo.replicas {} exceeds VRAM limit (max 56 for 8GB devices)",
-                self.thermo.replicas
-            )));
-        }
-
-        if self.thermo.num_temps > 56 {
-            eprintln!("[VRAM][GUARD] thermo.num_temps {} exceeds safe limit for 8GB devices (max 56)", self.thermo.num_temps);
-            return Err(PRCTError::ColoringFailed(format!(
-                "thermo.num_temps {} exceeds VRAM limit (max 56 for 8GB devices)",
-                self.thermo.num_temps
-            )));
-        }
+        // VRAM guards removed for B200 GPUs (180GB VRAM each)
+        // Multi-GPU configuration allows massive scaling:
+        // - 8x B200 = 1440GB total VRAM
+        // - Conservative per-GPU limit: 160GB
+        // No artificial caps on replicas or temps
 
         // Validate ADP parameters use config values
         if self.adp.alpha <= 0.0 || self.adp.alpha > 1.0 {
@@ -804,11 +834,11 @@ impl WorldRecordConfig {
         Ok(())
     }
 
-    /// Validate VRAM requirements at runtime (conservative 8GB baseline)
+    /// Validate VRAM requirements at runtime (B200 180GB baseline)
     #[cfg(feature = "cuda")]
     pub fn validate_vram_requirements(&self, graph: &Graph) -> Result<()> {
-        // Conservative VRAM estimate for 8GB devices
-        const VRAM_GB: usize = 8;
+        // B200 GPU: 180GB VRAM available, use 160GB conservatively per GPU
+        const VRAM_GB: usize = 160;
         const VRAM_MB: usize = VRAM_GB * 1024;
 
         // Estimate VRAM usage for thermodynamic replica exchange
@@ -1496,6 +1526,10 @@ pub struct WorldRecordPipeline {
     #[cfg(feature = "cuda")]
     cuda_device: Arc<CudaDevice>,
 
+    /// Multi-GPU device pool (if enabled)
+    #[cfg(feature = "cuda")]
+    multi_gpu_pool: Option<Arc<crate::gpu::MultiGpuDevicePool>>,
+
     /// GPU stream pool and state management
     #[cfg(feature = "cuda")]
     gpu_state: Option<Arc<crate::gpu::PipelineGpuState>>,
@@ -1533,6 +1567,19 @@ impl WorldRecordPipeline {
                  config.gpu.enable_te_gpu,
                  config.gpu.enable_thermo_gpu,
                  config.gpu.enable_quantum_gpu);
+
+        // Initialize multi-GPU pool if enabled
+        let multi_gpu_pool = if config.multi_gpu.enabled {
+            println!("[PIPELINE][INIT] Multi-GPU mode enabled: {} devices", config.multi_gpu.num_gpus);
+            let pool = crate::gpu::MultiGpuDevicePool::new(
+                &config.multi_gpu.devices,
+                config.multi_gpu.enable_peer_access,
+            )?;
+            println!("[PIPELINE][INIT] Multi-GPU pool initialized: {} devices", pool.num_devices());
+            Some(Arc::new(pool))
+        } else {
+            None
+        };
 
         // Initialize GPU stream pool if streams > 0
         let gpu_state = if config.gpu.streams > 0 {
@@ -1573,6 +1620,7 @@ impl WorldRecordPipeline {
             ensemble: EnsembleConsensus::new(),
             adp_q_table: std::collections::HashMap::new(),
             cuda_device,
+            multi_gpu_pool,
             gpu_state,
             telemetry: None,
             phase_gpu_status: PhaseGpuStatus::default(),
@@ -2313,19 +2361,58 @@ impl WorldRecordPipeline {
                 #[cfg(feature = "cuda")]
                 {
                     if self.config.gpu.enable_thermo_gpu {
-                        // Get stream for Phase 2 (Thermodynamic)
-                        let stream = if let Some(ref gpu_state) = self.gpu_state {
-                            let stream = gpu_state.stream_for_phase(2);
-                            println!("[PHASE 2][GPU] Using stream {:?} for thermodynamic equilibration", stream as *const _ as usize);
-                            stream
-                        } else {
-                            println!("[PHASE 2][WARNING] GPU state not initialized, using default stream");
-                            &self.cuda_device.fork_default_stream().map_err(|e| PRCTError::GpuError(format!("Failed to fork stream: {}", e)))?
-                        };
+                        // Check if multi-GPU mode is enabled
+                        if let Some(ref pool) = self.multi_gpu_pool {
+                            if pool.num_devices() > 1 {
+                                println!("[PHASE 2][MULTI-GPU] Using {} GPUs for distributed thermodynamic",
+                                         pool.num_devices());
 
-                        println!("[PHASE 2][GPU] Attempting thermodynamic replica exchange (temps={}, steps={})",
-                                 self.adp_thermo_num_temps, self.config.thermo.steps_per_temp);
-                        match gpu_thermodynamic::equilibrate_thermodynamic_gpu(
+                                match crate::gpu_thermodynamic_multi::equilibrate_thermodynamic_multi_gpu(
+                                    pool.devices(),
+                                    graph,
+                                    &self.best_solution,
+                                    self.config.thermo.replicas,
+                                    self.adp_thermo_num_temps,
+                                    self.config.thermo.t_min,
+                                    self.config.thermo.t_max,
+                                    self.config.thermo.steps_per_temp,
+                                ) {
+                                    Ok(states) => {
+                                        self.phase_gpu_status.phase2_gpu_used = true;
+                                        println!("[PHASE 2][MULTI-GPU] ✅ Distributed thermodynamic completed, {} solutions",
+                                                 states.len());
+                                        states
+                                    }
+                                    Err(e) => {
+                                        self.phase_gpu_status.phase2_fallback_reason = Some(format!("Multi-GPU: {}", e));
+                                        println!("[PHASE 2][MULTI-GPU→CPU FALLBACK] {}", e);
+                                        println!("[PHASE 2][CPU] Using CPU thermodynamic equilibration");
+                                        let eq = ThermodynamicEquilibrator::equilibrate(
+                                            graph,
+                                            &self.best_solution,
+                                            self.config.target_chromatic,
+                                            self.config.thermo.t_min,
+                                            self.config.thermo.t_max,
+                                            self.adp_thermo_num_temps,
+                                            self.config.thermo.steps_per_temp,
+                                        )?;
+                                        eq.equilibrium_states
+                                    }
+                                }
+                            } else {
+                                // Single GPU in pool, use single-GPU path
+                                let stream = if let Some(ref gpu_state) = self.gpu_state {
+                                    let stream = gpu_state.stream_for_phase(2);
+                                    println!("[PHASE 2][GPU] Using stream {:?} for thermodynamic equilibration", stream as *const _ as usize);
+                                    stream
+                                } else {
+                                    println!("[PHASE 2][WARNING] GPU state not initialized, using default stream");
+                                    &self.cuda_device.fork_default_stream().map_err(|e| PRCTError::GpuError(format!("Failed to fork stream: {}", e)))?
+                                };
+
+                                println!("[PHASE 2][GPU] Attempting thermodynamic replica exchange (temps={}, steps={})",
+                                         self.adp_thermo_num_temps, self.config.thermo.steps_per_temp);
+                                match gpu_thermodynamic::equilibrate_thermodynamic_gpu(
                             &self.cuda_device,
                             stream,
                             graph,
@@ -2355,6 +2442,53 @@ impl WorldRecordPipeline {
                                     self.config.thermo.steps_per_temp,
                                 )?;
                                 eq.equilibrium_states
+                            }
+                        }
+                            }
+                        } else {
+                            // No multi-GPU pool, use single GPU
+                            let stream = if let Some(ref gpu_state) = self.gpu_state {
+                                let stream = gpu_state.stream_for_phase(2);
+                                println!("[PHASE 2][GPU] Using stream {:?} for thermodynamic equilibration", stream as *const _ as usize);
+                                stream
+                            } else {
+                                println!("[PHASE 2][WARNING] GPU state not initialized, using default stream");
+                                &self.cuda_device.fork_default_stream().map_err(|e| PRCTError::GpuError(format!("Failed to fork stream: {}", e)))?
+                            };
+
+                            println!("[PHASE 2][GPU] Attempting thermodynamic replica exchange (temps={}, steps={})",
+                                     self.adp_thermo_num_temps, self.config.thermo.steps_per_temp);
+                            match gpu_thermodynamic::equilibrate_thermodynamic_gpu(
+                                &self.cuda_device,
+                                stream,
+                                graph,
+                                &self.best_solution,
+                                self.config.target_chromatic,
+                                self.config.thermo.t_min,
+                                self.config.thermo.t_max,
+                                self.adp_thermo_num_temps,
+                                self.config.thermo.steps_per_temp,
+                            ) {
+                                Ok(states) => {
+                                    self.phase_gpu_status.phase2_gpu_used = true;
+                                    println!("[PHASE 2][GPU] ✅ Thermodynamic kernels executed successfully");
+                                    states
+                                }
+                                Err(e) => {
+                                    self.phase_gpu_status.phase2_fallback_reason = Some(format!("{}", e));
+                                    println!("[PHASE 2][GPU→CPU FALLBACK] {}", e);
+                                    println!("[PHASE 2][CPU] Using CPU thermodynamic equilibration");
+                                    let eq = ThermodynamicEquilibrator::equilibrate(
+                                        graph,
+                                        &self.best_solution,
+                                        self.config.target_chromatic,
+                                        self.config.thermo.t_min,
+                                        self.config.thermo.t_max,
+                                        self.adp_thermo_num_temps,
+                                        self.config.thermo.steps_per_temp,
+                                    )?;
+                                    eq.equilibrium_states
+                                }
                             }
                         }
                     } else {
