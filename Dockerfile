@@ -13,7 +13,7 @@ LABEL gpu.target="8x NVIDIA B200"
 
 # Environment variables
 ENV DEBIAN_FRONTEND=noninteractive
-ENV RUST_VERSION=1.75.0
+ENV RUST_VERSION=1.90.0
 ENV CUDA_HOME=/usr/local/cuda
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
 ENV PATH=/root/.cargo/bin:${PATH}
@@ -47,9 +47,10 @@ WORKDIR /workspace/prism
 COPY . .
 
 # Build PRISM with CUDA support (release mode, optimized)
+# Build only world_record_dsjc1000 example (skip broken examples)
 RUN echo "🔨 Building PRISM with CUDA support..." && \
-    cargo build --release --features cuda --examples && \
-    cargo build --release --features cuda && \
+    cargo build --release --features cuda --example world_record_dsjc1000 && \
+    cargo build --release --features cuda --lib && \
     echo "✅ Build complete!"
 
 # Create necessary directories
