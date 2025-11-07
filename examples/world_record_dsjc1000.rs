@@ -13,7 +13,6 @@
 ///! Target: 83 colors (world record)
 ///! Current best: 115 colors
 ///! Gap: 32 colors (27.8%)
-
 use anyhow::Result;
 use prism_ai::data::DimacsGraph;
 use std::path::Path;
@@ -42,13 +41,12 @@ fn main() -> Result<()> {
     let graph_path = Path::new("benchmarks/dimacs/DSJC1000.5.col");
 
     println!("📊 Loading DSJC1000.5...");
-    let dimacs = DimacsGraph::from_file(graph_path)
-        .map_err(|e| anyhow::anyhow!(e))?;
+    let dimacs = DimacsGraph::from_file(graph_path).map_err(|e| anyhow::anyhow!(e))?;
 
     // Convert adjacency matrix to edge list
     let mut edges = Vec::new();
     for i in 0..dimacs.num_vertices {
-        for j in (i+1)..dimacs.num_vertices {
+        for j in (i + 1)..dimacs.num_vertices {
             if dimacs.adjacency[[i, j]] {
                 edges.push((i, j, 1.0));
             }
@@ -75,7 +73,10 @@ fn main() -> Result<()> {
     println!("✅ Graph loaded:");
     println!("   Vertices: {}", graph.num_vertices);
     println!("   Edges: {}", graph.num_edges);
-    println!("   Density: {:.1}%", dimacs.characteristics.edge_density * 100.0);
+    println!(
+        "   Density: {:.1}%",
+        dimacs.characteristics.edge_density * 100.0
+    );
     println!("   Best known: 83 colors (world record)");
     println!();
 
@@ -110,11 +111,15 @@ fn main() -> Result<()> {
         mean_phase: 0.0,
     };
 
-    println!("✅ Kuramoto initialized with {} oscillators", graph.num_vertices);
+    println!(
+        "✅ Kuramoto initialized with {} oscillators",
+        graph.num_vertices
+    );
     println!();
 
     // Load configuration from file (with command-line override)
-    let cfg_path = std::env::args().nth(1)
+    let cfg_path = std::env::args()
+        .nth(1)
         .unwrap_or_else(|| "foundation/prct-core/configs/world_record.v1.toml".to_string());
 
     println!("📂 Loading configuration from: {}", cfg_path);
@@ -126,19 +131,75 @@ fn main() -> Result<()> {
     println!("   Target: {} colors", config.target_chromatic);
     println!("   Max Runtime: {:.1} hours", config.max_runtime_hours);
     println!("   Workers: {}", config.num_workers);
-    println!("   GPU Reservoir: {}", if config.use_reservoir_prediction { "✅" } else { "❌" });
-    println!("   Active Inference: {}", if config.use_active_inference { "✅" } else { "❌" });
-    println!("   ADP Q-Learning: {}", if config.use_adp_learning { "✅" } else { "❌" });
-    println!("   Thermodynamic: {}", if config.use_thermodynamic_equilibration { "✅" } else { "❌" });
-    println!("   Quantum-Classical: {}", if config.use_quantum_classical_hybrid { "✅" } else { "❌" });
-    println!("   Multi-Scale: {}", if config.use_multiscale_analysis { "✅" } else { "❌" });
-    println!("   Ensemble Consensus: {}", if config.use_ensemble_consensus { "✅" } else { "❌" });
+    println!(
+        "   GPU Reservoir: {}",
+        if config.use_reservoir_prediction {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "   Active Inference: {}",
+        if config.use_active_inference {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "   ADP Q-Learning: {}",
+        if config.use_adp_learning {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "   Thermodynamic: {}",
+        if config.use_thermodynamic_equilibration {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "   Quantum-Classical: {}",
+        if config.use_quantum_classical_hybrid {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "   Multi-Scale: {}",
+        if config.use_multiscale_analysis {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "   Ensemble Consensus: {}",
+        if config.use_ensemble_consensus {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
     println!();
 
     // Initialize world record pipeline
     println!("🔧 Initializing World Record Pipeline...");
-    let mut pipeline = WorldRecordPipeline::new(config, cuda_device)?;
+    let pipeline = WorldRecordPipeline::new(config, cuda_device)?;
+
+    // Enable telemetry for real-time monitoring
+    let run_id = format!("dsjc1000_{}", chrono::Local::now().format("%Y%m%d_%H%M%S"));
+    println!("📊 Enabling telemetry: run_id={}", run_id);
+    let mut pipeline = pipeline.with_telemetry(&run_id)?;
+
     println!("✅ Pipeline ready");
+    println!("✅ Telemetry enabled: target/run_artifacts/live_metrics_{}.jsonl", run_id);
     println!();
 
     // Run world record attempt
@@ -159,7 +220,10 @@ fn main() -> Result<()> {
     println!("   Chromatic Number: {} colors", result.chromatic_number);
     println!("   Conflicts: {}", result.conflicts);
     println!("   Quality Score: {:.4}", result.quality_score);
-    println!("   Computation Time: {:.2}s", result.computation_time_ms / 1000.0);
+    println!(
+        "   Computation Time: {:.2}s",
+        result.computation_time_ms / 1000.0
+    );
     println!("   Total Elapsed: {:.2}s", elapsed.as_secs_f64());
     println!();
 
@@ -172,7 +236,11 @@ fn main() -> Result<()> {
         if gap <= 0 {
             println!("   Status: 🏆 WORLD RECORD MATCHED/BEATEN!");
         } else {
-            println!("   Gap: +{} colors ({:.1}%)", gap, (gap as f64 / 83.0) * 100.0);
+            println!(
+                "   Gap: +{} colors ({:.1}%)",
+                gap,
+                (gap as f64 / 83.0) * 100.0
+            );
 
             if result.chromatic_number <= 90 {
                 println!("   Status: ✨ EXCELLENT (within 10% of WR)");
@@ -183,7 +251,10 @@ fn main() -> Result<()> {
             }
         }
     } else {
-        println!("   Status: ⚠️  Invalid coloring ({} conflicts)", result.conflicts);
+        println!(
+            "   Status: ⚠️  Invalid coloring ({} conflicts)",
+            result.conflicts
+        );
     }
 
     println!();
@@ -197,6 +268,8 @@ fn main() -> Result<()> {
 #[cfg(not(feature = "cuda"))]
 fn main() -> Result<()> {
     println!("❌ This benchmark requires CUDA support.");
-    println!("   Rebuild with: cargo run --release --features cuda --example world_record_dsjc1000");
+    println!(
+        "   Rebuild with: cargo run --release --features cuda --example world_record_dsjc1000"
+    );
     Ok(())
 }
