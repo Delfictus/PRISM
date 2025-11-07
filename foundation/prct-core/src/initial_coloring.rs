@@ -14,6 +14,23 @@ use ndarray::{Array1, Array2};
 use rand::Rng;
 use std::collections::HashMap;
 
+/// Compute vertex degree from adjacency matrix
+fn vertex_degree(graph: &Graph, v: usize) -> usize {
+    let n = graph.num_vertices;
+    (0..n).filter(|&u| graph.adjacency[v * n + u]).count()
+}
+
+/// Collect neighbors of vertex v into provided vector
+fn collect_neighbors(graph: &Graph, v: usize, neighbors: &mut Vec<usize>) {
+    neighbors.clear();
+    let n = graph.num_vertices;
+    for u in 0..n {
+        if graph.adjacency[v * n + u] {
+            neighbors.push(u);
+        }
+    }
+}
+
 /// Initial coloring strategy
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -50,7 +67,7 @@ fn greedy_ordering(graph: &Graph) -> Result<ColoringSolution> {
     let mut ordering: Vec<usize> = (0..n).collect();
 
     // Sort by degree (descending)
-    ordering.sort_by_key(|&v| std::cmp::Reverse(graph.neighbors[v].len()));
+    ordering.sort_by_key(|&v| std::cmp::Reverse(vertex_degree(graph, v)));
 
     greedy_coloring_with_ordering(graph, &ordering)
 }
@@ -61,12 +78,14 @@ fn spectral_ordering(graph: &Graph) -> Result<ColoringSolution> {
 
     // Build Laplacian matrix: L = D - A
     let mut laplacian = Array2::<f64>::zeros((n, n));
+    let mut scratch = Vec::new();
 
     for v in 0..n {
-        let degree = graph.neighbors[v].len() as f64;
+        let degree = vertex_degree(graph, v) as f64;
         laplacian[[v, v]] = degree;
 
-        for &u in &graph.neighbors[v] {
+        collect_neighbors(graph, v, &mut scratch);
+        for &u in &scratch {
             laplacian[[v, u]] = -1.0;
         }
     }
@@ -124,13 +143,15 @@ fn community_ordering(graph: &Graph) -> Result<ColoringSolution> {
     let mut labels: Vec<usize> = (0..n).collect();
 
     // Label propagation
+    let mut scratch = Vec::new();
     for _ in 0..20 {
         let mut new_labels = labels.clone();
 
         for v in 0..n {
             let mut label_counts: HashMap<usize, usize> = HashMap::new();
 
-            for &u in &graph.neighbors[v] {
+            collect_neighbors(graph, v, &mut scratch);
+            for &u in &scratch {
                 *label_counts.entry(labels[u]).or_insert(0) += 1;
             }
 
@@ -170,7 +191,7 @@ fn randomized_ordering(graph: &Graph, num_runs: usize) -> Result<ColoringSolutio
 
         // Sort by degree with random tie-breaking
         ordering.sort_by_key(|&v| {
-            let degree = graph.neighbors[v].len();
+            let degree = vertex_degree(graph, v);
             let noise: u32 = rng.gen_range(0..100);
             (std::cmp::Reverse(degree), noise)
         });

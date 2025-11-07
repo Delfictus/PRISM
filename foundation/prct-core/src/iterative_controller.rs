@@ -6,9 +6,12 @@
 use crate::errors::*;
 use crate::world_record_pipeline::{WorldRecordPipeline, WorldRecordConfig};
 use crate::telemetry::{TelemetryHandle, PhaseName, PhaseExecMode, RunMetric};
-use shared_types::{ColoringSolution, Graph};
+use shared_types::{ColoringSolution, Graph, KuramotoState};
 use std::sync::Arc;
 use std::time::Instant;
+
+#[cfg(feature = "cuda")]
+use cudarc::driver::CudaDevice;
 
 /// Configuration for iterative refinement
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -62,14 +65,32 @@ pub fn run_iterative_pipeline(
         eprintln!("\n=== Iterative Pass {}/{} ===", pass + 1, iterative_config.max_passes);
 
         // Create pipeline for this pass
-        let mut pipeline = WorldRecordPipeline::new(graph.clone(), config.clone())?;
+        #[cfg(feature = "cuda")]
+        let cuda_device = CudaDevice::new(config.gpu.device_id)
+            .map_err(|e| PRCTError::GpuError(format!("Failed to init CUDA device: {}", e)))?;
+
+        #[cfg(feature = "cuda")]
+        let mut pipeline = WorldRecordPipeline::new(config.clone(), cuda_device)?;
+
+        #[cfg(not(feature = "cuda"))]
+        let mut pipeline = WorldRecordPipeline::new(config.clone())?;
+
+        // Create initial Kuramoto state (default/uniform)
+        let n = graph.num_vertices;
+        let initial_kuramoto = KuramotoState {
+            phases: vec![0.0; n],
+            natural_frequencies: vec![1.0; n],
+            coupling_matrix: vec![0.0; n * n],
+            order_parameter: 0.0,
+            mean_phase: 0.0,
+        };
 
         // If warm start enabled, use previous best as initial solution
         // (This would require modifying WorldRecordPipeline to accept initial solution)
         // For now, each pass runs from scratch
 
         // Run pipeline pass
-        let solution = pipeline.run()?;
+        let solution = pipeline.optimize_world_record(graph, &initial_kuramoto)?;
 
         let pass_duration = pass_start.elapsed().as_secs_f64();
 

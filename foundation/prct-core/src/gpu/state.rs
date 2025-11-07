@@ -54,11 +54,11 @@ impl PipelineGpuState {
     /// # Errors
     /// - `PRCTError::GpuError` if device initialization fails
     pub fn new(device_id: usize, num_streams: usize, mode: StreamMode) -> Result<Self> {
+        // CudaDevice::new() returns Arc<CudaDevice>, don't double-wrap
         let device = CudaDevice::new(device_id)
             .map_err(|e| PRCTError::GpuError(
                 format!("Failed to initialize CUDA device {}: {}", device_id, e)
             ))?;
-        let device = Arc::new(device);
 
         let stream_pool = CudaStreamPool::new(&device, num_streams)?;
         let stream_pool = Arc::new(stream_pool);
