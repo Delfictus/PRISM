@@ -116,3 +116,21 @@ pub use gpu_active_inference::{active_inference_policy_gpu, ActiveInferencePolic
 pub mod gpu_quantum_annealing;
 #[cfg(feature = "cuda")]
 pub use gpu_quantum_annealing::{gpu_qubo_simulated_annealing, qubo_solution_to_coloring, GpuQuboSolver};
+
+// GPU stream management and telemetry
+#[cfg(feature = "cuda")]
+pub mod gpu;
+#[cfg(feature = "cuda")]
+pub use gpu::{PipelineGpuState, CudaStreamPool, EventRegistry};
+
+pub mod telemetry;
+pub use telemetry::{RunMetric, PhaseName, PhaseExecMode, TelemetryHandle};
+
+pub mod initial_coloring;
+pub use initial_coloring::{compute_initial_coloring, InitialColoringStrategy};
+
+pub mod iterative_controller;
+pub use iterative_controller::{run_iterative_pipeline, IterativeConfig};
+
+pub mod hypertune;
+pub use hypertune::{HypertuneController, AdpControl};

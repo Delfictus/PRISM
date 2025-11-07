@@ -29,6 +29,7 @@ num-complex = "0.4"  # For quantum adapter
 neuromorphic-engine = { path = "../neuromorphic", features = ["cuda"], optional = true }
 cudarc = { version = "0.9", features = ["std"], optional = true }
 chrono = "0.4"
+crossbeam-channel = "0.5"  # For telemetry channels
 
 # GPU acceleration (optional) - relies on parent workspace cudarc
 # cudarc is provided by parent crate, not declared here

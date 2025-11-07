@@ -210,7 +210,7 @@ impl QuantumColoringSolver {
         println!("\n[QUANTUM-COLORING] Phase 7: Transfer Entropy-Guided Ordering");
         println!("[QUANTUM-COLORING] Computing information flow ordering...");
 
-        let te_ordering = match hybrid_te_kuramoto_ordering(graph, kuramoto_state, None, 0.0, 0.7) {
+        let te_ordering = match hybrid_te_kuramoto_ordering(graph, kuramoto_state, None, 0.0) {
             Ok(ordering) => {
                 println!("[QUANTUM-COLORING] ✅ Transfer entropy ordering computed");
                 Some(ordering)
@@ -1012,7 +1012,7 @@ impl QuantumColoringSolver {
 
         // Step 3: Transfer Entropy Refinement (CPU)
         println!("[PHASE 3][GPU] Transfer Entropy-Guided Ordering");
-        let te_ordering = match hybrid_te_kuramoto_ordering(graph, kuramoto_state, None, 0.0, 0.7) {
+        let te_ordering = match hybrid_te_kuramoto_ordering(graph, kuramoto_state, None, 0.0) {
             Ok(ordering) => {
                 println!("[PHASE 3][GPU] TE ordering computed successfully");
                 ordering

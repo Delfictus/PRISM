@@ -34,11 +34,15 @@ use std::sync::Arc;
 #[cfg(feature = "cuda")]
 pub fn compute_transfer_entropy_ordering_gpu(
     cuda_device: &Arc<CudaDevice>,
+    stream: &CudaStream,  // Stream for async execution (cudarc 0.9: synchronous, prepared for future)
     graph: &Graph,
     kuramoto_state: &KuramotoState,
     geodesic_features: Option<&crate::geodesic::GeodesicFeatures>,
     geodesic_weight: f64,
 ) -> Result<Vec<usize>> {
+    // Note: cudarc 0.9 doesn't support async stream execution, but we accept the parameter
+    // for API consistency and future cudarc 0.17+ upgrade
+    let _ = stream;  // Will be used when cudarc supports stream.launch()
     let n = graph.num_vertices;
 
     println!("[TE-GPU] Computing transfer entropy ordering for {} vertices on GPU (BATCHED)", n);

@@ -2179,7 +2179,6 @@ impl WorldRecordPipeline {
                                 initial_kuramoto,
                                 geodesic_features.as_ref(),
                                 self.config.transfer_entropy.geodesic_weight,
-                                self.config.transfer_entropy.te_vs_kuramoto_weight,
                             )?
                         }
                     }
@@ -2190,7 +2189,6 @@ impl WorldRecordPipeline {
                         initial_kuramoto,
                         geodesic_features.as_ref(),
                         self.config.transfer_entropy.geodesic_weight,
-                        self.config.transfer_entropy.te_vs_kuramoto_weight,
                     )?
                 }
             }
@@ -2203,7 +2201,6 @@ impl WorldRecordPipeline {
                     initial_kuramoto,
                     geodesic_features.as_ref(),
                     self.config.transfer_entropy.geodesic_weight,
-                    self.config.transfer_entropy.te_vs_kuramoto_weight,
                 )?
             }
         } else {

@@ -34,6 +34,7 @@ use std::sync::Arc;
 #[cfg(feature = "cuda")]
 pub fn equilibrate_thermodynamic_gpu(
     cuda_device: &Arc<CudaDevice>,
+    stream: &CudaStream,  // Stream for async execution (cudarc 0.9: synchronous, prepared for future)
     graph: &Graph,
     initial_solution: &ColoringSolution,
     target_chromatic: usize,
@@ -42,6 +43,9 @@ pub fn equilibrate_thermodynamic_gpu(
     num_temps: usize,
     steps_per_temp: usize,
 ) -> Result<Vec<ColoringSolution>> {
+    // Note: cudarc 0.9 doesn't support async stream execution, but we accept the parameter
+    // for API consistency and future cudarc 0.17+ upgrade
+    let _ = stream;  // Will be used when cudarc supports stream.launch()
     let n = graph.num_vertices;
 
     println!("[THERMO-GPU] Starting GPU thermodynamic equilibration");
