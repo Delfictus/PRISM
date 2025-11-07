@@ -265,3 +265,180 @@ extern "C" __global__ void build_histogram_2d_xp_yp_kernel(
     int hist_idx = bin_x_past * n_bins + bin_y_past;
     atomicAdd(&histogram[hist_idx], 1);
 }
+
+//==============================================================================
+// BATCHED TRANSFER ENTROPY KERNELS
+// Process ALL vertex pairs in parallel with minimal kernel launches
+//==============================================================================
+
+// Kernel: Batched global min/max computation across ALL time series
+// Computes min/max for all n vertices in parallel
+extern "C" __global__ void compute_global_minmax_batched_kernel(
+    const double* all_time_series,  // [n_vertices x time_steps]
+    int n_vertices,
+    int time_steps,
+    double* min_vals,               // Output: [n_vertices]
+    double* max_vals                // Output: [n_vertices]
+) {
+    int vertex_id = blockIdx.x;
+    if (vertex_id >= n_vertices) return;
+
+    int tid = threadIdx.x;
+    int ts_offset = vertex_id * time_steps;
+
+    __shared__ double shared_min[256];
+    __shared__ double shared_max[256];
+
+    // Initialize with first values
+    shared_min[tid] = 1e308;
+    shared_max[tid] = -1e308;
+
+    // Each thread processes a subset of time steps
+    for (int t = tid; t < time_steps; t += blockDim.x) {
+        double val = all_time_series[ts_offset + t];
+        shared_min[tid] = fmin(shared_min[tid], val);
+        shared_max[tid] = fmax(shared_max[tid], val);
+    }
+    __syncthreads();
+
+    // Reduction
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            shared_min[tid] = fmin(shared_min[tid], shared_min[tid + stride]);
+            shared_max[tid] = fmax(shared_max[tid], shared_max[tid + stride]);
+        }
+        __syncthreads();
+    }
+
+    if (tid == 0) {
+        min_vals[vertex_id] = shared_min[0];
+        max_vals[vertex_id] = shared_max[0];
+    }
+}
+
+// Kernel: Batched TE computation - each thread block processes ONE vertex pair
+// Grid: (n_vertices, n_vertices) - one block per pair
+// Much faster than sequential O(n²) processing!
+extern "C" __global__ void compute_te_matrix_batched_kernel(
+    const double* all_time_series,  // [n_vertices x time_steps]
+    const double* min_vals,         // [n_vertices]
+    const double* max_vals,         // [n_vertices]
+    int n_vertices,
+    int time_steps,
+    int embedding_dim,
+    int tau,
+    int n_bins,
+    double* te_matrix               // Output: [n_vertices x n_vertices]
+) {
+    int source_id = blockIdx.y;     // Source vertex (X)
+    int target_id = blockIdx.x;     // Target vertex (Y)
+
+    if (source_id >= n_vertices || target_id >= n_vertices) return;
+
+    // Self-loops have zero TE
+    if (source_id == target_id) {
+        te_matrix[source_id * n_vertices + target_id] = 0.0;
+        return;
+    }
+
+    int tid = threadIdx.x;
+
+    // Allocate shared histograms (use small n_bins=8 for memory efficiency)
+    // 8^3 = 512 bins for 3D, 8^2 = 64 for 2D, 8 for 1D
+    __shared__ int hist_3d[512];      // P(Y_future, X_past, Y_past)
+    __shared__ int hist_2d_yf_yp[64]; // P(Y_future, Y_past)
+    __shared__ int hist_2d_xp_yp[64]; // P(X_past, Y_past)
+    __shared__ int hist_1d_yp[8];     // P(Y_past)
+
+    // Zero-initialize histograms
+    for (int i = tid; i < 512; i += blockDim.x) hist_3d[i] = 0;
+    for (int i = tid; i < 64; i += blockDim.x) hist_2d_yf_yp[i] = 0;
+    for (int i = tid; i < 64; i += blockDim.x) hist_2d_xp_yp[i] = 0;
+    for (int i = tid; i < 8; i += blockDim.x) hist_1d_yp[i] = 0;
+    __syncthreads();
+
+    // Get time series pointers
+    const double* source_ts = all_time_series + source_id * time_steps;
+    const double* target_ts = all_time_series + target_id * time_steps;
+
+    double source_min = min_vals[source_id];
+    double source_max = max_vals[source_id];
+    double target_min = min_vals[target_id];
+    double target_max = max_vals[target_id];
+
+    // Compute valid time range
+    int min_time = embedding_dim * tau;
+    int max_time = time_steps - 1;
+    int valid_length = max_time - min_time;
+
+    // Build histograms in parallel across threads
+    for (int idx = tid; idx < valid_length; idx += blockDim.x) {
+        int t = min_time + idx;
+
+        // Y_future
+        double y_future = target_ts[t];
+        int bin_yf = compute_bin(y_future, target_min, target_max, n_bins);
+
+        // X_past
+        double x_past = (t >= tau) ? source_ts[t - tau] : source_ts[0];
+        int bin_xp = compute_bin(x_past, source_min, source_max, n_bins);
+
+        // Y_past
+        double y_past = (t >= tau) ? target_ts[t - tau] : target_ts[0];
+        int bin_yp = compute_bin(y_past, target_min, target_max, n_bins);
+
+        // Update histograms atomically
+        atomicAdd(&hist_3d[bin_yf * n_bins * n_bins + bin_xp * n_bins + bin_yp], 1);
+        atomicAdd(&hist_2d_yf_yp[bin_yf * n_bins + bin_yp], 1);
+        atomicAdd(&hist_2d_xp_yp[bin_xp * n_bins + bin_yp], 1);
+        atomicAdd(&hist_1d_yp[bin_yp], 1);
+    }
+    __syncthreads();
+
+    // Compute transfer entropy from histograms (parallel reduction)
+    __shared__ double shared_te[256];
+    shared_te[tid] = 0.0;
+
+    int total_bins_3d = n_bins * n_bins * n_bins;
+    for (int idx = tid; idx < total_bins_3d; idx += blockDim.x) {
+        int bin_yf = idx / (n_bins * n_bins);
+        int bin_xp = (idx / n_bins) % n_bins;
+        int bin_yp = idx % n_bins;
+
+        int count_3d = hist_3d[idx];
+        if (count_3d == 0) continue;
+
+        int count_2d_yf_yp = hist_2d_yf_yp[bin_yf * n_bins + bin_yp];
+        int count_2d_xp_yp = hist_2d_xp_yp[bin_xp * n_bins + bin_yp];
+        int count_1d_yp = hist_1d_yp[bin_yp];
+
+        if (count_2d_yf_yp == 0 || count_2d_xp_yp == 0 || count_1d_yp == 0) continue;
+
+        double p_3d = (double)count_3d / valid_length;
+        double p_2d_yf_yp = (double)count_2d_yf_yp / valid_length;
+        double p_2d_xp_yp = (double)count_2d_xp_yp / valid_length;
+        double p_1d_yp = (double)count_1d_yp / valid_length;
+
+        // TE formula: sum p(yf,xp,yp) * log[ p(yf,xp,yp)*p(yp) / (p(yf,yp)*p(xp,yp)) ]
+        double numerator = p_3d * p_1d_yp;
+        double denominator = p_2d_yf_yp * p_2d_xp_yp;
+
+        if (denominator > 0.0) {
+            shared_te[tid] += p_3d * log(numerator / denominator);
+        }
+    }
+    __syncthreads();
+
+    // Final reduction to get total TE
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            shared_te[tid] += shared_te[tid + stride];
+        }
+        __syncthreads();
+    }
+
+    // Write result
+    if (tid == 0) {
+        te_matrix[source_id * n_vertices + target_id] = shared_te[0];
+    }
+}

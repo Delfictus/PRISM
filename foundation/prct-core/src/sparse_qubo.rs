@@ -190,6 +190,21 @@ impl SparseQUBO {
     pub fn memory_bytes(&self) -> usize {
         self.entries.len() * std::mem::size_of::<(usize, usize, f64)>()
     }
+
+    /// Get direct access to QUBO entries (for GPU upload)
+    pub fn entries(&self) -> &[(usize, usize, f64)] {
+        &self.entries
+    }
+
+    /// Get number of vertices
+    pub fn num_vertices(&self) -> usize {
+        self.num_vertices
+    }
+
+    /// Get number of colors
+    pub fn num_colors(&self) -> usize {
+        self.num_colors
+    }
 }
 
 /// Chromatic bounds from TDA

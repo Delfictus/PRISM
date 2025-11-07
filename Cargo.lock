@@ -2568,6 +2568,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "toml",
+ "toml_edit 0.22.27",
  "uuid",
  "zeroize",
  "zstd",
@@ -3241,7 +3242,10 @@ dependencies = [
 name = "shared-types"
 version = "0.1.0"
 dependencies = [
+ "once_cell",
  "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]

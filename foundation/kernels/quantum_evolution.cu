@@ -5,6 +5,7 @@
 #include <cublas_v2.h>
 #include <cufft.h>
 #include <cuComplex.h>
+#include <curand_kernel.h>
 #include <math.h>
 #include <stdio.h>
 
@@ -490,6 +491,199 @@ void quantum_evolution_cleanup(void* plans) {
     cufftDestroy(fft_plans[0]);
     cufftDestroy(fft_plans[1]);
     free(fft_plans);
+}
+
+// ============================================================================
+// QUBO Simulated Annealing Kernels
+// ============================================================================
+
+/// Initialize cuRAND states for parallel RNG
+__global__ void init_curand_states(
+    curandStatePhilox4_32_10_t* states,
+    unsigned long seed,
+    int num_states
+) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < num_states) {
+        curand_init(seed, idx, 0, &states[idx]);
+    }
+}
+
+/// Compute QUBO energy for current state
+/// Energy = x^T Q x (using CSR sparse matrix format)
+__global__ void qubo_energy_kernel(
+    const int* row_ptr,
+    const int* col_idx,
+    const double* values,
+    const unsigned char* x,
+    double* energy_out,
+    int num_vars
+) {
+    // Shared memory for block-level reduction
+    __shared__ double shared_energy[256];
+
+    int tid = threadIdx.x;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    double local_energy = 0.0;
+
+    // Each thread processes multiple rows (stride)
+    for (int row = idx; row < num_vars; row += blockDim.x * gridDim.x) {
+        if (x[row] == 0) continue;  // Skip if variable is 0
+
+        int row_start = row_ptr[row];
+        int row_end = row_ptr[row + 1];
+
+        // Diagonal contribution
+        for (int j = row_start; j < row_end; j++) {
+            int col = col_idx[j];
+            if (col == row) {
+                local_energy += values[j];  // x[row]^2 * Q[row,row] = Q[row,row]
+            } else if (x[col] != 0) {
+                // Off-diagonal: symmetric contribution
+                // Upper triangular stored, so add 2x for symmetric term
+                local_energy += 2.0 * values[j];
+            }
+        }
+    }
+
+    // Store to shared memory
+    shared_energy[tid] = local_energy;
+    __syncthreads();
+
+    // Block-level reduction
+    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+        if (tid < s) {
+            shared_energy[tid] += shared_energy[tid + s];
+        }
+        __syncthreads();
+    }
+
+    // Write block result
+    if (tid == 0) {
+        atomicAdd(energy_out, shared_energy[0]);
+    }
+}
+
+/// Evaluate batch of flip candidates and compute delta energy
+__global__ void qubo_flip_batch_kernel(
+    const int* row_ptr,
+    const int* col_idx,
+    const double* values,
+    const unsigned char* x_current,
+    curandStatePhilox4_32_10_t* rng_states,
+    double* delta_energy,
+    int* flip_candidates,
+    int batch_size,
+    int num_vars
+) {
+    int batch_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (batch_idx >= batch_size) return;
+
+    // Select random variable to flip
+    curandStatePhilox4_32_10_t local_state = rng_states[batch_idx];
+    int var_idx = curand(&local_state) % num_vars;
+    rng_states[batch_idx] = local_state;
+
+    flip_candidates[batch_idx] = var_idx;
+
+    // Compute delta energy for flipping this variable
+    // ΔE = E(x') - E(x)
+    // For binary variable: ΔE = (2*x[i] - 1) * (2 * Σ_j Q[i,j]*x[j])
+
+    int current_val = x_current[var_idx];
+    int new_val = 1 - current_val;
+
+    double delta = 0.0;
+
+    // Process row var_idx
+    int row_start = row_ptr[var_idx];
+    int row_end = row_ptr[var_idx + 1];
+
+    for (int j = row_start; j < row_end; j++) {
+        int col = col_idx[j];
+        double q_val = values[j];
+
+        if (col == var_idx) {
+            // Diagonal term: Q[i,i] * (new_val^2 - current_val^2)
+            delta += q_val * (new_val - current_val);
+        } else {
+            // Off-diagonal: 2 * Q[i,col] * x[col] * (new_val - current_val)
+            // Factor of 2 because matrix is symmetric
+            delta += 2.0 * q_val * x_current[col] * (new_val - current_val);
+        }
+    }
+
+    // Process column var_idx (symmetric entries)
+    // For upper triangular storage, we need to check other rows
+    for (int row = 0; row < var_idx; row++) {
+        int r_start = row_ptr[row];
+        int r_end = row_ptr[row + 1];
+
+        for (int j = r_start; j < r_end; j++) {
+            if (col_idx[j] == var_idx) {
+                double q_val = values[j];
+                delta += 2.0 * q_val * x_current[row] * (new_val - current_val);
+                break;
+            }
+        }
+    }
+
+    delta_energy[batch_idx] = delta;
+}
+
+/// Apply Metropolis-Hastings acceptance criterion
+__global__ void qubo_metropolis_kernel(
+    unsigned char* x_current,
+    unsigned char* x_best,
+    const double* delta_energy,
+    const int* flip_candidates,
+    double* best_energy,
+    double temperature,
+    curandStatePhilox4_32_10_t* rng_states,
+    int batch_size,
+    int num_vars
+) {
+    int batch_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (batch_idx >= batch_size) return;
+
+    double delta_e = delta_energy[batch_idx];
+    int var_idx = flip_candidates[batch_idx];
+
+    if (var_idx < 0 || var_idx >= num_vars) return;
+
+    bool accept = false;
+
+    if (delta_e < 0.0) {
+        // Always accept improvement
+        accept = true;
+    } else if (temperature > 1e-10) {
+        // Metropolis criterion for uphill moves
+        curandStatePhilox4_32_10_t local_state = rng_states[batch_idx];
+        float rand_val = curand_uniform(&local_state);
+        rng_states[batch_idx] = local_state;
+
+        double acceptance_prob = exp(-delta_e / temperature);
+        accept = (rand_val < acceptance_prob);
+    }
+
+    if (accept) {
+        // Flip the bit
+        unsigned char current = x_current[var_idx];
+        unsigned char new_val = 1 - current;
+        x_current[var_idx] = new_val;
+
+        // Update best solution if improved
+        // Note: This is approximate since we don't track total energy exactly
+        // For production, could add periodic energy evaluation
+        if (delta_e < -1e-6) {
+            // Likely improvement - speculatively update best
+            x_best[var_idx] = new_val;
+
+            // Atomic update of best energy (approximate)
+            atomicAdd(best_energy, delta_e);
+        }
+    }
 }
 
 }  // extern "C"
