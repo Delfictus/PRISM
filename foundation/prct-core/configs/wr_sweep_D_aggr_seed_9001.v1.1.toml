@@ -15,6 +15,9 @@ pin_pool = false
 work_steal = true
 parallel_io = true
 
+[initial_coloring]
+strategy = "greedy"  # Options: greedy, spectral, community, randomized
+
 [gpu]
 device_id = 0
 streams = 1
