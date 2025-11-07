@@ -13,21 +13,21 @@
 //! Current best: 115 colors (1.39x gap)
 //! Expected: 83-90 colors with full integration
 
-use crate::errors::*;
-use crate::transfer_entropy_coloring::hybrid_te_kuramoto_ordering;
-use crate::dsatur_backtracking::DSaturSolver;
-use crate::memetic_coloring::{MemeticColoringSolver, MemeticConfig};
 use crate::coloring::greedy_coloring_with_ordering;
-use crate::quantum_coloring::QuantumColoringSolver;
-use crate::geodesic::{compute_landmark_distances, GeodesicFeatures};
 use crate::cpu_init::init_rayon_threads;
-use crate::telemetry::{RunMetric, PhaseName, PhaseExecMode};
+use crate::dsatur_backtracking::DSaturSolver;
+use crate::errors::*;
+use crate::geodesic::{compute_landmark_distances, GeodesicFeatures};
 use crate::initial_coloring::{compute_initial_coloring, InitialColoringStrategy};
+use crate::memetic_coloring::{MemeticColoringSolver, MemeticConfig};
+use crate::quantum_coloring::QuantumColoringSolver;
+use crate::telemetry::{PhaseExecMode, PhaseName, RunMetric};
+use crate::transfer_entropy_coloring::hybrid_te_kuramoto_ordering;
 use shared_types::*;
 
-use std::sync::Arc;
 use rand::Rng;
 use serde_json::json;
+use std::sync::Arc;
 
 #[cfg(feature = "cuda")]
 use cudarc::driver::CudaDevice;
@@ -70,13 +70,27 @@ impl Default for PhaseGpuStatus {
 }
 
 // Serde default helpers for v1.1 config
-fn default_true() -> bool { true }
-fn default_threads() -> usize { 24 }
-fn default_streams() -> usize { 4 }
-fn default_replicas() -> usize { 256 }  // Scaled for B200 GPUs (distributed across multi-GPU)
-fn default_beads() -> usize { 256 }     // Scaled for B200 GPUs (future PIMC)
-fn default_batch_size() -> usize { 1024 }
-fn default_stream_mode() -> StreamMode { StreamMode::Sequential }
+fn default_true() -> bool {
+    true
+}
+fn default_threads() -> usize {
+    24
+}
+fn default_streams() -> usize {
+    4
+}
+fn default_replicas() -> usize {
+    256
+} // Scaled for B200 GPUs (distributed across multi-GPU)
+fn default_beads() -> usize {
+    256
+} // Scaled for B200 GPUs (future PIMC)
+fn default_batch_size() -> usize {
+    1024
+}
+fn default_stream_mode() -> StreamMode {
+    StreamMode::Sequential
+}
 
 /// Stream execution mode for GPU phases
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -321,9 +335,15 @@ pub struct GpuColoringConfig {
     pub mask_width: u32,
 }
 
-fn default_sparse_threshold() -> f64 { 0.40 }
-fn default_mask_width() -> u32 { 64 }
-fn default_false() -> bool { false }
+fn default_sparse_threshold() -> f64 {
+    0.40
+}
+fn default_mask_width() -> u32 {
+    64
+}
+fn default_false() -> bool {
+    false
+}
 
 impl Default for GpuColoringConfig {
     fn default() -> Self {
@@ -370,6 +390,14 @@ impl Default for GeodesicConfig {
 /// Transfer Entropy Configuration
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TransferEntropyConfig {
+    /// Number of histogram bins for discretization (default: 128)
+    #[serde(default = "default_histogram_bins")]
+    pub histogram_bins: usize,
+
+    /// Number of time series steps for dynamics (default: 200)
+    #[serde(default = "default_time_series_steps")]
+    pub time_series_steps: usize,
+
     /// Weight for geodesic features in TE ordering (0.0 = TE only, 1.0 = geodesic only)
     #[serde(default = "default_geodesic_weight")]
     pub geodesic_weight: f64,
@@ -379,19 +407,29 @@ pub struct TransferEntropyConfig {
     pub te_vs_kuramoto_weight: f64,
 }
 
+fn default_histogram_bins() -> usize {
+    128
+}
+
+fn default_time_series_steps() -> usize {
+    200
+}
+
 fn default_geodesic_weight() -> f64 {
-    0.2
+    0.35
 }
 
 fn default_te_vs_kuramoto_weight() -> f64 {
-    0.7
+    0.85
 }
 
 impl Default for TransferEntropyConfig {
     fn default() -> Self {
         Self {
-            geodesic_weight: 0.2,
-            te_vs_kuramoto_weight: 0.7,
+            histogram_bins: 128,
+            time_series_steps: 200,
+            geodesic_weight: 0.35,
+            te_vs_kuramoto_weight: 0.85,
         }
     }
 }
@@ -685,8 +723,8 @@ impl Default for WorldRecordConfig {
             version: Some("1.0.0".to_string()),
             deterministic: false,
             seed: Some(123456789),
-            target_chromatic: 83,  // DSJC1000.5 world record
-            max_runtime_hours: 48.0,  // 2 days maximum
+            target_chromatic: 83,    // DSJC1000.5 world record
+            max_runtime_hours: 48.0, // 2 days maximum
             use_active_inference: true,
             use_adp_learning: true,
             use_reservoir_prediction: true,
@@ -698,8 +736,8 @@ impl Default for WorldRecordConfig {
             use_ensemble_consensus: true,
             use_geodesic_features: false,
             use_gnn_screening: false,
-            use_tda: true,  // Topological Data Analysis ENABLED by default
-            num_workers: 24,  // Intel i9 Ultra
+            use_tda: true,   // Topological Data Analysis ENABLED by default
+            num_workers: 24, // Intel i9 Ultra
             multi_gpu: MultiGpuConfig::default(),
             gpu: GpuConfig::default(),
             memetic: MemeticConfig::default(),
@@ -720,15 +758,21 @@ impl Default for WorldRecordConfig {
 impl WorldRecordConfig {
     pub fn validate(&self) -> Result<()> {
         if self.target_chromatic < 1 {
-            return Err(PRCTError::ColoringFailed("target_chromatic must be >= 1".to_string()));
+            return Err(PRCTError::ColoringFailed(
+                "target_chromatic must be >= 1".to_string(),
+            ));
         }
 
         if self.max_runtime_hours <= 0.0 || self.max_runtime_hours > 168.0 {
-            return Err(PRCTError::ColoringFailed("max_runtime_hours must be in (0, 168]".to_string()));
+            return Err(PRCTError::ColoringFailed(
+                "max_runtime_hours must be in (0, 168]".to_string(),
+            ));
         }
 
         if self.num_workers == 0 || self.num_workers > 256 {
-            return Err(PRCTError::ColoringFailed("num_workers must be in [1, 256]".to_string()));
+            return Err(PRCTError::ColoringFailed(
+                "num_workers must be in [1, 256]".to_string(),
+            ));
         }
 
         // Require at least one method enabled
@@ -742,28 +786,40 @@ impl WorldRecordConfig {
         any_enabled |= self.use_multiscale_analysis;
 
         if !any_enabled {
-            return Err(PRCTError::ColoringFailed("enable at least one phase".to_string()));
+            return Err(PRCTError::ColoringFailed(
+                "enable at least one phase".to_string(),
+            ));
         }
 
         // Validate geodesic configuration if enabled
         if self.use_geodesic_features {
             if self.geodesic.num_landmarks == 0 {
-                return Err(PRCTError::ColoringFailed("geodesic.num_landmarks must be > 0".to_string()));
+                return Err(PRCTError::ColoringFailed(
+                    "geodesic.num_landmarks must be > 0".to_string(),
+                ));
             }
             if self.geodesic.metric != "hop" && self.geodesic.metric != "weighted" {
-                return Err(PRCTError::ColoringFailed("geodesic.metric must be 'hop' or 'weighted'".to_string()));
+                return Err(PRCTError::ColoringFailed(
+                    "geodesic.metric must be 'hop' or 'weighted'".to_string(),
+                ));
             }
             if self.geodesic.centrality_weight < 0.0 || self.geodesic.centrality_weight > 1.0 {
-                return Err(PRCTError::ColoringFailed("geodesic.centrality_weight must be in [0, 1]".to_string()));
+                return Err(PRCTError::ColoringFailed(
+                    "geodesic.centrality_weight must be in [0, 1]".to_string(),
+                ));
             }
             if self.geodesic.eccentricity_weight < 0.0 || self.geodesic.eccentricity_weight > 1.0 {
-                return Err(PRCTError::ColoringFailed("geodesic.eccentrity_weight must be in [0, 1]".to_string()));
+                return Err(PRCTError::ColoringFailed(
+                    "geodesic.eccentrity_weight must be in [0, 1]".to_string(),
+                ));
             }
         }
 
         // Validate CPU configuration
         if self.cpu.threads == 0 || self.cpu.threads > 1024 {
-            return Err(PRCTError::ColoringFailed("cpu.threads must be in [1, 1024]".to_string()));
+            return Err(PRCTError::ColoringFailed(
+                "cpu.threads must be in [1, 1024]".to_string(),
+            ));
         }
 
         // VRAM guards removed for B200 GPUs (180GB VRAM each)
@@ -774,19 +830,27 @@ impl WorldRecordConfig {
 
         // Validate ADP parameters use config values
         if self.adp.alpha <= 0.0 || self.adp.alpha > 1.0 {
-            return Err(PRCTError::ColoringFailed("adp.alpha must be in (0, 1]".to_string()));
+            return Err(PRCTError::ColoringFailed(
+                "adp.alpha must be in (0, 1]".to_string(),
+            ));
         }
 
         if self.adp.gamma < 0.0 || self.adp.gamma > 1.0 {
-            return Err(PRCTError::ColoringFailed("adp.gamma must be in [0, 1]".to_string()));
+            return Err(PRCTError::ColoringFailed(
+                "adp.gamma must be in [0, 1]".to_string(),
+            ));
         }
 
         if self.adp.epsilon_decay <= 0.0 || self.adp.epsilon_decay > 1.0 {
-            return Err(PRCTError::ColoringFailed("adp.epsilon_decay must be in (0, 1]".to_string()));
+            return Err(PRCTError::ColoringFailed(
+                "adp.epsilon_decay must be in (0, 1]".to_string(),
+            ));
         }
 
         if self.adp.epsilon_min < 0.0 || self.adp.epsilon_min > 1.0 {
-            return Err(PRCTError::ColoringFailed("adp.epsilon_min must be in [0, 1]".to_string()));
+            return Err(PRCTError::ColoringFailed(
+                "adp.epsilon_min must be in [0, 1]".to_string(),
+            ));
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -827,7 +891,9 @@ impl WorldRecordConfig {
                 }
             }
 
-            println!("[PIPELINE][FALLBACK] PIMC requested but not implemented, will skip this phase");
+            println!(
+                "[PIPELINE][FALLBACK] PIMC requested but not implemented, will skip this phase"
+            );
             println!("[PIPELINE][FALLBACK] Performance impact: none (experimental feature)");
         }
 
@@ -857,8 +923,10 @@ impl WorldRecordConfig {
                 )));
             }
 
-            println!("[VRAM][GUARD] Thermodynamic allocation estimate: {} MB ({} replicas)",
-                     total_thermo_mb, self.thermo.replicas);
+            println!(
+                "[VRAM][GUARD] Thermodynamic allocation estimate: {} MB ({} replicas)",
+                total_thermo_mb, self.thermo.replicas
+            );
         }
 
         // Estimate VRAM for reservoir computing
@@ -869,27 +937,35 @@ impl WorldRecordConfig {
             if reservoir_mb > VRAM_MB / 4 {
                 return Err(PRCTError::GpuError(format!(
                     "Reservoir VRAM requirement (~{} MB for size {}) exceeds safe limit ({} MB)",
-                    reservoir_mb, reservoir_size, VRAM_MB / 4
+                    reservoir_mb,
+                    reservoir_size,
+                    VRAM_MB / 4
                 )));
             }
 
-            println!("[VRAM][GUARD] Reservoir allocation estimate: {} MB (size={})",
-                     reservoir_mb, reservoir_size);
+            println!(
+                "[VRAM][GUARD] Reservoir allocation estimate: {} MB (size={})",
+                reservoir_mb, reservoir_size
+            );
         }
 
         // Estimate VRAM for quantum solver
         if self.use_quantum_classical_hybrid && self.gpu.enable_quantum_gpu {
             let vertices = graph.num_vertices;
-            let quantum_mb = (vertices * vertices * 8) / (1024 * 1024);  // PhaseField coherence matrix
+            let quantum_mb = (vertices * vertices * 8) / (1024 * 1024); // PhaseField coherence matrix
 
             if quantum_mb > VRAM_MB / 4 {
                 return Err(PRCTError::GpuError(format!(
                     "Quantum solver VRAM requirement (~{} MB) exceeds safe limit ({} MB)",
-                    quantum_mb, VRAM_MB / 4
+                    quantum_mb,
+                    VRAM_MB / 4
                 )));
             }
 
-            println!("[VRAM][GUARD] Quantum solver allocation estimate: {} MB", quantum_mb);
+            println!(
+                "[VRAM][GUARD] Quantum solver allocation estimate: {} MB",
+                quantum_mb
+            );
         }
 
         println!("[VRAM][GUARD] ✅ VRAM validation passed for all enabled GPU phases");
@@ -936,7 +1012,7 @@ impl ActiveInferencePolicy {
 
         for v in 0..n {
             if partial_coloring[v] != usize::MAX {
-                continue;  // Already colored
+                continue; // Already colored
             }
 
             // Pragmatic value: How hard is this vertex to color?
@@ -957,11 +1033,13 @@ impl ActiveInferencePolicy {
 
             if !neighbor_phases.is_empty() {
                 let mean_phase = neighbor_phases.iter().sum::<f64>() / neighbor_phases.len() as f64;
-                let phase_variance = neighbor_phases.iter()
+                let phase_variance = neighbor_phases
+                    .iter()
                     .map(|&p| (p - mean_phase).powi(2))
-                    .sum::<f64>() / neighbor_phases.len() as f64;
+                    .sum::<f64>()
+                    / neighbor_phases.len() as f64;
 
-                epistemic_value[v] = phase_variance;  // Higher variance = more information
+                epistemic_value[v] = phase_variance; // Higher variance = more information
             }
 
             // Uncertainty: Combination of degree and phase dispersion
@@ -969,6 +1047,29 @@ impl ActiveInferencePolicy {
 
             // Expected Free Energy: Balance pragmatic and epistemic
             expected_free_energy[v] = pragmatic_value[v] - 0.5 * epistemic_value[v];
+        }
+
+        // Normalize uncertainty using min-max scaling to [0, 1]
+        let min_unc = uncertainty.iter().cloned().fold(f64::INFINITY, f64::min);
+        let max_unc = uncertainty.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+
+        if (max_unc - min_unc).abs() > 1e-10 {
+            // Valid range, normalize
+            for u in &mut uncertainty {
+                *u = (*u - min_unc) / (max_unc - min_unc);
+            }
+            println!("[AI-CPU] Normalized uncertainty: min={:.6}, max={:.6}, mean={:.6}",
+                     min_unc, max_unc,
+                     uncertainty.iter().sum::<f64>() / uncertainty.len() as f64);
+        } else {
+            // All values same or zero - this is a BUG
+            eprintln!("[AI-CPU][BUG] Uncertainty vector is constant (all {:.6})! Using uniform fallback.",
+                      min_unc);
+            // Set to uniform distribution
+            let uniform_value = 1.0 / uncertainty.len() as f64;
+            for u in &mut uncertainty {
+                *u = uniform_value;
+            }
         }
 
         Ok(Self {
@@ -990,7 +1091,7 @@ impl ActiveInferencePolicy {
                 a.partial_cmp(b).unwrap_or(Ordering::Equal)
             })
             .map(|(idx, _)| idx)
-            .unwrap_or(0)  // Fallback to vertex 0 if no positive EFE found
+            .unwrap_or(0) // Fallback to vertex 0 if no positive EFE found
     }
 }
 
@@ -1029,7 +1130,7 @@ pub enum ColoringAction {
     IncreasePopulationSize,
     DecreasePopulationSize,
     FocusOnExploration,  // Higher diversity
-    FocusOnExploitation,  // More local search
+    FocusOnExploitation, // More local search
     IncreaseQuantumIterations,
     DecreaseQuantumIterations,
     IncreaseThermoTemperatures,
@@ -1099,14 +1200,15 @@ impl ReservoirConflictPredictor {
 
         for seed in 0..n {
             if conflict_scores[seed] < 2.0 {
-                continue;  // Not a difficult vertex
+                continue; // Not a difficult vertex
             }
 
             let mut zone = vec![seed];
             for v in 0..n {
                 if v != seed
                     && conflict_scores[v] >= 2.0
-                    && (kuramoto_state.phases[v] - kuramoto_state.phases[seed]).abs() < phase_threshold
+                    && (kuramoto_state.phases[v] - kuramoto_state.phases[seed]).abs()
+                        < phase_threshold
                 {
                     zone.push(v);
                 }
@@ -1157,10 +1259,18 @@ impl ThermodynamicEquilibrator {
         let mut current = initial_solution.clone();
 
         println!("[THERMODYNAMIC] Starting replica exchange...");
-        println!("[THERMODYNAMIC] Temperature range: [{:.3}, {:.3}], steps_per_temp: {}", t_min, t_max, steps_per_temp);
+        println!(
+            "[THERMODYNAMIC] Temperature range: [{:.3}, {:.3}], steps_per_temp: {}",
+            t_min, t_max, steps_per_temp
+        );
 
         for (i, &temp) in temperatures.iter().enumerate() {
-            println!("[THERMODYNAMIC] Temperature {}/{}: T = {:.3}", i + 1, num_temps, temp);
+            println!(
+                "[THERMODYNAMIC] Temperature {}/{}: T = {:.3}",
+                i + 1,
+                num_temps,
+                temp
+            );
 
             // Simulated annealing at this temperature
             let mut best = current.clone();
@@ -1192,7 +1302,7 @@ impl ThermodynamicEquilibrator {
                 if delta_conflicts > 0 {
                     let prob = (-delta_conflicts as f64 / temp).exp();
                     if rand::random::<f64>() > prob {
-                        current.colors[v] = old_color;  // Reject
+                        current.colors[v] = old_color; // Reject
                     }
                 }
 
@@ -1236,10 +1346,7 @@ pub struct QuantumClassicalHybrid {
 
 impl QuantumClassicalHybrid {
     #[cfg(feature = "cuda")]
-    pub fn new(
-        max_colors: usize,
-        cuda_device: Option<Arc<CudaDevice>>,
-    ) -> Result<Self> {
+    pub fn new(max_colors: usize, cuda_device: Option<Arc<CudaDevice>>) -> Result<Self> {
         Ok(Self {
             quantum_solver: QuantumColoringSolver::new(cuda_device)?,
             classical_solver: DSaturSolver::new(max_colors, 50000),
@@ -1284,7 +1391,11 @@ impl QuantumClassicalHybrid {
         println!("[QUANTUM-CLASSICAL] Starting hybrid feedback loop...");
 
         for iter in 0..num_iterations {
-            println!("[QUANTUM-CLASSICAL] Iteration {}/{}", iter + 1, num_iterations);
+            println!(
+                "[QUANTUM-CLASSICAL] Iteration {}/{}",
+                iter + 1,
+                num_iterations
+            );
 
             // Construct PhaseField from current best coloring and Kuramoto state
             let phase_field = self.construct_phase_field(graph, &best, kuramoto_state, None)?;
@@ -1298,14 +1409,21 @@ impl QuantumClassicalHybrid {
                 best.chromatic_number,
             ) {
                 Ok(quantum_result) => {
-                    if quantum_result.chromatic_number < best.chromatic_number && quantum_result.conflicts == 0 {
-                        println!("[QUANTUM-CLASSICAL]   🎯 Quantum improved: {} → {} colors",
-                                 best.chromatic_number, quantum_result.chromatic_number);
+                    if quantum_result.chromatic_number < best.chromatic_number
+                        && quantum_result.conflicts == 0
+                    {
+                        println!(
+                            "[QUANTUM-CLASSICAL]   🎯 Quantum improved: {} → {} colors",
+                            best.chromatic_number, quantum_result.chromatic_number
+                        );
                         best = quantum_result.clone();
                     }
                 }
                 Err(e) => {
-                    println!("[QUANTUM-CLASSICAL][FALLBACK] Quantum solver failed: {:?}", e);
+                    println!(
+                        "[QUANTUM-CLASSICAL][FALLBACK] Quantum solver failed: {:?}",
+                        e
+                    );
                     println!("[QUANTUM-CLASSICAL][FALLBACK] Using DSATUR-only refinement instead");
                     println!("[QUANTUM-CLASSICAL][FALLBACK] Performance impact: ~20-30% slower (loses quantum exploration)");
                     // Don't abort - continue with classical solver below
@@ -1321,16 +1439,21 @@ impl QuantumClassicalHybrid {
             )?;
 
             if classical_result.chromatic_number < best.chromatic_number
-               && classical_result.conflicts == 0
+                && classical_result.conflicts == 0
             {
-                println!("[QUANTUM-CLASSICAL]   🎯 Classical improved: {} → {} colors",
-                         best.chromatic_number, classical_result.chromatic_number);
+                println!(
+                    "[QUANTUM-CLASSICAL]   🎯 Classical improved: {} → {} colors",
+                    best.chromatic_number, classical_result.chromatic_number
+                );
                 best = classical_result;
             }
 
             // Adaptive iteration: stop early if no progress
             if iter > 0 && best.chromatic_number == initial_solution.chromatic_number {
-                println!("[QUANTUM-CLASSICAL]   No improvement after {} iterations, stopping early", iter + 1);
+                println!(
+                    "[QUANTUM-CLASSICAL]   No improvement after {} iterations, stopping early",
+                    iter + 1
+                );
                 break;
             }
         }
@@ -1407,16 +1530,19 @@ impl EnsembleConsensus {
     /// Consensus voting: Choose best valid coloring
     pub fn vote(&self) -> Result<ColoringSolution> {
         if self.solutions.is_empty() {
-            return Err(PRCTError::ColoringFailed("No solutions to vote on".to_string()));
+            return Err(PRCTError::ColoringFailed(
+                "No solutions to vote on".to_string(),
+            ));
         }
 
-        println!("[ENSEMBLE] Voting among {} solutions...", self.solutions.len());
+        println!(
+            "[ENSEMBLE] Voting among {} solutions...",
+            self.solutions.len()
+        );
 
         // Filter valid colorings only
-        let valid: Vec<&ColoringSolution> = self.solutions
-            .iter()
-            .filter(|s| s.conflicts == 0)
-            .collect();
+        let valid: Vec<&ColoringSolution> =
+            self.solutions.iter().filter(|s| s.conflicts == 0).collect();
 
         if valid.is_empty() {
             println!("[ENSEMBLE][FALLBACK] No valid colorings found in ensemble");
@@ -1428,12 +1554,17 @@ impl EnsembleConsensus {
                 .iter()
                 .min_by_key(|s| (s.conflicts, s.chromatic_number))
                 .cloned()
-                .ok_or_else(|| PRCTError::ColoringFailed(
-                    "No solutions available for ensemble voting (empty solutions list)".to_string()
-                ))?;
+                .ok_or_else(|| {
+                    PRCTError::ColoringFailed(
+                        "No solutions available for ensemble voting (empty solutions list)"
+                            .to_string(),
+                    )
+                })?;
 
-            println!("[ENSEMBLE] ℹ️  Best approximate: {} colors, {} conflicts",
-                     best_approx.chromatic_number, best_approx.conflicts);
+            println!(
+                "[ENSEMBLE] ℹ️  Best approximate: {} colors, {} conflicts",
+                best_approx.chromatic_number, best_approx.conflicts
+            );
             return Ok(best_approx);
         }
 
@@ -1442,9 +1573,12 @@ impl EnsembleConsensus {
         let best = valid
             .iter()
             .min_by_key(|s| s.chromatic_number)
-            .ok_or_else(|| PRCTError::ColoringFailed(
-                "Failed to find minimum chromatic in non-empty valid solutions (logic error)".to_string()
-            ))?;
+            .ok_or_else(|| {
+                PRCTError::ColoringFailed(
+                    "Failed to find minimum chromatic in non-empty valid solutions (logic error)"
+                        .to_string(),
+                )
+            })?;
 
         println!("[ENSEMBLE] ✅ Consensus: {} colors", best.chromatic_number);
         Ok((*best).clone())
@@ -1562,20 +1696,28 @@ impl WorldRecordPipeline {
 
         // Log GPU availability and configuration
         println!("[PIPELINE][INIT] CUDA device available (GPU acceleration enabled)");
-        println!("[PIPELINE][INIT] GPU phases: reservoir={}, te={}, thermo={}, quantum={}",
-                 config.gpu.enable_reservoir_gpu,
-                 config.gpu.enable_te_gpu,
-                 config.gpu.enable_thermo_gpu,
-                 config.gpu.enable_quantum_gpu);
+        println!(
+            "[PIPELINE][INIT] GPU phases: reservoir={}, te={}, thermo={}, quantum={}",
+            config.gpu.enable_reservoir_gpu,
+            config.gpu.enable_te_gpu,
+            config.gpu.enable_thermo_gpu,
+            config.gpu.enable_quantum_gpu
+        );
 
         // Initialize multi-GPU pool if enabled
         let multi_gpu_pool = if config.multi_gpu.enabled {
-            println!("[PIPELINE][INIT] Multi-GPU mode enabled: {} devices", config.multi_gpu.num_gpus);
+            println!(
+                "[PIPELINE][INIT] Multi-GPU mode enabled: {} devices",
+                config.multi_gpu.num_gpus
+            );
             let pool = crate::gpu::MultiGpuDevicePool::new(
                 &config.multi_gpu.devices,
                 config.multi_gpu.enable_peer_access,
             )?;
-            println!("[PIPELINE][INIT] Multi-GPU pool initialized: {} devices", pool.num_devices());
+            println!(
+                "[PIPELINE][INIT] Multi-GPU pool initialized: {} devices",
+                pool.num_devices()
+            );
             Some(Arc::new(pool))
         } else {
             None
@@ -1592,8 +1734,10 @@ impl WorldRecordPipeline {
                 config.gpu.streams,
                 stream_mode,
             )?;
-            println!("[PIPELINE][INIT] GPU stream pool: {} streams, mode={:?}",
-                     config.gpu.streams, config.gpu.stream_mode);
+            println!(
+                "[PIPELINE][INIT] GPU stream pool: {} streams, mode={:?}",
+                config.gpu.streams, config.gpu.stream_mode
+            );
             Some(Arc::new(state))
         } else {
             println!("[PIPELINE][INIT] GPU streams disabled (streams=0)");
@@ -1647,7 +1791,9 @@ impl WorldRecordPipeline {
 
         // Warn about enabled GPU phases that will fallback
         if config.use_reservoir_prediction && config.gpu.enable_reservoir_gpu {
-            println!("[PIPELINE][FALLBACK] Reservoir GPU requested but CUDA unavailable → CPU fallback");
+            println!(
+                "[PIPELINE][FALLBACK] Reservoir GPU requested but CUDA unavailable → CPU fallback"
+            );
         }
         if config.use_transfer_entropy && config.gpu.enable_te_gpu {
             println!("[PIPELINE][FALLBACK] Transfer Entropy GPU requested but CUDA unavailable → CPU fallback");
@@ -1697,9 +1843,38 @@ impl WorldRecordPipeline {
     /// # Returns
     /// Self with telemetry enabled
     pub fn with_telemetry(mut self, run_id: &str) -> Result<Self> {
-        self.telemetry = Some(Arc::new(crate::telemetry::TelemetryHandle::new(run_id, 1000)?));
+        self.telemetry = Some(Arc::new(crate::telemetry::TelemetryHandle::new(
+            run_id, 1000,
+        )?));
         println!("[PIPELINE][INIT] Telemetry enabled: run_id={}", run_id);
         Ok(self)
+    }
+
+    /// Get Active Inference uncertainty vector (if available)
+    ///
+    /// Returns reference to normalized uncertainty vector from Phase 1.
+    /// Higher values indicate vertices that are more difficult to color
+    /// and should be prioritized for thermodynamic exploration.
+    ///
+    /// # Returns
+    /// Option<&Vec<f64>> - Uncertainty scores per vertex (if AI policy computed)
+    pub fn get_ai_uncertainty(&self) -> Option<&Vec<f64>> {
+        self.active_inference_policy
+            .as_ref()
+            .map(|policy| &policy.uncertainty)
+    }
+
+    /// Get Active Inference expected free energy (if available)
+    ///
+    /// Returns reference to expected free energy vector from Phase 1.
+    /// Lower values indicate more favorable coloring configurations.
+    ///
+    /// # Returns
+    /// Option<&Vec<f64>> - Expected free energy per vertex (if AI policy computed)
+    pub fn get_ai_expected_free_energy(&self) -> Option<&Vec<f64>> {
+        self.active_inference_policy
+            .as_ref()
+            .map(|policy| &policy.expected_free_energy)
     }
 
     /// Print comprehensive phase checklist validating all config toggles and GPU paths
@@ -1731,26 +1906,38 @@ impl WorldRecordPipeline {
         {
             // Note: cudarc 0.9 doesn't expose total_memory() API
             // Using conservative estimates based on config defaults (8GB baseline)
-            let vram_gb_estimate = 8;  // Conservative baseline for RTX 5070 Ti
-            println!("[VRAM][GUARD] Device: CUDA {} (assumed {} GB VRAM)",
-                     self.config.gpu.device_id, vram_gb_estimate);
+            let vram_gb_estimate = 8; // Conservative baseline for RTX 5070 Ti
+            println!(
+                "[VRAM][GUARD] Device: CUDA {} (assumed {} GB VRAM)",
+                self.config.gpu.device_id, vram_gb_estimate
+            );
 
             // Check replica clamping
             if self.config.thermo.replicas > 56 {
-                println!("[VRAM][GUARD] ⚠️  WARN: thermo.replicas={} exceeds 8GB safe limit (56)",
-                         self.config.thermo.replicas);
+                println!(
+                    "[VRAM][GUARD] ⚠️  WARN: thermo.replicas={} exceeds 8GB safe limit (56)",
+                    self.config.thermo.replicas
+                );
             } else {
-                println!("[VRAM][GUARD] ✅ thermo.replicas={} (within safe limit)",
-                         self.config.thermo.replicas);
+                println!(
+                    "[VRAM][GUARD] ✅ thermo.replicas={} (within safe limit)",
+                    self.config.thermo.replicas
+                );
             }
 
             // Check beads clamping (for PIMC)
-            let pimc_beads = default_beads();  // Use default as reference
+            let pimc_beads = default_beads(); // Use default as reference
             if self.config.use_pimc {
                 if pimc_beads > 64 {
-                    println!("[VRAM][GUARD] ⚠️  WARN: pimc.beads={} exceeds 8GB safe limit (64)", pimc_beads);
+                    println!(
+                        "[VRAM][GUARD] ⚠️  WARN: pimc.beads={} exceeds 8GB safe limit (64)",
+                        pimc_beads
+                    );
                 } else {
-                    println!("[VRAM][GUARD] ✅ pimc.beads={} (within safe limit)", pimc_beads);
+                    println!(
+                        "[VRAM][GUARD] ✅ pimc.beads={} (within safe limit)",
+                        pimc_beads
+                    );
                 }
             }
             println!();
@@ -1836,8 +2023,8 @@ impl WorldRecordPipeline {
         // Phase 3: Quantum-Classical Hybrid
         let phase3_quantum = self.config.use_quantum_classical_hybrid;
         let phase3_quantum_gpu = self.config.gpu.enable_quantum_gpu;
-        let phase3_memetic = true;  // Always enabled when quantum is used
-        let phase3_dsatur = true;   // Always enabled as fallback
+        let phase3_memetic = true; // Always enabled when quantum is used
+        let phase3_dsatur = true; // Always enabled as fallback
         println!("  Phase 3: Quantum-Classical Hybrid");
         println!("    • Quantum-Classical={}", phase3_quantum);
         println!("    • Quantum GPU={}", phase3_quantum_gpu);
@@ -1910,7 +2097,10 @@ impl WorldRecordPipeline {
         println!("║       WORLD RECORD BREAKING PIPELINE - PRISM ULTIMATE     ║");
         println!("╚═══════════════════════════════════════════════════════════╝");
         // IMPORTANT: This is the TARGET/GOAL, not the result (DO NOT PARSE)
-        println!("[WR-PIPELINE] Target: {} colors (World Record - GOAL)", self.config.target_chromatic);
+        println!(
+            "[WR-PIPELINE] Target: {} colors (World Record - GOAL)",
+            self.config.target_chromatic
+        );
         println!("[WR-PIPELINE] Current Best: 115 colors (Full Integration - BASELINE)");
         println!("[WR-PIPELINE] Gap to Close: 32 colors");
         println!();
@@ -1927,17 +2117,18 @@ impl WorldRecordPipeline {
         println!("\n┌─────────────────────────────────────────────────────────┐");
         println!("│ INITIAL COLORING: Starting Solution Generation         │");
         println!("└─────────────────────────────────────────────────────────┘");
-        println!("[INIT] Computing initial coloring with strategy: {:?}",
-                 self.config.initial_coloring.strategy);
+        println!(
+            "[INIT] Computing initial coloring with strategy: {:?}",
+            self.config.initial_coloring.strategy
+        );
 
-        let initial_solution = compute_initial_coloring(
-            graph,
-            self.config.initial_coloring.strategy,
-        )?;
+        let initial_solution =
+            compute_initial_coloring(graph, self.config.initial_coloring.strategy)?;
 
-        println!("[INIT] Initial coloring: {} colors, {} conflicts",
-                 initial_solution.chromatic_number,
-                 initial_solution.conflicts);
+        println!(
+            "[INIT] Initial coloring: {} colors, {} conflicts",
+            initial_solution.chromatic_number, initial_solution.conflicts
+        );
 
         self.best_solution = initial_solution;
         self.history.push(self.best_solution.clone());
@@ -1954,18 +2145,21 @@ impl WorldRecordPipeline {
 
             // Record telemetry: phase start
             if let Some(ref telemetry) = self.telemetry {
-                telemetry.record(RunMetric::new(
-                    PhaseName::Validation,
-                    "phase_0a_start",
-                    self.best_solution.chromatic_number,
-                    self.best_solution.conflicts,
-                    0.0,
-                    PhaseExecMode::cpu_disabled(),
-                ).with_parameters(json!({
-                    "phase": "0A",
-                    "enabled": true,
-                    "num_landmarks": self.config.geodesic.num_landmarks,
-                })));
+                telemetry.record(
+                    RunMetric::new(
+                        PhaseName::Validation,
+                        "phase_0a_start",
+                        self.best_solution.chromatic_number,
+                        self.best_solution.conflicts,
+                        0.0,
+                        PhaseExecMode::cpu_disabled(),
+                    )
+                    .with_parameters(json!({
+                        "phase": "0A",
+                        "enabled": true,
+                        "num_landmarks": self.config.geodesic.num_landmarks,
+                    })),
+                );
             }
 
             let features = compute_landmark_distances(
@@ -1976,22 +2170,28 @@ impl WorldRecordPipeline {
 
             let phase_elapsed = phase_start.elapsed();
             // IMPORTANT: This is an intermediate phase result (DO NOT PARSE as final result)
-            println!("[PHASE 0A] ✅ Geodesic features computed for {} landmarks", features.landmarks.len());
+            println!(
+                "[PHASE 0A] ✅ Geodesic features computed for {} landmarks",
+                features.landmarks.len()
+            );
             println!("{{\"event\":\"phase_end\",\"phase\":\"0A\",\"name\":\"geodesic\",\"time_s\":{:.3}}}",
                      phase_elapsed.as_secs_f64());
 
             // Record telemetry: phase complete
             if let Some(ref telemetry) = self.telemetry {
-                telemetry.record(RunMetric::new(
-                    PhaseName::Validation,
-                    "phase_0a_complete",
-                    self.best_solution.chromatic_number,
-                    self.best_solution.conflicts,
-                    phase_elapsed.as_secs_f64() * 1000.0,
-                    PhaseExecMode::cpu_disabled(),
-                ).with_parameters(json!({
-                    "num_landmarks": features.landmarks.len(),
-                })));
+                telemetry.record(
+                    RunMetric::new(
+                        PhaseName::Validation,
+                        "phase_0a_complete",
+                        self.best_solution.chromatic_number,
+                        self.best_solution.conflicts,
+                        phase_elapsed.as_secs_f64() * 1000.0,
+                        PhaseExecMode::cpu_disabled(),
+                    )
+                    .with_parameters(json!({
+                        "num_landmarks": features.landmarks.len(),
+                    })),
+                );
             }
 
             Some(features)
@@ -2011,26 +2211,31 @@ impl WorldRecordPipeline {
 
             // Record telemetry: phase start
             if let Some(ref telemetry) = self.telemetry {
-                telemetry.record(RunMetric::new(
-                    PhaseName::Reservoir,
-                    "phase_0b_start",
-                    self.best_solution.chromatic_number,
-                    self.best_solution.conflicts,
-                    0.0,
-                    PhaseExecMode::cpu_disabled(),
-                ).with_parameters(json!({
-                    "phase": "0B",
-                    "enabled": true,
-                    "gpu_enabled": self.config.gpu.enable_reservoir_gpu,
-                })));
+                telemetry.record(
+                    RunMetric::new(
+                        PhaseName::Reservoir,
+                        "phase_0b_start",
+                        self.best_solution.chromatic_number,
+                        self.best_solution.conflicts,
+                        0.0,
+                        PhaseExecMode::cpu_disabled(),
+                    )
+                    .with_parameters(json!({
+                        "phase": "0B",
+                        "enabled": true,
+                        "gpu_enabled": self.config.gpu.enable_reservoir_gpu,
+                    })),
+                );
             }
 
             // ACTIVATION LOG: Phase entry
             #[cfg(feature = "cuda")]
             {
                 if self.config.gpu.enable_reservoir_gpu {
-                    println!("[PHASE 0][GPU] Reservoir active (custom GEMV), M={}, N={}",
-                             graph.num_vertices, graph.num_vertices);
+                    println!(
+                        "[PHASE 0][GPU] Reservoir active (custom GEMV), M={}, N={}",
+                        graph.num_vertices, graph.num_vertices
+                    );
                 } else {
                     println!("[PHASE 0] Reservoir active (CPU fallback)");
                 }
@@ -2057,8 +2262,12 @@ impl WorldRecordPipeline {
                                 stream as *const _ as usize);
                         stream
                     } else {
-                        println!("[PHASE 0][WARNING] GPU state not initialized, using default stream");
-                        &self.cuda_device.fork_default_stream().map_err(|e| PRCTError::GpuError(format!("Failed to fork stream: {}", e)))?
+                        println!(
+                            "[PHASE 0][WARNING] GPU state not initialized, using default stream"
+                        );
+                        &self.cuda_device.fork_default_stream().map_err(|e| {
+                            PRCTError::GpuError(format!("Failed to fork stream: {}", e))
+                        })?
                     };
 
                     match GpuReservoirConflictPredictor::predict_gpu(
@@ -2071,9 +2280,18 @@ impl WorldRecordPipeline {
                         Ok(predictor) => {
                             self.phase_gpu_status.phase0_gpu_used = true;
                             println!("[PHASE 0][GPU] ✅ GPU reservoir executed successfully");
-                            println!("[PHASE 0] ✅ Identified {} difficulty zones", predictor.difficulty_zones.len());
-                            println!("[PHASE 0] ✅ GPU dendritic processing: {} high-conflict vertices",
-                                     predictor.conflict_scores.iter().filter(|&&s| s > 2.0).count());
+                            println!(
+                                "[PHASE 0] ✅ Identified {} difficulty zones",
+                                predictor.difficulty_zones.len()
+                            );
+                            println!(
+                                "[PHASE 0] ✅ GPU dendritic processing: {} high-conflict vertices",
+                                predictor
+                                    .conflict_scores
+                                    .iter()
+                                    .filter(|&&s| s > 2.0)
+                                    .count()
+                            );
                             self.conflict_predictor_gpu = Some(predictor);
                         }
                         Err(e) => {
@@ -2089,7 +2307,10 @@ impl WorldRecordPipeline {
                                 initial_kuramoto,
                                 self.config.neuromorphic.phase_threshold,
                             )?;
-                            println!("[PHASE 0] ✅ CPU fallback: {} difficulty zones identified", predictor.difficulty_zones.len());
+                            println!(
+                                "[PHASE 0] ✅ CPU fallback: {} difficulty zones identified",
+                                predictor.difficulty_zones.len()
+                            );
                             // Note: can't store in conflict_predictor_gpu (wrong type), continue without it
                         }
                     }
@@ -2103,7 +2324,10 @@ impl WorldRecordPipeline {
                         initial_kuramoto,
                         self.config.neuromorphic.phase_threshold,
                     )?;
-                    println!("[PHASE 0] ✅ CPU reservoir: {} difficulty zones identified", predictor.difficulty_zones.len());
+                    println!(
+                        "[PHASE 0] ✅ CPU reservoir: {} difficulty zones identified",
+                        predictor.difficulty_zones.len()
+                    );
                 }
             }
 
@@ -2120,9 +2344,18 @@ impl WorldRecordPipeline {
 
                 // Safe: just set above; if this fails, it's a logic error
                 if let Some(ref predictor) = self.conflict_predictor {
-                    println!("[PHASE 0] ✅ Identified {} difficulty zones", predictor.difficulty_zones.len());
-                    println!("[PHASE 0] ✅ Dendritic processing: {} high-conflict vertices",
-                             predictor.conflict_scores.iter().filter(|&&s| s > 2.0).count());
+                    println!(
+                        "[PHASE 0] ✅ Identified {} difficulty zones",
+                        predictor.difficulty_zones.len()
+                    );
+                    println!(
+                        "[PHASE 0] ✅ Dendritic processing: {} high-conflict vertices",
+                        predictor
+                            .conflict_scores
+                            .iter()
+                            .filter(|&&s| s > 2.0)
+                            .count()
+                    );
                 } else {
                     println!("[PHASE 0][ERROR] Logic error: conflict_predictor should be set after predict()");
                 }
@@ -2142,17 +2375,73 @@ impl WorldRecordPipeline {
                     PhaseExecMode::cpu_disabled()
                 };
 
-                telemetry.record(RunMetric::new(
-                    PhaseName::Reservoir,
-                    "phase_0b_complete",
-                    self.best_solution.chromatic_number,
-                    self.best_solution.conflicts,
-                    phase_elapsed.as_secs_f64() * 1000.0,
-                    gpu_mode,
-                ).with_parameters(json!({
-                    "phase": "0B",
-                    "gpu_used": self.phase_gpu_status.phase0_gpu_used,
-                })));
+                // Gather difficulty zone stats
+                let difficulty_stats = {
+                    #[cfg(feature = "cuda")]
+                    {
+                        if let Some(ref pred) = self.conflict_predictor_gpu {
+                            let scores = pred.get_conflict_scores();
+                            let mut indexed_scores: Vec<(usize, f64)> = scores.iter().enumerate().map(|(i, &s)| (i, s)).collect();
+                            indexed_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+                            let top_10: Vec<(usize, f64)> = indexed_scores.into_iter().take(10).collect();
+
+                            println!("[PHASE 0][RESERVOIR] Top 10 difficulty vertices:");
+                            for (i, (v, score)) in top_10.iter().enumerate() {
+                                println!("  {}. Vertex {} → score {:.4}", i + 1, v, score);
+                            }
+
+                            json!({
+                                "num_zones": pred.get_difficulty_zones().len(),
+                                "high_conflict_vertices": pred.get_conflict_scores().iter().filter(|&&s| s > 2.0).count(),
+                                "max_conflict_score": pred.get_conflict_scores().iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                                "mean_conflict_score": pred.get_conflict_scores().iter().sum::<f64>() / pred.get_conflict_scores().len() as f64,
+                                "top_10_difficulty": top_10,
+                            })
+                        } else {
+                            json!({"zones_available": false})
+                        }
+                    }
+                    #[cfg(not(feature = "cuda"))]
+                    {
+                        if let Some(ref pred) = self.conflict_predictor {
+                            let scores = &pred.conflict_scores;
+                            let mut indexed_scores: Vec<(usize, f64)> = scores.iter().enumerate().map(|(i, &s)| (i, s)).collect();
+                            indexed_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+                            let top_10: Vec<(usize, f64)> = indexed_scores.into_iter().take(10).collect();
+
+                            println!("[PHASE 0][RESERVOIR] Top 10 difficulty vertices:");
+                            for (i, (v, score)) in top_10.iter().enumerate() {
+                                println!("  {}. Vertex {} → score {:.4}", i + 1, v, score);
+                            }
+
+                            json!({
+                                "num_zones": pred.difficulty_zones.len(),
+                                "high_conflict_vertices": pred.conflict_scores.iter().filter(|&&s| s > 2.0).count(),
+                                "max_conflict_score": pred.conflict_scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                                "mean_conflict_score": pred.conflict_scores.iter().sum::<f64>() / pred.conflict_scores.len() as f64,
+                                "top_10_difficulty": top_10,
+                            })
+                        } else {
+                            json!({"zones_available": false})
+                        }
+                    }
+                };
+
+                telemetry.record(
+                    RunMetric::new(
+                        PhaseName::Reservoir,
+                        "phase_0b_complete",
+                        self.best_solution.chromatic_number,
+                        self.best_solution.conflicts,
+                        phase_elapsed.as_secs_f64() * 1000.0,
+                        gpu_mode,
+                    )
+                    .with_parameters(json!({
+                        "phase": "0B",
+                        "gpu_used": self.phase_gpu_status.phase0_gpu_used,
+                        "difficulty_zones": difficulty_stats,
+                    })),
+                );
             }
         } else {
             println!("[PHASE 0] disabled by config");
@@ -2169,20 +2458,23 @@ impl WorldRecordPipeline {
 
         // Record telemetry: phase start
         if let Some(ref telemetry) = self.telemetry {
-            telemetry.record(RunMetric::new(
-                PhaseName::TransferEntropy,
-                "phase_1_start",
-                self.best_solution.chromatic_number,
-                self.best_solution.conflicts,
-                0.0,
-                PhaseExecMode::cpu_disabled(),
-            ).with_parameters(json!({
-                "phase": "1",
-                "enabled": self.config.use_transfer_entropy,
-                "gpu_enabled": self.config.gpu.enable_te_gpu,
-                "te_vs_kuramoto_weight": self.config.transfer_entropy.te_vs_kuramoto_weight,
-                "geodesic_weight": self.config.transfer_entropy.geodesic_weight,
-            })));
+            telemetry.record(
+                RunMetric::new(
+                    PhaseName::TransferEntropy,
+                    "phase_1_start",
+                    self.best_solution.chromatic_number,
+                    self.best_solution.conflicts,
+                    0.0,
+                    PhaseExecMode::cpu_disabled(),
+                )
+                .with_parameters(json!({
+                    "phase": "1",
+                    "enabled": self.config.use_transfer_entropy,
+                    "gpu_enabled": self.config.gpu.enable_te_gpu,
+                    "te_vs_kuramoto_weight": self.config.transfer_entropy.te_vs_kuramoto_weight,
+                    "geodesic_weight": self.config.transfer_entropy.geodesic_weight,
+                })),
+            );
         }
 
         // ACTIVATION LOG: Phase entry
@@ -2197,14 +2489,23 @@ impl WorldRecordPipeline {
                     // Get stream for Phase 1 (Transfer Entropy)
                     let stream = if let Some(ref gpu_state) = self.gpu_state {
                         let stream = gpu_state.stream_for_phase(1);
-                        println!("[PHASE 1][GPU] Using stream {:?} for TE computation", stream as *const _ as usize);
+                        println!(
+                            "[PHASE 1][GPU] Using stream {:?} for TE computation",
+                            stream as *const _ as usize
+                        );
                         stream
                     } else {
-                        println!("[PHASE 1][WARNING] GPU state not initialized, using default stream");
-                        &self.cuda_device.fork_default_stream().map_err(|e| PRCTError::GpuError(format!("Failed to fork stream: {}", e)))?
+                        println!(
+                            "[PHASE 1][WARNING] GPU state not initialized, using default stream"
+                        );
+                        &self.cuda_device.fork_default_stream().map_err(|e| {
+                            PRCTError::GpuError(format!("Failed to fork stream: {}", e))
+                        })?
                     };
 
-                    println!("[PHASE 1][GPU] Attempting TE kernels (histogram bins=auto, lag=1)");
+                    println!("[PHASE 1][GPU] Attempting TE kernels (histogram bins={}, time steps={}, lag=1)",
+                             self.config.transfer_entropy.histogram_bins,
+                             self.config.transfer_entropy.time_series_steps);
                     match gpu_transfer_entropy::compute_transfer_entropy_ordering_gpu(
                         &self.cuda_device,
                         stream,
@@ -2212,6 +2513,8 @@ impl WorldRecordPipeline {
                         initial_kuramoto,
                         geodesic_features.as_ref(),
                         self.config.transfer_entropy.geodesic_weight,
+                        self.config.transfer_entropy.histogram_bins,
+                        self.config.transfer_entropy.time_series_steps,
                     ) {
                         Ok(ordering) => {
                             self.phase_gpu_status.phase1_gpu_used = true;
@@ -2271,7 +2574,10 @@ impl WorldRecordPipeline {
         }
 
         // IMPORTANT: This is an intermediate phase result (DO NOT PARSE as final result)
-        println!("[PHASE 1] ✅ TE-guided coloring: {} colors", te_solution.chromatic_number);
+        println!(
+            "[PHASE 1] ✅ TE-guided coloring: {} colors",
+            te_solution.chromatic_number
+        );
         self.best_solution = te_solution.clone();
         self.history.push(te_solution.clone());
 
@@ -2290,21 +2596,44 @@ impl WorldRecordPipeline {
                 PhaseExecMode::cpu_disabled()
             };
 
-            telemetry.record(RunMetric::new(
-                PhaseName::TransferEntropy,
-                "phase_1_complete",
-                te_solution.chromatic_number,
-                te_solution.conflicts,
-                phase1_elapsed.as_secs_f64() * 1000.0,
-                gpu_mode,
-            ).with_parameters(json!({
-                "phase": "1",
-                "gpu_used": self.phase_gpu_status.phase1_gpu_used,
-                "active_inference_enabled": self.config.use_active_inference,
-            })));
+            // Gather AI uncertainty stats
+            let ai_stats = if let Some(ref policy) = self.active_inference_policy {
+                let unc_mean = policy.uncertainty.iter().sum::<f64>() / policy.uncertainty.len() as f64;
+                let unc_min = policy.uncertainty.iter().cloned().fold(f64::INFINITY, f64::min);
+                let unc_max = policy.uncertainty.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                let unc_variance = policy.uncertainty.iter().map(|u| (u - unc_mean).powi(2)).sum::<f64>() / policy.uncertainty.len() as f64;
+                json!({
+                    "uncertainty_available": true,
+                    "uncertainty_mean": unc_mean,
+                    "uncertainty_std": unc_variance.sqrt(),
+                    "uncertainty_min": unc_min,
+                    "uncertainty_max": unc_max,
+                    "uncertainty_nonzero": policy.uncertainty.iter().any(|&u| u > 1e-6),
+                })
+            } else {
+                json!({"uncertainty_available": false})
+            };
+
+            telemetry.record(
+                RunMetric::new(
+                    PhaseName::TransferEntropy,
+                    "phase_1_complete",
+                    te_solution.chromatic_number,
+                    te_solution.conflicts,
+                    phase1_elapsed.as_secs_f64() * 1000.0,
+                    gpu_mode,
+                )
+                .with_parameters(json!({
+                    "phase": "1",
+                    "gpu_used": self.phase_gpu_status.phase1_gpu_used,
+                    "active_inference_enabled": self.config.use_active_inference,
+                    "ai_stats": ai_stats,
+                })),
+            );
         }
 
-        self.ensemble.add_solution(te_solution.clone(), "Transfer Entropy");
+        self.ensemble
+            .add_solution(te_solution.clone(), "Transfer Entropy");
 
         // ═══════════════════════════════════════════════════════════
         // PHASE 2: Statistical Mechanics Thermodynamic Equilibration
@@ -2316,24 +2645,39 @@ impl WorldRecordPipeline {
             println!("└─────────────────────────────────────────────────────────┘");
             println!("{{\"event\":\"phase_start\",\"phase\":\"2\",\"name\":\"thermodynamic\"}}");
 
-            // Record telemetry: phase start
+            // Record telemetry: phase start with AI guidance status
             if let Some(ref telemetry) = self.telemetry {
-                telemetry.record(RunMetric::new(
-                    PhaseName::Thermodynamic,
-                    "phase_2_start",
-                    self.best_solution.chromatic_number,
-                    self.best_solution.conflicts,
-                    0.0,
-                    PhaseExecMode::cpu_disabled(),
-                ).with_parameters(json!({
-                    "phase": "2",
-                    "enabled": true,
-                    "gpu_enabled": self.config.gpu.enable_thermo_gpu,
-                    "num_temps": self.adp_thermo_num_temps,
-                    "steps_per_temp": self.config.thermo.steps_per_temp,
-                    "t_min": self.config.thermo.t_min,
-                    "t_max": self.config.thermo.t_max,
-                })));
+                let uncertainty_stats = if let Some(unc) = self.get_ai_uncertainty() {
+                    json!({
+                        "ai_guided": true,
+                        "uncertainty_mean": unc.iter().sum::<f64>() / unc.len() as f64,
+                        "uncertainty_min": unc.iter().cloned().fold(f64::INFINITY, f64::min),
+                        "uncertainty_max": unc.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                    })
+                } else {
+                    json!({"ai_guided": false})
+                };
+
+                telemetry.record(
+                    RunMetric::new(
+                        PhaseName::Thermodynamic,
+                        "phase_2_start",
+                        self.best_solution.chromatic_number,
+                        self.best_solution.conflicts,
+                        0.0,
+                        PhaseExecMode::cpu_disabled(),
+                    )
+                    .with_parameters(json!({
+                        "phase": "2",
+                        "enabled": true,
+                        "gpu_enabled": self.config.gpu.enable_thermo_gpu,
+                        "num_temps": self.adp_thermo_num_temps,
+                        "steps_per_temp": self.config.thermo.steps_per_temp,
+                        "t_min": self.config.thermo.t_min,
+                        "t_max": self.config.thermo.t_max,
+                        "ai_uncertainty": uncertainty_stats,
+                    })),
+                );
             }
 
             // ADP: Learn from Phase 1 results
@@ -2346,10 +2690,14 @@ impl WorldRecordPipeline {
 
                 // For thermodynamic phase, we only apply temperature-related actions
                 match best_action {
-                    ColoringAction::IncreaseThermoTemperatures | ColoringAction::DecreaseThermoTemperatures => {
+                    ColoringAction::IncreaseThermoTemperatures
+                    | ColoringAction::DecreaseThermoTemperatures => {
                         self.apply_adp_action(&mut MemeticConfig::default(), best_action);
-                        println!("[PHASE 2] 🧠 ADP tuned thermo temps: {}", self.adp_thermo_num_temps);
-                    },
+                        println!(
+                            "[PHASE 2] 🧠 ADP tuned thermo temps: {}",
+                            self.adp_thermo_num_temps
+                        );
+                    }
                     _ => {
                         // Save other actions for later phases
                     }
@@ -2367,6 +2715,9 @@ impl WorldRecordPipeline {
                                 println!("[PHASE 2][MULTI-GPU] Using {} GPUs for distributed thermodynamic",
                                          pool.num_devices());
 
+                                // Get AI uncertainty from Phase 1 (if available)
+                                let ai_uncertainty = self.get_ai_uncertainty();
+
                                 match crate::gpu_thermodynamic_multi::equilibrate_thermodynamic_multi_gpu(
                                     pool.devices(),
                                     graph,
@@ -2376,6 +2727,7 @@ impl WorldRecordPipeline {
                                     self.config.thermo.t_min,
                                     self.config.thermo.t_max,
                                     self.config.thermo.steps_per_temp,
+                                    ai_uncertainty,
                                 ) {
                                     Ok(states) => {
                                         self.phase_gpu_status.phase2_gpu_used = true;
@@ -2407,32 +2759,20 @@ impl WorldRecordPipeline {
                                     stream
                                 } else {
                                     println!("[PHASE 2][WARNING] GPU state not initialized, using default stream");
-                                    &self.cuda_device.fork_default_stream().map_err(|e| PRCTError::GpuError(format!("Failed to fork stream: {}", e)))?
+                                    &self.cuda_device.fork_default_stream().map_err(|e| {
+                                        PRCTError::GpuError(format!("Failed to fork stream: {}", e))
+                                    })?
                                 };
 
                                 println!("[PHASE 2][GPU] Attempting thermodynamic replica exchange (temps={}, steps={})",
                                          self.adp_thermo_num_temps, self.config.thermo.steps_per_temp);
+
+                                // Get AI uncertainty from Phase 1 (if available)
+                                let ai_uncertainty = self.get_ai_uncertainty();
+
                                 match gpu_thermodynamic::equilibrate_thermodynamic_gpu(
-                            &self.cuda_device,
-                            stream,
-                            graph,
-                            &self.best_solution,
-                            self.config.target_chromatic,
-                            self.config.thermo.t_min,
-                            self.config.thermo.t_max,
-                            self.adp_thermo_num_temps,
-                            self.config.thermo.steps_per_temp,
-                        ) {
-                            Ok(states) => {
-                                self.phase_gpu_status.phase2_gpu_used = true;
-                                println!("[PHASE 2][GPU] ✅ Thermodynamic kernels executed successfully");
-                                states
-                            }
-                            Err(e) => {
-                                self.phase_gpu_status.phase2_fallback_reason = Some(format!("{}", e));
-                                println!("[PHASE 2][GPU→CPU FALLBACK] {}", e);
-                                println!("[PHASE 2][CPU] Using CPU thermodynamic equilibration");
-                                let eq = ThermodynamicEquilibrator::equilibrate(
+                                    &self.cuda_device,
+                                    stream,
                                     graph,
                                     &self.best_solution,
                                     self.config.target_chromatic,
@@ -2440,10 +2780,32 @@ impl WorldRecordPipeline {
                                     self.config.thermo.t_max,
                                     self.adp_thermo_num_temps,
                                     self.config.thermo.steps_per_temp,
-                                )?;
-                                eq.equilibrium_states
-                            }
-                        }
+                                    ai_uncertainty,
+                                ) {
+                                    Ok(states) => {
+                                        self.phase_gpu_status.phase2_gpu_used = true;
+                                        println!("[PHASE 2][GPU] ✅ Thermodynamic kernels executed successfully");
+                                        states
+                                    }
+                                    Err(e) => {
+                                        self.phase_gpu_status.phase2_fallback_reason =
+                                            Some(format!("{}", e));
+                                        println!("[PHASE 2][GPU→CPU FALLBACK] {}", e);
+                                        println!(
+                                            "[PHASE 2][CPU] Using CPU thermodynamic equilibration"
+                                        );
+                                        let eq = ThermodynamicEquilibrator::equilibrate(
+                                            graph,
+                                            &self.best_solution,
+                                            self.config.target_chromatic,
+                                            self.config.thermo.t_min,
+                                            self.config.thermo.t_max,
+                                            self.adp_thermo_num_temps,
+                                            self.config.thermo.steps_per_temp,
+                                        )?;
+                                        eq.equilibrium_states
+                                    }
+                                }
                             }
                         } else {
                             // No multi-GPU pool, use single GPU
@@ -2453,11 +2815,17 @@ impl WorldRecordPipeline {
                                 stream
                             } else {
                                 println!("[PHASE 2][WARNING] GPU state not initialized, using default stream");
-                                &self.cuda_device.fork_default_stream().map_err(|e| PRCTError::GpuError(format!("Failed to fork stream: {}", e)))?
+                                &self.cuda_device.fork_default_stream().map_err(|e| {
+                                    PRCTError::GpuError(format!("Failed to fork stream: {}", e))
+                                })?
                             };
 
                             println!("[PHASE 2][GPU] Attempting thermodynamic replica exchange (temps={}, steps={})",
                                      self.adp_thermo_num_temps, self.config.thermo.steps_per_temp);
+
+                            // Get AI uncertainty from Phase 1 (if available)
+                            let ai_uncertainty = self.get_ai_uncertainty();
+
                             match gpu_thermodynamic::equilibrate_thermodynamic_gpu(
                                 &self.cuda_device,
                                 stream,
@@ -2468,6 +2836,7 @@ impl WorldRecordPipeline {
                                 self.config.thermo.t_max,
                                 self.adp_thermo_num_temps,
                                 self.config.thermo.steps_per_temp,
+                                ai_uncertainty,
                             ) {
                                 Ok(states) => {
                                     self.phase_gpu_status.phase2_gpu_used = true;
@@ -2475,9 +2844,12 @@ impl WorldRecordPipeline {
                                     states
                                 }
                                 Err(e) => {
-                                    self.phase_gpu_status.phase2_fallback_reason = Some(format!("{}", e));
+                                    self.phase_gpu_status.phase2_fallback_reason =
+                                        Some(format!("{}", e));
                                     println!("[PHASE 2][GPU→CPU FALLBACK] {}", e);
-                                    println!("[PHASE 2][CPU] Using CPU thermodynamic equilibration");
+                                    println!(
+                                        "[PHASE 2][CPU] Using CPU thermodynamic equilibration"
+                                    );
                                     let eq = ThermodynamicEquilibrator::equilibrate(
                                         graph,
                                         &self.best_solution,
@@ -2526,7 +2898,8 @@ impl WorldRecordPipeline {
             let temperatures: Vec<f64> = (0..self.adp_thermo_num_temps)
                 .map(|i| {
                     let ratio = self.config.thermo.t_min / self.config.thermo.t_max;
-                    self.config.thermo.t_max * ratio.powf(i as f64 / (self.adp_thermo_num_temps - 1) as f64)
+                    self.config.thermo.t_max
+                        * ratio.powf(i as f64 / (self.adp_thermo_num_temps - 1) as f64)
                 })
                 .collect();
 
@@ -2538,14 +2911,23 @@ impl WorldRecordPipeline {
 
             // Process equilibrium states
             for (i, state) in equilibrium_states.iter().enumerate() {
-                if state.conflicts == 0 && state.chromatic_number < self.best_solution.chromatic_number {
+                if state.conflicts == 0
+                    && state.chromatic_number < self.best_solution.chromatic_number
+                {
                     // IMPORTANT: This is an intermediate phase result (DO NOT PARSE as final result)
-                    println!("[PHASE 2] 🎯 Thermodynamic improvement at T={:.3}: {} → {} colors",
-                             temperatures[i], self.best_solution.chromatic_number, state.chromatic_number);
+                    println!(
+                        "[PHASE 2] 🎯 Thermodynamic improvement at T={:.3}: {} → {} colors",
+                        temperatures[i],
+                        self.best_solution.chromatic_number,
+                        state.chromatic_number
+                    );
                     self.best_solution = state.clone();
                 }
                 self.history.push(state.clone());
-                self.ensemble.add_solution(state.clone(), &format!("Thermodynamic-T{:.3}", temperatures[i]));
+                self.ensemble.add_solution(
+                    state.clone(),
+                    &format!("Thermodynamic-T{:.3}", temperatures[i]),
+                );
             }
 
             let phase2_elapsed = phase2_start.elapsed();
@@ -2563,18 +2945,21 @@ impl WorldRecordPipeline {
                     PhaseExecMode::cpu_disabled()
                 };
 
-                telemetry.record(RunMetric::new(
-                    PhaseName::Thermodynamic,
-                    "phase_2_complete",
-                    self.best_solution.chromatic_number,
-                    self.best_solution.conflicts,
-                    phase2_elapsed.as_secs_f64() * 1000.0,
-                    gpu_mode,
-                ).with_parameters(json!({
-                    "phase": "2",
-                    "gpu_used": self.phase_gpu_status.phase2_gpu_used,
-                    "num_states_explored": equilibrium_states.len(),
-                })));
+                telemetry.record(
+                    RunMetric::new(
+                        PhaseName::Thermodynamic,
+                        "phase_2_complete",
+                        self.best_solution.chromatic_number,
+                        self.best_solution.conflicts,
+                        phase2_elapsed.as_secs_f64() * 1000.0,
+                        gpu_mode,
+                    )
+                    .with_parameters(json!({
+                        "phase": "2",
+                        "gpu_used": self.phase_gpu_status.phase2_gpu_used,
+                        "num_states_explored": equilibrium_states.len(),
+                    })),
+                );
             }
         } else {
             println!("[PHASE 2] disabled by config");
@@ -2588,32 +2973,38 @@ impl WorldRecordPipeline {
             println!("\n┌─────────────────────────────────────────────────────────┐");
             println!("│ PHASE 3: Quantum-Classical Hybrid Feedback Loop        │");
             println!("└─────────────────────────────────────────────────────────┘");
-            println!("{{\"event\":\"phase_start\",\"phase\":\"3\",\"name\":\"quantum_classical\"}}");
+            println!(
+                "{{\"event\":\"phase_start\",\"phase\":\"3\",\"name\":\"quantum_classical\"}}"
+            );
 
             // Record telemetry: phase start
             if let Some(ref telemetry) = self.telemetry {
-                telemetry.record(RunMetric::new(
-                    PhaseName::Quantum,
-                    "phase_3_start",
-                    self.best_solution.chromatic_number,
-                    self.best_solution.conflicts,
-                    0.0,
-                    PhaseExecMode::cpu_disabled(),
-                ).with_parameters(json!({
-                    "phase": "3",
-                    "enabled": true,
-                    "gpu_enabled": self.config.gpu.enable_quantum_gpu,
-                    "quantum_iterations": self.adp_quantum_iterations,
-                })));
+                telemetry.record(
+                    RunMetric::new(
+                        PhaseName::Quantum,
+                        "phase_3_start",
+                        self.best_solution.chromatic_number,
+                        self.best_solution.conflicts,
+                        0.0,
+                        PhaseExecMode::cpu_disabled(),
+                    )
+                    .with_parameters(json!({
+                        "phase": "3",
+                        "enabled": true,
+                        "gpu_enabled": self.config.gpu.enable_quantum_gpu,
+                        "quantum_iterations": self.adp_quantum_iterations,
+                    })),
+                );
             }
 
             // ACTIVATION LOG: Phase entry
             #[cfg(feature = "cuda")]
             {
                 if self.config.gpu.enable_quantum_gpu {
-                    println!("[PHASE 3][GPU] Attempting quantum solver (iterations={}, retries={})",
-                             self.config.quantum.iterations,
-                             self.config.quantum.failure_retries);
+                    println!(
+                        "[PHASE 3][GPU] Attempting quantum solver (iterations={}, retries={})",
+                        self.config.quantum.iterations, self.config.quantum.failure_retries
+                    );
                 } else {
                     println!("[PHASE 3][CPU] Quantum solver on CPU (GPU disabled in config)");
                 }
@@ -2623,9 +3014,10 @@ impl WorldRecordPipeline {
             println!("[PHASE 3][CPU] Quantum solver on CPU (CUDA not compiled)");
 
             // Check for Memetic fallback
-            println!("[PHASE 3] Memetic active (gens={}, pop={})",
-                     self.config.memetic.generations,
-                     self.config.memetic.population_size);
+            println!(
+                "[PHASE 3] Memetic active (gens={}, pop={})",
+                self.config.memetic.generations, self.config.memetic.population_size
+            );
 
             // ADP: Learn from Phase 2 results and tune quantum parameters
             if self.config.use_adp_learning && self.history.len() >= 5 {
@@ -2637,11 +3029,13 @@ impl WorldRecordPipeline {
 
                 // Apply quantum-related and DSATUR-related actions
                 match best_action {
-                    ColoringAction::IncreaseQuantumIterations | ColoringAction::DecreaseQuantumIterations |
-                    ColoringAction::IncreaseDSaturDepth | ColoringAction::DecreaseDSaturDepth => {
+                    ColoringAction::IncreaseQuantumIterations
+                    | ColoringAction::DecreaseQuantumIterations
+                    | ColoringAction::IncreaseDSaturDepth
+                    | ColoringAction::DecreaseDSaturDepth => {
                         self.apply_adp_action(&mut MemeticConfig::default(), best_action);
                         println!("[PHASE 3] 🧠 ADP action: {:?}", best_action);
-                    },
+                    }
                     _ => {}
                 }
             }
@@ -2671,12 +3065,15 @@ impl WorldRecordPipeline {
                 }
 
                 // Use ADP-tuned quantum iteration count
-                println!("[PHASE 3] 🧠 ADP-tuned quantum iterations: {}", self.adp_quantum_iterations);
+                println!(
+                    "[PHASE 3] 🧠 ADP-tuned quantum iterations: {}",
+                    self.adp_quantum_iterations
+                );
                 match qc_hybrid.solve_with_feedback(
                     graph,
                     &self.best_solution,
                     initial_kuramoto,
-                    self.adp_quantum_iterations,  // ADP-tuned iterations
+                    self.adp_quantum_iterations, // ADP-tuned iterations
                 ) {
                     Ok(qc_solution) => {
                         #[cfg(feature = "cuda")]
@@ -2687,10 +3084,14 @@ impl WorldRecordPipeline {
                             }
                         }
 
-                        if qc_solution.conflicts == 0 && qc_solution.chromatic_number < self.best_solution.chromatic_number {
+                        if qc_solution.conflicts == 0
+                            && qc_solution.chromatic_number < self.best_solution.chromatic_number
+                        {
                             // IMPORTANT: This is an intermediate phase result (DO NOT PARSE as final result)
-                            println!("[PHASE 3] 🎯 Quantum-Classical breakthrough: {} → {} colors",
-                                     self.best_solution.chromatic_number, qc_solution.chromatic_number);
+                            println!(
+                                "[PHASE 3] 🎯 Quantum-Classical breakthrough: {} → {} colors",
+                                self.best_solution.chromatic_number, qc_solution.chromatic_number
+                            );
                             self.best_solution = qc_solution.clone();
                         }
                         self.history.push(qc_solution.clone());
@@ -2700,12 +3101,16 @@ impl WorldRecordPipeline {
                         #[cfg(feature = "cuda")]
                         {
                             if self.config.gpu.enable_quantum_gpu {
-                                self.phase_gpu_status.phase3_fallback_reason = Some(format!("{}", e));
+                                self.phase_gpu_status.phase3_fallback_reason =
+                                    Some(format!("{}", e));
                                 self.phase_gpu_status.phase3_gpu_used = false;
                             }
                         }
 
-                        println!("[PHASE 3][FALLBACK] Quantum-Classical phase failed: {:?}", e);
+                        println!(
+                            "[PHASE 3][FALLBACK] Quantum-Classical phase failed: {:?}",
+                            e
+                        );
                         println!("[PHASE 3][FALLBACK] Continuing with best solution from previous phases");
                         println!("[PHASE 3][FALLBACK] Performance impact: ~30% (loses quantum-classical hybrid optimization)");
                         // Continue the pipeline - don't abort
@@ -2728,17 +3133,20 @@ impl WorldRecordPipeline {
                     PhaseExecMode::cpu_disabled()
                 };
 
-                telemetry.record(RunMetric::new(
-                    PhaseName::Quantum,
-                    "phase_3_complete",
-                    self.best_solution.chromatic_number,
-                    self.best_solution.conflicts,
-                    phase3_elapsed.as_secs_f64() * 1000.0,
-                    gpu_mode,
-                ).with_parameters(json!({
-                    "phase": "3",
-                    "gpu_used": self.phase_gpu_status.phase3_gpu_used,
-                })));
+                telemetry.record(
+                    RunMetric::new(
+                        PhaseName::Quantum,
+                        "phase_3_complete",
+                        self.best_solution.chromatic_number,
+                        self.best_solution.conflicts,
+                        phase3_elapsed.as_secs_f64() * 1000.0,
+                        gpu_mode,
+                    )
+                    .with_parameters(json!({
+                        "phase": "3",
+                        "gpu_used": self.phase_gpu_status.phase3_gpu_used,
+                    })),
+                );
             }
         } else {
             println!("[PHASE 3] disabled by config");
@@ -2755,37 +3163,38 @@ impl WorldRecordPipeline {
 
         // Record telemetry: phase start
         if let Some(ref telemetry) = self.telemetry {
-            telemetry.record(RunMetric::new(
-                PhaseName::Memetic,
-                "phase_4_start",
-                self.best_solution.chromatic_number,
-                self.best_solution.conflicts,
-                0.0,
-                PhaseExecMode::cpu_disabled(),
-            ).with_parameters(json!({
-                "phase": "4",
-                "enabled": true,
-            })));
+            telemetry.record(
+                RunMetric::new(
+                    PhaseName::Memetic,
+                    "phase_4_start",
+                    self.best_solution.chromatic_number,
+                    self.best_solution.conflicts,
+                    0.0,
+                    PhaseExecMode::cpu_disabled(),
+                )
+                .with_parameters(json!({
+                    "phase": "4",
+                    "enabled": true,
+                })),
+            );
         }
 
         // World-record aggressive settings (48-hour target)
         let mut memetic_config = MemeticConfig {
-            population_size: 128,  // 4x for better diversity
-            elite_size: 16,        // Scale with population
-            generations: 500,      // 10x for deeper search
+            population_size: 128, // 4x for better diversity
+            elite_size: 16,       // Scale with population
+            generations: 500,     // 10x for deeper search
             mutation_rate: 0.20,
-            tournament_size: 5,    // Stronger selection pressure
-            local_search_depth: 50000,  // 10x for intensive local optimization
+            tournament_size: 5,        // Stronger selection pressure
+            local_search_depth: 50000, // 10x for intensive local optimization
             use_tsp_guidance: true,
             tsp_weight: 0.25,
         };
 
         // ADP: Learn optimal parameters from history
         if self.config.use_adp_learning && self.history.len() > 3 {
-            let current_state = ColoringState::from_solution(
-                &self.best_solution,
-                initial_kuramoto.order_parameter,
-            );
+            let current_state =
+                ColoringState::from_solution(&self.best_solution, initial_kuramoto.order_parameter);
 
             // Q-learning action selection
             let best_action = self.select_adp_action(&current_state);
@@ -2794,26 +3203,36 @@ impl WorldRecordPipeline {
             println!("[PHASE 4] 🧠 ADP selected action: {:?}", best_action);
         }
 
-        let initial_pop = vec![
-            self.best_solution.clone(),
-            te_solution,
-        ];
+        let initial_pop = vec![self.best_solution.clone(), te_solution];
 
         let mut memetic = MemeticColoringSolver::new(memetic_config.clone());
-        let memetic_solution = memetic.solve_with_restart(graph, initial_pop, 10)?;  // 10 restarts for world-record attempt
+        let memetic_solution = memetic.solve_with_restart(graph, initial_pop, 10)?; // 10 restarts for world-record attempt
 
-        if memetic_solution.conflicts == 0 && memetic_solution.chromatic_number < self.best_solution.chromatic_number {
+        if memetic_solution.conflicts == 0
+            && memetic_solution.chromatic_number < self.best_solution.chromatic_number
+        {
             // IMPORTANT: This is an intermediate phase result (DO NOT PARSE as final result)
-            println!("[PHASE 4] 🎯 Memetic+ADP improved: {} → {} colors",
-                     self.best_solution.chromatic_number, memetic_solution.chromatic_number);
+            println!(
+                "[PHASE 4] 🎯 Memetic+ADP improved: {} → {} colors",
+                self.best_solution.chromatic_number, memetic_solution.chromatic_number
+            );
 
             // ADP: Update Q-value with reward
             if self.config.use_adp_learning {
                 let reward = (self.best_solution.chromatic_number as f64
-                             - memetic_solution.chromatic_number as f64) * 10.0;
-                self.update_adp_q_value(&ColoringState::from_solution(&self.best_solution, initial_kuramoto.order_parameter),
-                                       self.select_adp_action(&ColoringState::from_solution(&self.best_solution, initial_kuramoto.order_parameter)),
-                                       reward);
+                    - memetic_solution.chromatic_number as f64)
+                    * 10.0;
+                self.update_adp_q_value(
+                    &ColoringState::from_solution(
+                        &self.best_solution,
+                        initial_kuramoto.order_parameter,
+                    ),
+                    self.select_adp_action(&ColoringState::from_solution(
+                        &self.best_solution,
+                        initial_kuramoto.order_parameter,
+                    )),
+                    reward,
+                );
             }
 
             self.best_solution = memetic_solution.clone();
@@ -2828,18 +3247,21 @@ impl WorldRecordPipeline {
 
         // Record telemetry: phase complete
         if let Some(ref telemetry) = self.telemetry {
-            telemetry.record(RunMetric::new(
-                PhaseName::Memetic,
-                "phase_4_complete",
-                self.best_solution.chromatic_number,
-                self.best_solution.conflicts,
-                phase4_elapsed.as_secs_f64() * 1000.0,
-                PhaseExecMode::cpu_disabled(),
-            ).with_parameters(json!({
-                "phase": "4",
-                "population_size": memetic_config.population_size,
-                "generations": memetic_config.generations,
-            })));
+            telemetry.record(
+                RunMetric::new(
+                    PhaseName::Memetic,
+                    "phase_4_complete",
+                    self.best_solution.chromatic_number,
+                    self.best_solution.conflicts,
+                    phase4_elapsed.as_secs_f64() * 1000.0,
+                    PhaseExecMode::cpu_disabled(),
+                )
+                .with_parameters(json!({
+                    "phase": "4",
+                    "population_size": memetic_config.population_size,
+                    "generations": memetic_config.generations,
+                })),
+            );
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -2854,25 +3276,30 @@ impl WorldRecordPipeline {
 
             // Record telemetry: phase start
             if let Some(ref telemetry) = self.telemetry {
-                telemetry.record(RunMetric::new(
-                    PhaseName::Ensemble,
-                    "phase_5_start",
-                    self.best_solution.chromatic_number,
-                    self.best_solution.conflicts,
-                    0.0,
-                    PhaseExecMode::cpu_disabled(),
-                ).with_parameters(json!({
-                    "phase": "5",
-                    "enabled": true,
-                })));
+                telemetry.record(
+                    RunMetric::new(
+                        PhaseName::Ensemble,
+                        "phase_5_start",
+                        self.best_solution.chromatic_number,
+                        self.best_solution.conflicts,
+                        0.0,
+                        PhaseExecMode::cpu_disabled(),
+                    )
+                    .with_parameters(json!({
+                        "phase": "5",
+                        "enabled": true,
+                    })),
+                );
             }
 
             let consensus_solution = self.ensemble.vote()?;
 
             if consensus_solution.chromatic_number < self.best_solution.chromatic_number {
                 // IMPORTANT: This is an intermediate phase result (DO NOT PARSE as final result)
-                println!("[PHASE 5] 🎯 Ensemble consensus: {} → {} colors",
-                         self.best_solution.chromatic_number, consensus_solution.chromatic_number);
+                println!(
+                    "[PHASE 5] 🎯 Ensemble consensus: {} → {} colors",
+                    self.best_solution.chromatic_number, consensus_solution.chromatic_number
+                );
                 self.best_solution = consensus_solution;
             }
 
@@ -2883,16 +3310,19 @@ impl WorldRecordPipeline {
 
             // Record telemetry: phase complete
             if let Some(ref telemetry) = self.telemetry {
-                telemetry.record(RunMetric::new(
-                    PhaseName::Ensemble,
-                    "phase_5_complete",
-                    self.best_solution.chromatic_number,
-                    self.best_solution.conflicts,
-                    phase5_elapsed.as_secs_f64() * 1000.0,
-                    PhaseExecMode::cpu_disabled(),
-                ).with_parameters(json!({
-                    "phase": "5",
-                })));
+                telemetry.record(
+                    RunMetric::new(
+                        PhaseName::Ensemble,
+                        "phase_5_complete",
+                        self.best_solution.chromatic_number,
+                        self.best_solution.conflicts,
+                        phase5_elapsed.as_secs_f64() * 1000.0,
+                        PhaseExecMode::cpu_disabled(),
+                    )
+                    .with_parameters(json!({
+                        "phase": "5",
+                    })),
+                );
             }
         }
 
@@ -2904,17 +3334,21 @@ impl WorldRecordPipeline {
 
         // Check if we've improved in the last 5 solutions
         let recent_improvement = if history_len >= 5 {
-            self.history.iter()
+            self.history
+                .iter()
                 .rev()
                 .take(5)
                 .any(|sol| sol.chromatic_number < current_best)
         } else {
-            true  // Still warming up
+            true // Still warming up
         };
 
         if !recent_improvement && history_len >= 10 {
             self.stagnation_count += 1;
-            println!("\n⚠️  STAGNATION DETECTED (count: {})", self.stagnation_count);
+            println!(
+                "\n⚠️  STAGNATION DETECTED (count: {})",
+                self.stagnation_count
+            );
 
             // Adaptive recovery strategies
             if self.stagnation_count >= 2 {
@@ -2925,24 +3359,35 @@ impl WorldRecordPipeline {
                 println!("   • Increased exploration: ε = {:.3}", self.adp_epsilon);
 
                 // Strategy 2: Boost thermodynamic escape capability
-                self.adp_thermo_num_temps = (self.adp_thermo_num_temps + 16).min(128);
-                println!("   • Increased thermal diversity: {} temps", self.adp_thermo_num_temps);
+                let new_temps = self.adp_thermo_num_temps + 16;
+                self.adp_thermo_num_temps = new_temps.min(self.config.thermo.num_temps);
+                if new_temps > self.config.thermo.num_temps {
+                    eprintln!("[ADP][WARNING] ADP wanted {} temps but clamping to config max {}",
+                              new_temps, self.config.thermo.num_temps);
+                }
+                println!(
+                    "   • Increased thermal diversity: {} temps",
+                    self.adp_thermo_num_temps
+                );
 
                 // Strategy 3: Intensify quantum iterations
                 self.adp_quantum_iterations = (self.adp_quantum_iterations + 5).min(30);
-                println!("   • Increased quantum depth: {} iterations", self.adp_quantum_iterations);
+                println!(
+                    "   • Increased quantum depth: {} iterations",
+                    self.adp_quantum_iterations
+                );
 
                 // Strategy 4: Try desperation phase with extreme memetic search
                 if self.stagnation_count >= 3 {
                     println!("   • 🚨 DESPERATION MODE: Running extreme memetic search...");
 
                     let desperation_config = MemeticConfig {
-                        population_size: 256,  // 2x aggressive
+                        population_size: 256, // 2x aggressive
                         elite_size: 32,
-                        generations: 1000,     // 2x aggressive
-                        mutation_rate: 0.35,   // Higher mutation
+                        generations: 1000,   // 2x aggressive
+                        mutation_rate: 0.35, // Higher mutation
                         tournament_size: 7,
-                        local_search_depth: 100000,  // Maximum depth
+                        local_search_depth: 100000, // Maximum depth
                         use_tsp_guidance: true,
                         tsp_weight: 0.3,
                     };
@@ -2952,17 +3397,25 @@ impl WorldRecordPipeline {
                         // Use last history solution, or best_solution if history is empty
                         self.history
                             .last()
-                            .unwrap_or(&self.best_solution)  // Fallback to best_solution (should be rare)
+                            .unwrap_or(&self.best_solution) // Fallback to best_solution (should be rare)
                             .clone(),
                     ];
 
                     let mut desperation_memetic = MemeticColoringSolver::new(desperation_config);
-                    if let Ok(desperation_sol) = desperation_memetic.solve_with_restart(graph, initial_pop, 5) {
-                        if desperation_sol.conflicts == 0 && desperation_sol.chromatic_number < self.best_solution.chromatic_number {
-                            println!("   • 🎯 Desperation mode SUCCESS: {} → {} colors!",
-                                     self.best_solution.chromatic_number, desperation_sol.chromatic_number);
+                    if let Ok(desperation_sol) =
+                        desperation_memetic.solve_with_restart(graph, initial_pop, 5)
+                    {
+                        if desperation_sol.conflicts == 0
+                            && desperation_sol.chromatic_number
+                                < self.best_solution.chromatic_number
+                        {
+                            println!(
+                                "   • 🎯 Desperation mode SUCCESS: {} → {} colors!",
+                                self.best_solution.chromatic_number,
+                                desperation_sol.chromatic_number
+                            );
                             self.best_solution = desperation_sol.clone();
-                            self.stagnation_count = 0;  // Reset on improvement
+                            self.stagnation_count = 0; // Reset on improvement
                         }
                     }
                 }
@@ -2987,9 +3440,18 @@ impl WorldRecordPipeline {
         println!();
 
         // IMPORTANT: Below are summary statistics (DO NOT PARSE for final results)
-        println!("🏆 Summary: {} colors achieved", self.best_solution.chromatic_number);
-        println!("🥇 World Record: {} colors (REFERENCE)", self.config.target_chromatic);
-        println!("📊 Gap to WR: {:.2}x", self.best_solution.chromatic_number as f64 / self.config.target_chromatic as f64);
+        println!(
+            "🏆 Summary: {} colors achieved",
+            self.best_solution.chromatic_number
+        );
+        println!(
+            "🥇 World Record: {} colors (REFERENCE)",
+            self.config.target_chromatic
+        );
+        println!(
+            "📊 Gap to WR: {:.2}x",
+            self.best_solution.chromatic_number as f64 / self.config.target_chromatic as f64
+        );
         println!("⏱️  Total Time: {:.2}s", elapsed);
         println!();
 
@@ -3008,16 +3470,16 @@ impl WorldRecordPipeline {
         println!("\n╔═══════════════════════════════════════════════════════════╗");
         println!("║                     FINAL RESULT                          ║");
         println!("╚═══════════════════════════════════════════════════════════╝");
-        println!("FINAL RESULT: colors={} conflicts={} time={:.2}s",
-                 self.best_solution.chromatic_number,
-                 self.best_solution.conflicts,
-                 elapsed);
+        println!(
+            "FINAL RESULT: colors={} conflicts={} time={:.2}s",
+            self.best_solution.chromatic_number, self.best_solution.conflicts, elapsed
+        );
 
         // ═══════════════════════════════════════════════════════════
         // JSON TELEMETRY (Machine-Parseable)
         // ═══════════════════════════════════════════════════════════
-        let graph_density = 2.0 * graph.num_edges as f64 /
-                           (graph.num_vertices * (graph.num_vertices - 1)) as f64;
+        let graph_density =
+            2.0 * graph.num_edges as f64 / (graph.num_vertices * (graph.num_vertices - 1)) as f64;
 
         println!("{{\"event\":\"final_result\",\"colors\":{},\"conflicts\":{},\"time_s\":{:.3},\"quality_score\":{:.6},\"graph\":{{\"vertices\":{},\"edges\":{},\"density\":{:.6}}}}}",
                  self.best_solution.chromatic_number,
@@ -3036,21 +3498,47 @@ impl WorldRecordPipeline {
 
     /// Save phase GPU status to JSON file for verification
     fn save_phase_gpu_status(&self) -> Result<()> {
-        let status_json = serde_json::to_string_pretty(&self.phase_gpu_status)
-            .map_err(|e| PRCTError::ConfigError(format!("Failed to serialize GPU status: {}", e)))?;
+        let status_json = serde_json::to_string_pretty(&self.phase_gpu_status).map_err(|e| {
+            PRCTError::ConfigError(format!("Failed to serialize GPU status: {}", e))
+        })?;
 
-        std::fs::write("phase_gpu_status.json", status_json)
-            .map_err(|e| PRCTError::ConfigError(format!("Failed to write phase_gpu_status.json: {}", e)))?;
+        std::fs::write("phase_gpu_status.json", status_json).map_err(|e| {
+            PRCTError::ConfigError(format!("Failed to write phase_gpu_status.json: {}", e))
+        })?;
 
         println!("\n[GPU-STATUS] Saved runtime GPU usage to phase_gpu_status.json");
-        println!("[GPU-STATUS] Phase 0 (Reservoir): {}",
-                 if self.phase_gpu_status.phase0_gpu_used { "GPU ✅" } else { "CPU" });
-        println!("[GPU-STATUS] Phase 1 (Transfer Entropy): {}",
-                 if self.phase_gpu_status.phase1_gpu_used { "GPU ✅" } else { "CPU" });
-        println!("[GPU-STATUS] Phase 2 (Thermodynamic): {}",
-                 if self.phase_gpu_status.phase2_gpu_used { "GPU ✅" } else { "CPU" });
-        println!("[GPU-STATUS] Phase 3 (Quantum): {}",
-                 if self.phase_gpu_status.phase3_gpu_used { "GPU ✅" } else { "CPU" });
+        println!(
+            "[GPU-STATUS] Phase 0 (Reservoir): {}",
+            if self.phase_gpu_status.phase0_gpu_used {
+                "GPU ✅"
+            } else {
+                "CPU"
+            }
+        );
+        println!(
+            "[GPU-STATUS] Phase 1 (Transfer Entropy): {}",
+            if self.phase_gpu_status.phase1_gpu_used {
+                "GPU ✅"
+            } else {
+                "CPU"
+            }
+        );
+        println!(
+            "[GPU-STATUS] Phase 2 (Thermodynamic): {}",
+            if self.phase_gpu_status.phase2_gpu_used {
+                "GPU ✅"
+            } else {
+                "CPU"
+            }
+        );
+        println!(
+            "[GPU-STATUS] Phase 3 (Quantum): {}",
+            if self.phase_gpu_status.phase3_gpu_used {
+                "GPU ✅"
+            } else {
+                "CPU"
+            }
+        );
 
         Ok(())
     }
@@ -3066,15 +3554,16 @@ impl WorldRecordPipeline {
         } else {
             // Exploit: Best Q-value
             let actions = ColoringAction::all();
-            actions.iter()
+            actions
+                .iter()
                 .max_by(|a, b| {
                     use std::cmp::Ordering;
                     let q_a = self.adp_q_table.get(&(state.clone(), **a)).unwrap_or(&0.0);
                     let q_b = self.adp_q_table.get(&(state.clone(), **b)).unwrap_or(&0.0);
-                    q_a.partial_cmp(q_b).unwrap_or(Ordering::Equal)  // NaN-safe comparison
+                    q_a.partial_cmp(q_b).unwrap_or(Ordering::Equal) // NaN-safe comparison
                 })
                 .copied()
-                .unwrap_or(ColoringAction::FocusOnExploration)  // Fallback if no actions available
+                .unwrap_or(ColoringAction::FocusOnExploration) // Fallback if no actions available
         }
     }
 
@@ -3083,7 +3572,10 @@ impl WorldRecordPipeline {
         let alpha = self.config.adp.alpha;
         let gamma = self.config.adp.gamma;
 
-        let old_q = self.adp_q_table.get(&(state.clone(), action)).unwrap_or(&0.0);  // Default to 0.0 for new states
+        let old_q = self
+            .adp_q_table
+            .get(&(state.clone(), action))
+            .unwrap_or(&0.0); // Default to 0.0 for new states
         let new_q = old_q + alpha * (reward - old_q);
 
         self.adp_q_table.insert((state.clone(), action), new_q);
@@ -3099,37 +3591,50 @@ impl WorldRecordPipeline {
             ColoringAction::IncreaseDSaturDepth => {
                 config.local_search_depth += 1000;
                 self.adp_dsatur_depth = (self.adp_dsatur_depth + 5000).min(100000);
-            },
+            }
             ColoringAction::DecreaseDSaturDepth => {
                 config.local_search_depth = config.local_search_depth.saturating_sub(1000).max(500);
                 self.adp_dsatur_depth = self.adp_dsatur_depth.saturating_sub(5000).max(10000);
-            },
+            }
             ColoringAction::IncreaseMemeticGenerations => config.generations += 10,
-            ColoringAction::DecreaseMemeticGenerations => config.generations = config.generations.saturating_sub(10).max(20),
-            ColoringAction::IncreaseMutationRate => config.mutation_rate = (config.mutation_rate + 0.05).min(0.5),
-            ColoringAction::DecreaseMutationRate => config.mutation_rate = (config.mutation_rate - 0.05).max(0.05),
+            ColoringAction::DecreaseMemeticGenerations => {
+                config.generations = config.generations.saturating_sub(10).max(20)
+            }
+            ColoringAction::IncreaseMutationRate => {
+                config.mutation_rate = (config.mutation_rate + 0.05).min(0.5)
+            }
+            ColoringAction::DecreaseMutationRate => {
+                config.mutation_rate = (config.mutation_rate - 0.05).max(0.05)
+            }
             ColoringAction::IncreasePopulationSize => config.population_size += 8,
-            ColoringAction::DecreasePopulationSize => config.population_size = config.population_size.saturating_sub(8).max(16),
+            ColoringAction::DecreasePopulationSize => {
+                config.population_size = config.population_size.saturating_sub(8).max(16)
+            }
             ColoringAction::FocusOnExploration => {
                 config.mutation_rate = (config.mutation_rate + 0.1).min(0.5);
                 config.population_size += 8;
-            },
+            }
             ColoringAction::FocusOnExploitation => {
                 config.local_search_depth += 2000;
                 config.elite_size += 2;
-            },
+            }
             ColoringAction::IncreaseQuantumIterations => {
                 self.adp_quantum_iterations = (self.adp_quantum_iterations + 2).min(10);
-            },
+            }
             ColoringAction::DecreaseQuantumIterations => {
                 self.adp_quantum_iterations = self.adp_quantum_iterations.saturating_sub(1).max(2);
-            },
+            }
             ColoringAction::IncreaseThermoTemperatures => {
-                self.adp_thermo_num_temps = (self.adp_thermo_num_temps + 8).min(64);
-            },
+                let new_temps = self.adp_thermo_num_temps + 8;
+                self.adp_thermo_num_temps = new_temps.min(self.config.thermo.num_temps);
+                if new_temps > self.config.thermo.num_temps {
+                    eprintln!("[ADP][WARNING] ADP wanted {} temps but clamping to config max {}",
+                              new_temps, self.config.thermo.num_temps);
+                }
+            }
             ColoringAction::DecreaseThermoTemperatures => {
                 self.adp_thermo_num_temps = self.adp_thermo_num_temps.saturating_sub(8).max(8);
-            },
+            }
         }
     }
 }
@@ -3138,15 +3643,18 @@ impl Default for WorldRecordPipeline {
     #[cfg(feature = "cuda")]
     fn default() -> Self {
         // Default implementation for testing/convenience - in production, use explicit new()
-        let device = CudaDevice::new(0).expect("[DEFAULT][FATAL] Failed to create CUDA device 0 for default pipeline");
-        Self::new(WorldRecordConfig::default(), device)
-            .expect("[DEFAULT][FATAL] Failed to create default WorldRecordPipeline with default config")
+        let device = CudaDevice::new(0)
+            .expect("[DEFAULT][FATAL] Failed to create CUDA device 0 for default pipeline");
+        Self::new(WorldRecordConfig::default(), device).expect(
+            "[DEFAULT][FATAL] Failed to create default WorldRecordPipeline with default config",
+        )
     }
 
     #[cfg(not(feature = "cuda"))]
     fn default() -> Self {
         // Default implementation for testing/convenience - in production, use explicit new()
-        Self::new(WorldRecordConfig::default())
-            .expect("[DEFAULT][FATAL] Failed to create default WorldRecordPipeline with default config")
+        Self::new(WorldRecordConfig::default()).expect(
+            "[DEFAULT][FATAL] Failed to create default WorldRecordPipeline with default config",
+        )
     }
 }

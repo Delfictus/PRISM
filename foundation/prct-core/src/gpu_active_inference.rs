@@ -9,9 +9,9 @@
 //! - Zero stubs: Full implementation, no todo!/unimplemented!
 
 use crate::errors::*;
-use shared_types::*;
 use cudarc::driver::*;
 use cudarc::nvrtc::Ptx;
+use shared_types::*;
 use std::sync::Arc;
 
 /// Active Inference policy computed on GPU
@@ -52,56 +52,74 @@ pub fn active_inference_policy_gpu(
 ) -> Result<ActiveInferencePolicy> {
     let n = graph.num_vertices;
 
-    println!("[ACTIVE-INFERENCE-GPU] Computing policy for {} vertices on GPU", n);
+    println!(
+        "[ACTIVE-INFERENCE-GPU] Computing policy for {} vertices on GPU",
+        n
+    );
     let start_time = std::time::Instant::now();
 
     // Load PTX module for active inference kernels
     let ptx_path = "target/ptx/active_inference.ptx";
     let ptx = Ptx::from_file(ptx_path);
 
-    cuda_device.load_ptx(
-        ptx,
-        "active_inference_module",
-        &["gemv_kernel",
-          "prediction_error_kernel",
-          "belief_update_kernel",
-          "precision_weight_kernel",
-          "kl_divergence_kernel",
-          "accuracy_kernel",
-          "sum_reduction_kernel",
-          "axpby_kernel"],
-    ).map_err(|e| PRCTError::GpuError(format!("Failed to load active inference kernels: {}", e)))?;
+    cuda_device
+        .load_ptx(
+            ptx,
+            "active_inference_module",
+            &[
+                "gemv_kernel",
+                "prediction_error_kernel",
+                "belief_update_kernel",
+                "precision_weight_kernel",
+                "kl_divergence_kernel",
+                "accuracy_kernel",
+                "sum_reduction_kernel",
+                "axpby_kernel",
+            ],
+        )
+        .map_err(|e| {
+            PRCTError::GpuError(format!("Failed to load active inference kernels: {}", e))
+        })?;
 
     // Compute observations from Kuramoto state
     let observations = compute_observations(graph, kuramoto_state, n)?;
 
     // Upload observations to GPU
-    let d_observations = cuda_device.htod_copy(observations.clone())
+    let d_observations = cuda_device
+        .htod_copy(observations.clone())
         .map_err(|e| PRCTError::GpuError(format!("Failed to upload observations: {}", e)))?;
 
     // Initialize beliefs (mean and variance)
-    let initial_mean: Vec<f64> = coloring.iter()
+    let initial_mean: Vec<f64> = coloring
+        .iter()
         .map(|&c| if c == usize::MAX { 0.5 } else { c as f64 })
         .collect();
     let initial_variance = vec![1.0; n];
 
-    let d_mean = cuda_device.htod_copy(initial_mean)
+    let d_mean = cuda_device
+        .htod_copy(initial_mean)
         .map_err(|e| PRCTError::GpuError(format!("Failed to upload mean: {}", e)))?;
-    let d_variance = cuda_device.htod_copy(initial_variance)
+    let d_variance = cuda_device
+        .htod_copy(initial_variance)
         .map_err(|e| PRCTError::GpuError(format!("Failed to upload variance: {}", e)))?;
 
     // Compute precision (inverse variance)
-    let precision: Vec<f64> = vec![1.0; n];  // Uniform precision for simplicity
-    let d_precision = cuda_device.htod_copy(precision)
+    let precision: Vec<f64> = vec![1.0; n]; // Uniform precision for simplicity
+    let d_precision = cuda_device
+        .htod_copy(precision)
         .map_err(|e| PRCTError::GpuError(format!("Failed to upload precision: {}", e)))?;
 
     // Allocate workspace for prediction errors
-    let d_pred_error = cuda_device.alloc_zeros::<f64>(n)
+    let d_pred_error = cuda_device
+        .alloc_zeros::<f64>(n)
         .map_err(|e| PRCTError::GpuError(format!("Failed to allocate pred_error: {}", e)))?;
 
     // Get kernels
-    let pred_error_kernel = Arc::new(cuda_device.get_func("active_inference_module", "prediction_error_kernel")
-        .ok_or_else(|| PRCTError::GpuError("prediction_error_kernel not found".into()))?);
+    let pred_error_kernel = Arc::new(
+        cuda_device
+            .get_func("active_inference_module", "prediction_error_kernel")
+            .ok_or_else(|| PRCTError::GpuError("prediction_error_kernel not found".into()))?,
+    );
 
     let threads = 256;
     let blocks = (n + threads - 1) / threads;
@@ -109,27 +127,67 @@ pub fn active_inference_policy_gpu(
     // Compute prediction errors: error = precision * (observation - prediction)
     // For graph coloring, prediction is current belief (coloring)
     unsafe {
-        (*pred_error_kernel).clone().launch(
-            LaunchConfig {
-                grid_dim: (blocks as u32, 1, 1),
-                block_dim: (threads as u32, 1, 1),
-                shared_mem_bytes: 0,
-            },
-            (&d_pred_error, &d_observations, &d_mean, &d_precision, n as i32),
-        ).map_err(|e| PRCTError::GpuError(format!("Prediction error kernel failed: {}", e)))?;
+        (*pred_error_kernel)
+            .clone()
+            .launch(
+                LaunchConfig {
+                    grid_dim: (blocks as u32, 1, 1),
+                    block_dim: (threads as u32, 1, 1),
+                    shared_mem_bytes: 0,
+                },
+                (
+                    &d_pred_error,
+                    &d_observations,
+                    &d_mean,
+                    &d_precision,
+                    n as i32,
+                ),
+            )
+            .map_err(|e| PRCTError::GpuError(format!("Prediction error kernel failed: {}", e)))?;
     }
 
     // Compute expected free energy for each vertex
     // F = Complexity - Accuracy
     // For simplicity, use prediction error magnitude as proxy
-    let pred_errors = cuda_device.dtoh_sync_copy(&d_pred_error)
+    let pred_errors = cuda_device
+        .dtoh_sync_copy(&d_pred_error)
         .map_err(|e| PRCTError::GpuError(format!("Failed to download pred_errors: {}", e)))?;
 
     // Expected free energy = |prediction error|
     // Higher error → higher free energy → should color this vertex first
-    let expected_free_energy: Vec<f64> = pred_errors.iter()
-        .map(|&e| e.abs())
-        .collect();
+    let mut expected_free_energy: Vec<f64> = pred_errors.iter().map(|&e| e.abs()).collect();
+
+    // Z-score normalization with clamp to [0, 1]
+    let mean_unc = expected_free_energy.iter().sum::<f64>() / expected_free_energy.len() as f64;
+    let variance = expected_free_energy.iter().map(|u| (u - mean_unc).powi(2)).sum::<f64>() / expected_free_energy.len() as f64;
+    let std_dev = variance.sqrt();
+
+    if std_dev > 1e-10 {
+        // Valid distribution, apply z-score normalization
+        for efe in &mut expected_free_energy {
+            *efe = (*efe - mean_unc) / std_dev;
+        }
+
+        // Clamp to [0, 1] range (3-sigma → [0, 1])
+        let min_z = expected_free_energy.iter().cloned().fold(f64::INFINITY, f64::min);
+        let max_z = expected_free_energy.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+
+        if (max_z - min_z).abs() > 1e-10 {
+            for efe in &mut expected_free_energy {
+                *efe = (*efe - min_z) / (max_z - min_z);
+            }
+        }
+
+        println!("[AI-GPU] Normalized uncertainty: mean={:.6}, std={:.6}, range=[{:.6}, {:.6}]",
+                 mean_unc, std_dev, min_z, max_z);
+    } else {
+        // Only warn if using fallback (truly constant)
+        eprintln!("[AI-GPU][FALLBACK] Uncertainty vector has zero variance, using uniform distribution");
+        let uniform_value = 1.0 / expected_free_energy.len() as f64;
+        for efe in &mut expected_free_energy {
+            *efe = uniform_value;
+        }
+    }
 
     // Compute confidence as inverse of mean squared error
     let mse: f64 = expected_free_energy.iter().map(|&e| e * e).sum::<f64>() / n as f64;
@@ -161,13 +219,16 @@ fn compute_observations(
         // Observation combines:
         // 1. Kuramoto phase (normalized to [0, 1])
         let phase = if v < kuramoto_state.phases.len() {
-            (kuramoto_state.phases[v].rem_euclid(2.0 * std::f64::consts::PI)) / (2.0 * std::f64::consts::PI)
+            (kuramoto_state.phases[v].rem_euclid(2.0 * std::f64::consts::PI))
+                / (2.0 * std::f64::consts::PI)
         } else {
             0.5
         };
 
         // 2. Normalized vertex degree
-        let degree = graph.edges.iter()
+        let degree = graph
+            .edges
+            .iter()
             .filter(|(u, w, _)| *u == v || *w == v)
             .count();
         let normalized_degree = degree as f64 / n as f64;

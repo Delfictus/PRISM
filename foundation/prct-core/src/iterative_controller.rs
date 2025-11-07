@@ -4,8 +4,8 @@
 //! improve chromatic number until convergence.
 
 use crate::errors::*;
-use crate::world_record_pipeline::{WorldRecordPipeline, WorldRecordConfig};
-use crate::telemetry::{TelemetryHandle, PhaseName, PhaseExecMode, RunMetric};
+use crate::telemetry::{PhaseExecMode, PhaseName, RunMetric, TelemetryHandle};
+use crate::world_record_pipeline::{WorldRecordConfig, WorldRecordPipeline};
 use shared_types::{ColoringSolution, Graph, KuramotoState};
 use std::sync::Arc;
 use std::time::Instant;
@@ -33,9 +33,15 @@ pub struct IterativeConfig {
     pub enable_telemetry: bool,
 }
 
-fn default_max_passes() -> usize { 3 }
-fn default_min_delta() -> usize { 1 }
-fn default_true() -> bool { true }
+fn default_max_passes() -> usize {
+    3
+}
+fn default_min_delta() -> usize {
+    1
+}
+fn default_true() -> bool {
+    true
+}
 
 impl Default for IterativeConfig {
     fn default() -> Self {
@@ -62,18 +68,57 @@ pub fn run_iterative_pipeline(
     while pass < iterative_config.max_passes {
         let pass_start = Instant::now();
 
-        eprintln!("\n=== Iterative Pass {}/{} ===", pass + 1, iterative_config.max_passes);
+        eprintln!(
+            "\n=== Iterative Pass {}/{} ===",
+            pass + 1,
+            iterative_config.max_passes
+        );
 
-        // Create pipeline for this pass
+        // Escalate parameters based on pass number
+        let mut escalated_config = config.clone();
+
+        match pass {
+            0 => {
+                eprintln!("[ITERATIVE][PASS 1] Base settings");
+            }
+            1 => {
+                escalated_config.thermo.steps_per_temp =
+                    (config.thermo.steps_per_temp as f64 * 1.25) as usize;
+                eprintln!(
+                    "[ITERATIVE][PASS 2] Escalation: +25% thermo steps_per_temp → {}",
+                    escalated_config.thermo.steps_per_temp
+                );
+            }
+            2 => {
+                escalated_config.thermo.steps_per_temp =
+                    (config.thermo.steps_per_temp as f64 * 1.25) as usize;
+                escalated_config.quantum.iterations += 10;
+                eprintln!(
+                    "[ITERATIVE][PASS 3] Escalation: +25% thermo, +10 quantum iters → {}",
+                    escalated_config.quantum.iterations
+                );
+            }
+            3 => {
+                escalated_config.thermo.steps_per_temp =
+                    (config.thermo.steps_per_temp as f64 * 1.5) as usize;
+                escalated_config.quantum.iterations += 15;
+                eprintln!(
+                    "[ITERATIVE][PASS 4] Escalation: +50% thermo, +15 quantum, early desperation"
+                );
+            }
+            _ => {}
+        }
+
+        // Create pipeline for this pass with escalated config
         #[cfg(feature = "cuda")]
-        let cuda_device = CudaDevice::new(config.gpu.device_id)
+        let cuda_device = CudaDevice::new(escalated_config.gpu.device_id)
             .map_err(|e| PRCTError::GpuError(format!("Failed to init CUDA device: {}", e)))?;
 
         #[cfg(feature = "cuda")]
-        let mut pipeline = WorldRecordPipeline::new(config.clone(), cuda_device)?;
+        let mut pipeline = WorldRecordPipeline::new(escalated_config.clone(), cuda_device)?;
 
         #[cfg(not(feature = "cuda"))]
-        let mut pipeline = WorldRecordPipeline::new(config.clone())?;
+        let mut pipeline = WorldRecordPipeline::new(escalated_config.clone())?;
 
         // Create initial Kuramoto state (default/uniform)
         let n = graph.num_vertices;
@@ -107,6 +152,8 @@ pub fn run_iterative_pipeline(
             .with_parameters(serde_json::json!({
                 "pass": pass + 1,
                 "max_passes": iterative_config.max_passes,
+                "escalated_thermo_steps": escalated_config.thermo.steps_per_temp,
+                "escalated_quantum_iters": escalated_config.quantum.iterations,
             }))
             .with_notes(format!(
                 "Pass {} complete: {} colors, {} conflicts",
@@ -131,13 +178,20 @@ pub fn run_iterative_pipeline(
             );
 
             if delta < iterative_config.min_delta as i32 {
-                eprintln!("Convergence detected: improvement {} < min_delta {}", delta, iterative_config.min_delta);
+                eprintln!(
+                    "Convergence detected: improvement {} < min_delta {}",
+                    delta, iterative_config.min_delta
+                );
                 break;
             }
 
             delta
         } else {
-            eprintln!("Pass {}: {} colors (initial)", pass + 1, solution.chromatic_number);
+            eprintln!(
+                "Pass {}: {} colors (initial)",
+                pass + 1,
+                solution.chromatic_number
+            );
             0
         };
 
