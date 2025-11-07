@@ -21,10 +21,13 @@ use crate::coloring::greedy_coloring_with_ordering;
 use crate::quantum_coloring::QuantumColoringSolver;
 use crate::geodesic::{compute_landmark_distances, GeodesicFeatures};
 use crate::cpu_init::init_rayon_threads;
+use crate::telemetry::{RunMetric, PhaseName, PhaseExecMode};
+use crate::initial_coloring::{compute_initial_coloring, InitialColoringStrategy};
 use shared_types::*;
 
 use std::sync::Arc;
 use rand::Rng;
+use serde_json::json;
 
 #[cfg(feature = "cuda")]
 use cudarc::driver::CudaDevice;
@@ -73,6 +76,18 @@ fn default_streams() -> usize { 4 }
 fn default_replicas() -> usize { 56 }  // VRAM guard for 8GB
 fn default_beads() -> usize { 64 }     // VRAM guard for 8GB (future PIMC)
 fn default_batch_size() -> usize { 1024 }
+fn default_stream_mode() -> StreamMode { StreamMode::Sequential }
+
+/// Stream execution mode for GPU phases
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StreamMode {
+    /// All phases use default stream (sequential execution)
+    Sequential,
+
+    /// Phases use separate streams (parallel execution)
+    Parallel,
+}
 
 /// GPU Configuration
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -82,6 +97,9 @@ pub struct GpuConfig {
 
     #[serde(default = "default_streams")]
     pub streams: usize,
+
+    #[serde(default = "default_stream_mode")]
+    pub stream_mode: StreamMode,
 
     #[serde(default = "default_batch_size")]
     pub batch_size: usize,
@@ -113,6 +131,7 @@ impl Default for GpuConfig {
         Self {
             device_id: 0,
             streams: default_streams(),
+            stream_mode: default_stream_mode(),
             batch_size: default_batch_size(),
             enable_reservoir_gpu: true,
             enable_te_gpu: true,
@@ -418,6 +437,21 @@ impl Default for NeuromorphicConfig {
     }
 }
 
+/// Initial Coloring Configuration
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct InitialColoringConfig {
+    pub strategy: InitialColoringStrategy,
+}
+
+impl Default for InitialColoringConfig {
+    fn default() -> Self {
+        Self {
+            strategy: InitialColoringStrategy::Greedy,
+        }
+    }
+}
+
 /// Orchestrator Configuration
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OrchestratorConfig {
@@ -598,6 +632,10 @@ pub struct WorldRecordConfig {
     /// Neuromorphic configuration
     #[serde(default)]
     pub neuromorphic: NeuromorphicConfig,
+
+    /// Initial coloring configuration
+    #[serde(default)]
+    pub initial_coloring: InitialColoringConfig,
 }
 
 impl Default for WorldRecordConfig {
@@ -633,6 +671,7 @@ impl Default for WorldRecordConfig {
             cpu: CpuConfig::default(),
             transfer_entropy: TransferEntropyConfig::default(),
             neuromorphic: NeuromorphicConfig::default(),
+            initial_coloring: InitialColoringConfig::default(),
         }
     }
 }
@@ -1457,6 +1496,13 @@ pub struct WorldRecordPipeline {
     #[cfg(feature = "cuda")]
     cuda_device: Arc<CudaDevice>,
 
+    /// GPU stream pool and state management
+    #[cfg(feature = "cuda")]
+    gpu_state: Option<Arc<crate::gpu::PipelineGpuState>>,
+
+    /// Telemetry handle for real-time metric collection
+    telemetry: Option<Arc<crate::telemetry::TelemetryHandle>>,
+
     /// Runtime GPU usage tracking
     phase_gpu_status: PhaseGpuStatus,
 
@@ -1488,6 +1534,25 @@ impl WorldRecordPipeline {
                  config.gpu.enable_thermo_gpu,
                  config.gpu.enable_quantum_gpu);
 
+        // Initialize GPU stream pool if streams > 0
+        let gpu_state = if config.gpu.streams > 0 {
+            let stream_mode = match config.gpu.stream_mode {
+                StreamMode::Sequential => crate::gpu::state::StreamMode::Sequential,
+                StreamMode::Parallel => crate::gpu::state::StreamMode::Parallel,
+            };
+            let state = crate::gpu::PipelineGpuState::new(
+                config.gpu.device_id,
+                config.gpu.streams,
+                stream_mode,
+            )?;
+            println!("[PIPELINE][INIT] GPU stream pool: {} streams, mode={:?}",
+                     config.gpu.streams, config.gpu.stream_mode);
+            Some(Arc::new(state))
+        } else {
+            println!("[PIPELINE][INIT] GPU streams disabled (streams=0)");
+            None
+        };
+
         Ok(Self {
             config: config.clone(),
             best_solution: ColoringSolution {
@@ -1508,6 +1573,8 @@ impl WorldRecordPipeline {
             ensemble: EnsembleConsensus::new(),
             adp_q_table: std::collections::HashMap::new(),
             cuda_device,
+            gpu_state,
+            telemetry: None,
             phase_gpu_status: PhaseGpuStatus::default(),
             adp_epsilon: config.adp.epsilon,
             adp_dsatur_depth: config.orchestrator.adp_dsatur_depth,
@@ -1560,6 +1627,7 @@ impl WorldRecordPipeline {
             quantum_classical: Some(QuantumClassicalHybrid::new(config.target_chromatic)?),
             ensemble: EnsembleConsensus::new(),
             adp_q_table: std::collections::HashMap::new(),
+            telemetry: None,
             phase_gpu_status: PhaseGpuStatus::default(),
             adp_epsilon: config.adp.epsilon,
             adp_dsatur_depth: config.orchestrator.adp_dsatur_depth,
@@ -1568,6 +1636,22 @@ impl WorldRecordPipeline {
             stagnation_count: 0,
             last_improvement_iteration: 0,
         })
+    }
+
+    /// Enable telemetry collection with specified run ID
+    ///
+    /// Creates a TelemetryHandle that will write metrics to
+    /// target/run_artifacts/live_metrics_{run_id}_{timestamp}.jsonl
+    ///
+    /// # Arguments
+    /// - `run_id`: Unique identifier for this run (e.g., graph name or experiment ID)
+    ///
+    /// # Returns
+    /// Self with telemetry enabled
+    pub fn with_telemetry(mut self, run_id: &str) -> Result<Self> {
+        self.telemetry = Some(Arc::new(crate::telemetry::TelemetryHandle::new(run_id, 1000)?));
+        println!("[PIPELINE][INIT] Telemetry enabled: run_id={}", run_id);
+        Ok(self)
     }
 
     /// Print comprehensive phase checklist validating all config toggles and GPU paths
@@ -1790,6 +1874,27 @@ impl WorldRecordPipeline {
         self.config.validate_vram_requirements(graph)?;
 
         // ═══════════════════════════════════════════════════════════
+        // INITIAL COLORING: Compute starting solution
+        // ═══════════════════════════════════════════════════════════
+        println!("\n┌─────────────────────────────────────────────────────────┐");
+        println!("│ INITIAL COLORING: Starting Solution Generation         │");
+        println!("└─────────────────────────────────────────────────────────┘");
+        println!("[INIT] Computing initial coloring with strategy: {:?}",
+                 self.config.initial_coloring.strategy);
+
+        let initial_solution = compute_initial_coloring(
+            graph,
+            self.config.initial_coloring.strategy,
+        )?;
+
+        println!("[INIT] Initial coloring: {} colors, {} conflicts",
+                 initial_solution.chromatic_number,
+                 initial_solution.conflicts);
+
+        self.best_solution = initial_solution;
+        self.history.push(self.best_solution.clone());
+
+        // ═══════════════════════════════════════════════════════════
         // PHASE 0A: Geodesic Features (if enabled)
         // ═══════════════════════════════════════════════════════════
         let geodesic_features = if self.config.use_geodesic_features {
@@ -1798,6 +1903,22 @@ impl WorldRecordPipeline {
             println!("│ PHASE 0A: Geodesic Feature Computation                 │");
             println!("└─────────────────────────────────────────────────────────┘");
             println!("{{\"event\":\"phase_start\",\"phase\":\"0A\",\"name\":\"geodesic\"}}");
+
+            // Record telemetry: phase start
+            if let Some(ref telemetry) = self.telemetry {
+                telemetry.record(RunMetric::new(
+                    PhaseName::Validation,
+                    "phase_0a_start",
+                    self.best_solution.chromatic_number,
+                    self.best_solution.conflicts,
+                    0.0,
+                    PhaseExecMode::cpu_disabled(),
+                ).with_parameters(json!({
+                    "phase": "0A",
+                    "enabled": true,
+                    "num_landmarks": self.config.geodesic.num_landmarks,
+                })));
+            }
 
             let features = compute_landmark_distances(
                 graph,
@@ -1810,6 +1931,21 @@ impl WorldRecordPipeline {
             println!("[PHASE 0A] ✅ Geodesic features computed for {} landmarks", features.landmarks.len());
             println!("{{\"event\":\"phase_end\",\"phase\":\"0A\",\"name\":\"geodesic\",\"time_s\":{:.3}}}",
                      phase_elapsed.as_secs_f64());
+
+            // Record telemetry: phase complete
+            if let Some(ref telemetry) = self.telemetry {
+                telemetry.record(RunMetric::new(
+                    PhaseName::Validation,
+                    "phase_0a_complete",
+                    self.best_solution.chromatic_number,
+                    self.best_solution.conflicts,
+                    phase_elapsed.as_secs_f64() * 1000.0,
+                    PhaseExecMode::cpu_disabled(),
+                ).with_parameters(json!({
+                    "num_landmarks": features.landmarks.len(),
+                })));
+            }
+
             Some(features)
         } else {
             None
@@ -1824,6 +1960,22 @@ impl WorldRecordPipeline {
             println!("│ PHASE 0: Dendritic Neuromorphic Conflict Prediction    │");
             println!("└─────────────────────────────────────────────────────────┘");
             println!("{{\"event\":\"phase_start\",\"phase\":\"0B\",\"name\":\"reservoir\"}}");
+
+            // Record telemetry: phase start
+            if let Some(ref telemetry) = self.telemetry {
+                telemetry.record(RunMetric::new(
+                    PhaseName::Reservoir,
+                    "phase_0b_start",
+                    self.best_solution.chromatic_number,
+                    self.best_solution.conflicts,
+                    0.0,
+                    PhaseExecMode::cpu_disabled(),
+                ).with_parameters(json!({
+                    "phase": "0B",
+                    "enabled": true,
+                    "gpu_enabled": self.config.gpu.enable_reservoir_gpu,
+                })));
+            }
 
             // ACTIVATION LOG: Phase entry
             #[cfg(feature = "cuda")]
@@ -1850,13 +2002,23 @@ impl WorldRecordPipeline {
             #[cfg(feature = "cuda")]
             {
                 if self.config.gpu.enable_reservoir_gpu {
-                    println!("[PHASE 0] 🚀 Using GPU-accelerated neuromorphic reservoir (10-50x speedup)");
+                    // Get stream for Phase 0 (Reservoir)
+                    let stream = if let Some(ref gpu_state) = self.gpu_state {
+                        let stream = gpu_state.stream_for_phase(0);
+                        println!("[PHASE 0] 🚀 Using GPU-accelerated neuromorphic reservoir (10-50x speedup) on stream {:?}",
+                                stream as *const _ as usize);
+                        stream
+                    } else {
+                        println!("[PHASE 0][WARNING] GPU state not initialized, using default stream");
+                        &self.cuda_device.fork_default_stream().map_err(|e| PRCTError::GpuError(format!("Failed to fork stream: {}", e)))?
+                    };
+
                     match GpuReservoirConflictPredictor::predict_gpu(
                         graph,
                         &training_solutions,
                         initial_kuramoto,
                         Arc::clone(&self.cuda_device),
-                        self.config.neuromorphic.phase_threshold,
+                        stream,
                     ) {
                         Ok(predictor) => {
                             self.phase_gpu_status.phase0_gpu_used = true;
@@ -1921,6 +2083,29 @@ impl WorldRecordPipeline {
             let phase_elapsed = phase_start.elapsed();
             println!("{{\"event\":\"phase_end\",\"phase\":\"0B\",\"name\":\"reservoir\",\"time_s\":{:.3}}}",
                      phase_elapsed.as_secs_f64());
+
+            // Record telemetry: phase complete
+            if let Some(ref telemetry) = self.telemetry {
+                let gpu_mode = if self.phase_gpu_status.phase0_gpu_used {
+                    PhaseExecMode::gpu_success(Some(0))
+                } else if let Some(ref reason) = self.phase_gpu_status.phase0_fallback_reason {
+                    PhaseExecMode::cpu_fallback(reason)
+                } else {
+                    PhaseExecMode::cpu_disabled()
+                };
+
+                telemetry.record(RunMetric::new(
+                    PhaseName::Reservoir,
+                    "phase_0b_complete",
+                    self.best_solution.chromatic_number,
+                    self.best_solution.conflicts,
+                    phase_elapsed.as_secs_f64() * 1000.0,
+                    gpu_mode,
+                ).with_parameters(json!({
+                    "phase": "0B",
+                    "gpu_used": self.phase_gpu_status.phase0_gpu_used,
+                })));
+            }
         } else {
             println!("[PHASE 0] disabled by config");
         }
@@ -1934,6 +2119,24 @@ impl WorldRecordPipeline {
         println!("└─────────────────────────────────────────────────────────┘");
         println!("{{\"event\":\"phase_start\",\"phase\":\"1\",\"name\":\"transfer_entropy\"}}");
 
+        // Record telemetry: phase start
+        if let Some(ref telemetry) = self.telemetry {
+            telemetry.record(RunMetric::new(
+                PhaseName::TransferEntropy,
+                "phase_1_start",
+                self.best_solution.chromatic_number,
+                self.best_solution.conflicts,
+                0.0,
+                PhaseExecMode::cpu_disabled(),
+            ).with_parameters(json!({
+                "phase": "1",
+                "enabled": self.config.use_transfer_entropy,
+                "gpu_enabled": self.config.gpu.enable_te_gpu,
+                "te_vs_kuramoto_weight": self.config.transfer_entropy.te_vs_kuramoto_weight,
+                "geodesic_weight": self.config.transfer_entropy.geodesic_weight,
+            })));
+        }
+
         // ACTIVATION LOG: Phase entry
         if !self.config.use_transfer_entropy {
             println!("[PHASE 1] disabled by config");
@@ -1943,9 +2146,20 @@ impl WorldRecordPipeline {
             #[cfg(feature = "cuda")]
             {
                 if self.config.gpu.enable_te_gpu {
+                    // Get stream for Phase 1 (Transfer Entropy)
+                    let stream = if let Some(ref gpu_state) = self.gpu_state {
+                        let stream = gpu_state.stream_for_phase(1);
+                        println!("[PHASE 1][GPU] Using stream {:?} for TE computation", stream as *const _ as usize);
+                        stream
+                    } else {
+                        println!("[PHASE 1][WARNING] GPU state not initialized, using default stream");
+                        &self.cuda_device.fork_default_stream().map_err(|e| PRCTError::GpuError(format!("Failed to fork stream: {}", e)))?
+                    };
+
                     println!("[PHASE 1][GPU] Attempting TE kernels (histogram bins=auto, lag=1)");
                     match gpu_transfer_entropy::compute_transfer_entropy_ordering_gpu(
                         &self.cuda_device,
+                        stream,
                         graph,
                         initial_kuramoto,
                         geodesic_features.as_ref(),
@@ -2020,6 +2234,31 @@ impl WorldRecordPipeline {
         println!("{{\"event\":\"phase_end\",\"phase\":\"1\",\"name\":\"transfer_entropy\",\"time_s\":{:.3},\"colors\":{}}}",
                  phase1_elapsed.as_secs_f64(),
                  te_solution.chromatic_number);
+
+        // Record telemetry: phase complete
+        if let Some(ref telemetry) = self.telemetry {
+            let gpu_mode = if self.phase_gpu_status.phase1_gpu_used {
+                PhaseExecMode::gpu_success(Some(1))
+            } else if let Some(ref reason) = self.phase_gpu_status.phase1_fallback_reason {
+                PhaseExecMode::cpu_fallback(reason)
+            } else {
+                PhaseExecMode::cpu_disabled()
+            };
+
+            telemetry.record(RunMetric::new(
+                PhaseName::TransferEntropy,
+                "phase_1_complete",
+                te_solution.chromatic_number,
+                te_solution.conflicts,
+                phase1_elapsed.as_secs_f64() * 1000.0,
+                gpu_mode,
+            ).with_parameters(json!({
+                "phase": "1",
+                "gpu_used": self.phase_gpu_status.phase1_gpu_used,
+                "active_inference_enabled": self.config.use_active_inference,
+            })));
+        }
+
         self.ensemble.add_solution(te_solution.clone(), "Transfer Entropy");
 
         // ═══════════════════════════════════════════════════════════
@@ -2031,6 +2270,26 @@ impl WorldRecordPipeline {
             println!("│ PHASE 2: Thermodynamic Replica Exchange                │");
             println!("└─────────────────────────────────────────────────────────┘");
             println!("{{\"event\":\"phase_start\",\"phase\":\"2\",\"name\":\"thermodynamic\"}}");
+
+            // Record telemetry: phase start
+            if let Some(ref telemetry) = self.telemetry {
+                telemetry.record(RunMetric::new(
+                    PhaseName::Thermodynamic,
+                    "phase_2_start",
+                    self.best_solution.chromatic_number,
+                    self.best_solution.conflicts,
+                    0.0,
+                    PhaseExecMode::cpu_disabled(),
+                ).with_parameters(json!({
+                    "phase": "2",
+                    "enabled": true,
+                    "gpu_enabled": self.config.gpu.enable_thermo_gpu,
+                    "num_temps": self.adp_thermo_num_temps,
+                    "steps_per_temp": self.config.thermo.steps_per_temp,
+                    "t_min": self.config.thermo.t_min,
+                    "t_max": self.config.thermo.t_max,
+                })));
+            }
 
             // ADP: Learn from Phase 1 results
             if self.config.use_adp_learning && self.history.len() >= 2 {
@@ -2057,10 +2316,21 @@ impl WorldRecordPipeline {
                 #[cfg(feature = "cuda")]
                 {
                     if self.config.gpu.enable_thermo_gpu {
+                        // Get stream for Phase 2 (Thermodynamic)
+                        let stream = if let Some(ref gpu_state) = self.gpu_state {
+                            let stream = gpu_state.stream_for_phase(2);
+                            println!("[PHASE 2][GPU] Using stream {:?} for thermodynamic equilibration", stream as *const _ as usize);
+                            stream
+                        } else {
+                            println!("[PHASE 2][WARNING] GPU state not initialized, using default stream");
+                            &self.cuda_device.fork_default_stream().map_err(|e| PRCTError::GpuError(format!("Failed to fork stream: {}", e)))?
+                        };
+
                         println!("[PHASE 2][GPU] Attempting thermodynamic replica exchange (temps={}, steps={})",
                                  self.adp_thermo_num_temps, self.config.thermo.steps_per_temp);
                         match gpu_thermodynamic::equilibrate_thermodynamic_gpu(
                             &self.cuda_device,
+                            stream,
                             graph,
                             &self.best_solution,
                             self.config.target_chromatic,
@@ -2151,6 +2421,30 @@ impl WorldRecordPipeline {
             println!("{{\"event\":\"phase_end\",\"phase\":\"2\",\"name\":\"thermodynamic\",\"time_s\":{:.3},\"colors\":{}}}",
                      phase2_elapsed.as_secs_f64(),
                      self.best_solution.chromatic_number);
+
+            // Record telemetry: phase complete
+            if let Some(ref telemetry) = self.telemetry {
+                let gpu_mode = if self.phase_gpu_status.phase2_gpu_used {
+                    PhaseExecMode::gpu_success(Some(2))
+                } else if let Some(ref reason) = self.phase_gpu_status.phase2_fallback_reason {
+                    PhaseExecMode::cpu_fallback(reason)
+                } else {
+                    PhaseExecMode::cpu_disabled()
+                };
+
+                telemetry.record(RunMetric::new(
+                    PhaseName::Thermodynamic,
+                    "phase_2_complete",
+                    self.best_solution.chromatic_number,
+                    self.best_solution.conflicts,
+                    phase2_elapsed.as_secs_f64() * 1000.0,
+                    gpu_mode,
+                ).with_parameters(json!({
+                    "phase": "2",
+                    "gpu_used": self.phase_gpu_status.phase2_gpu_used,
+                    "num_states_explored": equilibrium_states.len(),
+                })));
+            }
         } else {
             println!("[PHASE 2] disabled by config");
         }
@@ -2164,6 +2458,23 @@ impl WorldRecordPipeline {
             println!("│ PHASE 3: Quantum-Classical Hybrid Feedback Loop        │");
             println!("└─────────────────────────────────────────────────────────┘");
             println!("{{\"event\":\"phase_start\",\"phase\":\"3\",\"name\":\"quantum_classical\"}}");
+
+            // Record telemetry: phase start
+            if let Some(ref telemetry) = self.telemetry {
+                telemetry.record(RunMetric::new(
+                    PhaseName::Quantum,
+                    "phase_3_start",
+                    self.best_solution.chromatic_number,
+                    self.best_solution.conflicts,
+                    0.0,
+                    PhaseExecMode::cpu_disabled(),
+                ).with_parameters(json!({
+                    "phase": "3",
+                    "enabled": true,
+                    "gpu_enabled": self.config.gpu.enable_quantum_gpu,
+                    "quantum_iterations": self.adp_quantum_iterations,
+                })));
+            }
 
             // ACTIVATION LOG: Phase entry
             #[cfg(feature = "cuda")]
@@ -2275,6 +2586,29 @@ impl WorldRecordPipeline {
             println!("{{\"event\":\"phase_end\",\"phase\":\"3\",\"name\":\"quantum_classical\",\"time_s\":{:.3},\"colors\":{}}}",
                      phase3_elapsed.as_secs_f64(),
                      self.best_solution.chromatic_number);
+
+            // Record telemetry: phase complete
+            if let Some(ref telemetry) = self.telemetry {
+                let gpu_mode = if self.phase_gpu_status.phase3_gpu_used {
+                    PhaseExecMode::gpu_success(Some(3))
+                } else if let Some(ref reason) = self.phase_gpu_status.phase3_fallback_reason {
+                    PhaseExecMode::cpu_fallback(reason)
+                } else {
+                    PhaseExecMode::cpu_disabled()
+                };
+
+                telemetry.record(RunMetric::new(
+                    PhaseName::Quantum,
+                    "phase_3_complete",
+                    self.best_solution.chromatic_number,
+                    self.best_solution.conflicts,
+                    phase3_elapsed.as_secs_f64() * 1000.0,
+                    gpu_mode,
+                ).with_parameters(json!({
+                    "phase": "3",
+                    "gpu_used": self.phase_gpu_status.phase3_gpu_used,
+                })));
+            }
         } else {
             println!("[PHASE 3] disabled by config");
         }
@@ -2287,6 +2621,21 @@ impl WorldRecordPipeline {
         println!("│ PHASE 4: ADP Q-Learning Memetic Optimization           │");
         println!("└─────────────────────────────────────────────────────────┘");
         println!("{{\"event\":\"phase_start\",\"phase\":\"4\",\"name\":\"memetic\"}}");
+
+        // Record telemetry: phase start
+        if let Some(ref telemetry) = self.telemetry {
+            telemetry.record(RunMetric::new(
+                PhaseName::Memetic,
+                "phase_4_start",
+                self.best_solution.chromatic_number,
+                self.best_solution.conflicts,
+                0.0,
+                PhaseExecMode::cpu_disabled(),
+            ).with_parameters(json!({
+                "phase": "4",
+                "enabled": true,
+            })));
+        }
 
         // World-record aggressive settings (48-hour target)
         let mut memetic_config = MemeticConfig {
@@ -2346,6 +2695,22 @@ impl WorldRecordPipeline {
                  phase4_elapsed.as_secs_f64(),
                  self.best_solution.chromatic_number);
 
+        // Record telemetry: phase complete
+        if let Some(ref telemetry) = self.telemetry {
+            telemetry.record(RunMetric::new(
+                PhaseName::Memetic,
+                "phase_4_complete",
+                self.best_solution.chromatic_number,
+                self.best_solution.conflicts,
+                phase4_elapsed.as_secs_f64() * 1000.0,
+                PhaseExecMode::cpu_disabled(),
+            ).with_parameters(json!({
+                "phase": "4",
+                "population_size": memetic_config.population_size,
+                "generations": memetic_config.generations,
+            })));
+        }
+
         // ═══════════════════════════════════════════════════════════
         // PHASE 5: Ensemble Consensus with Multi-Scale Analysis
         // ═══════════════════════════════════════════════════════════
@@ -2355,6 +2720,21 @@ impl WorldRecordPipeline {
             println!("│ PHASE 5: Ensemble Consensus Voting                     │");
             println!("└─────────────────────────────────────────────────────────┘");
             println!("{{\"event\":\"phase_start\",\"phase\":\"5\",\"name\":\"ensemble\"}}");
+
+            // Record telemetry: phase start
+            if let Some(ref telemetry) = self.telemetry {
+                telemetry.record(RunMetric::new(
+                    PhaseName::Ensemble,
+                    "phase_5_start",
+                    self.best_solution.chromatic_number,
+                    self.best_solution.conflicts,
+                    0.0,
+                    PhaseExecMode::cpu_disabled(),
+                ).with_parameters(json!({
+                    "phase": "5",
+                    "enabled": true,
+                })));
+            }
 
             let consensus_solution = self.ensemble.vote()?;
 
@@ -2369,6 +2749,20 @@ impl WorldRecordPipeline {
             println!("{{\"event\":\"phase_end\",\"phase\":\"5\",\"name\":\"ensemble\",\"time_s\":{:.3},\"colors\":{}}}",
                      phase5_elapsed.as_secs_f64(),
                      self.best_solution.chromatic_number);
+
+            // Record telemetry: phase complete
+            if let Some(ref telemetry) = self.telemetry {
+                telemetry.record(RunMetric::new(
+                    PhaseName::Ensemble,
+                    "phase_5_complete",
+                    self.best_solution.chromatic_number,
+                    self.best_solution.conflicts,
+                    phase5_elapsed.as_secs_f64() * 1000.0,
+                    PhaseExecMode::cpu_disabled(),
+                ).with_parameters(json!({
+                    "phase": "5",
+                })));
+            }
         }
 
         // ═══════════════════════════════════════════════════════════

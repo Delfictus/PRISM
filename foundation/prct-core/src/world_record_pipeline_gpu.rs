@@ -38,6 +38,7 @@ impl GpuReservoirConflictPredictor {
         coloring_history: &[ColoringSolution],
         kuramoto_state: &KuramotoState,
         cuda_device: Arc<CudaDevice>,
+        stream: &CudaStream,
     ) -> Result<Self> {
         let n = graph.num_vertices;
 

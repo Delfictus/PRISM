@@ -2,10 +2,17 @@
 // Full control over all parameters with runtime verification
 
 use clap::{Parser, Subcommand};
-use std::fs;
-use std::collections::HashMap;
 use colored::*;
 use serde_json::Value;
+use std::collections::HashMap;
+use std::fs::{self, File};
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::Duration;
+
+// Import telemetry types from prct-core
+use prct_core::telemetry::{PhaseExecMode, PhaseName, RunMetric};
 
 #[derive(Parser)]
 #[clap(name = "prism-config")]
@@ -146,6 +153,25 @@ enum Commands {
         #[clap(short, long)]
         path: Option<String>,
     },
+
+    /// Monitor live telemetry metrics
+    Monitor {
+        /// Tail live metrics (follow mode)
+        #[clap(long)]
+        tail: bool,
+
+        /// Show summary statistics
+        #[clap(long)]
+        summary: bool,
+
+        /// Filter by phase
+        #[clap(long)]
+        phase: Option<String>,
+
+        /// Metrics file path (default: latest)
+        #[clap(long)]
+        file: Option<PathBuf>,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -155,7 +181,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     load_schema()?;
 
     match cli.command {
-        Commands::List { category, modified, accessed } => {
+        Commands::List {
+            category,
+            modified,
+            accessed,
+        } => {
             list_parameters(category, modified, accessed)?;
         }
 
@@ -163,15 +193,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             get_parameter(&path, verbose)?;
         }
 
-        Commands::Set { path, value, dry_run } => {
+        Commands::Set {
+            path,
+            value,
+            dry_run,
+        } => {
             set_parameter(&path, &value, dry_run)?;
         }
 
-        Commands::Apply { file, preview, merge } => {
+        Commands::Apply {
+            file,
+            preview,
+            merge,
+        } => {
             apply_config(&file, preview, merge)?;
         }
 
-        Commands::Generate { output, all, template } => {
+        Commands::Generate {
+            output,
+            all,
+            template,
+        } => {
             generate_config(&output, all, &template)?;
         }
 
@@ -179,7 +221,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             validate_config(gpu, deep)?;
         }
 
-        Commands::Verify { test, reset, export } => {
+        Commands::Verify {
+            test,
+            reset,
+            export,
+        } => {
             verify_usage(test, reset, export)?;
         }
 
@@ -187,12 +233,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             tune_interactive(&category, smart)?;
         }
 
-        Commands::Diff { file1, file2, changes_only } => {
+        Commands::Diff {
+            file1,
+            file2,
+            changes_only,
+        } => {
             diff_configs(&file1, &file2, changes_only)?;
         }
 
-        Commands::Reset { all, category, path } => {
+        Commands::Reset {
+            all,
+            category,
+            path,
+        } => {
             reset_parameters(all, category, path)?;
+        }
+
+        Commands::Monitor {
+            tail,
+            summary,
+            phase,
+            file,
+        } => {
+            monitor_telemetry(tail, summary, phase, file)?;
         }
     }
 
@@ -278,14 +341,26 @@ fn discover_from_toml(value: &toml::Value, prefix: &str) -> Result<(), Box<dyn s
 fn list_parameters(
     category: Option<String>,
     modified: bool,
-    accessed: bool
+    accessed: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("{}", "═══════════════════════════════════════════════════════════".blue());
-    println!("{}", "                    PRISM CONFIGURATION PARAMETERS         ".blue().bold());
-    println!("{}", "═══════════════════════════════════════════════════════════".blue());
+    println!(
+        "{}",
+        "═══════════════════════════════════════════════════════════".blue()
+    );
+    println!(
+        "{}",
+        "                    PRISM CONFIGURATION PARAMETERS         "
+            .blue()
+            .bold()
+    );
+    println!(
+        "{}",
+        "═══════════════════════════════════════════════════════════".blue()
+    );
 
     let params = CONFIG_REGISTRY.parameters.read().unwrap();
-    let mut categories: std::collections::HashMap<String, Vec<&ParameterMetadata>> = std::collections::HashMap::new();
+    let mut categories: std::collections::HashMap<String, Vec<&ParameterMetadata>> =
+        std::collections::HashMap::new();
 
     for (_, param) in params.iter() {
         // Apply filters
@@ -303,7 +378,8 @@ fn list_parameters(
             continue;
         }
 
-        categories.entry(param.category.clone())
+        categories
+            .entry(param.category.clone())
             .or_insert_with(Vec::new)
             .push(param);
     }
@@ -344,15 +420,26 @@ fn list_parameters(
             if param.min.is_some() || param.max.is_some() {
                 let bounds = format!(
                     "      Range: [{} .. {}]",
-                    param.min.as_ref().map(format_value).unwrap_or("∞".to_string()),
-                    param.max.as_ref().map(format_value).unwrap_or("∞".to_string())
+                    param
+                        .min
+                        .as_ref()
+                        .map(format_value)
+                        .unwrap_or("∞".to_string()),
+                    param
+                        .max
+                        .as_ref()
+                        .map(format_value)
+                        .unwrap_or("∞".to_string())
                 );
                 println!("{}", bounds.dim());
             }
         }
     }
 
-    println!("\n{}", "═══════════════════════════════════════════════════════════".blue());
+    println!(
+        "\n{}",
+        "═══════════════════════════════════════════════════════════".blue()
+    );
 
     // Summary statistics
     let total = params.len();
@@ -375,12 +462,25 @@ fn get_parameter(path: &str, verbose: bool) -> Result<(), Box<dyn std::error::Er
     if let Some(param) = params.get(path) {
         if verbose {
             println!("{}", "╔════════════════════════════════════════╗".blue());
-            println!("{} {} {}", "║".blue(), format!("Parameter: {}", path).white().bold(), "║".blue());
+            println!(
+                "{} {} {}",
+                "║".blue(),
+                format!("Parameter: {}", path).white().bold(),
+                "║".blue()
+            );
             println!("{}", "╚════════════════════════════════════════╝".blue());
 
             println!("  {} {}", "Type:".dim(), param.value_type.yellow());
-            println!("  {} {}", "Current:".dim(), format_value(&param.current).green().bold());
-            println!("  {} {}", "Default:".dim(), format_value(&param.default).white());
+            println!(
+                "  {} {}",
+                "Current:".dim(),
+                format_value(&param.current).green().bold()
+            );
+            println!(
+                "  {} {}",
+                "Default:".dim(),
+                format_value(&param.default).white()
+            );
             println!("  {} {}", "Category:".dim(), param.category.cyan());
             println!("  {} {}", "Description:".dim(), param.description);
 
@@ -388,16 +488,44 @@ fn get_parameter(path: &str, verbose: bool) -> Result<(), Box<dyn std::error::Er
                 println!(
                     "  {} [{} .. {}]",
                     "Range:".dim(),
-                    param.min.as_ref().map(format_value).unwrap_or("∞".to_string()).yellow(),
-                    param.max.as_ref().map(format_value).unwrap_or("∞".to_string()).yellow()
+                    param
+                        .min
+                        .as_ref()
+                        .map(format_value)
+                        .unwrap_or("∞".to_string())
+                        .yellow(),
+                    param
+                        .max
+                        .as_ref()
+                        .map(format_value)
+                        .unwrap_or("∞".to_string())
+                        .yellow()
                 );
             }
 
-            println!("  {} {}", "Affects GPU:".dim(),
-                if param.affects_gpu { "Yes".yellow() } else { "No".dim() });
-            println!("  {} {}", "Requires Restart:".dim(),
-                if param.requires_restart { "Yes".red() } else { "No".green() });
-            println!("  {} {}", "Access Count:".dim(), param.access_count.to_string().cyan());
+            println!(
+                "  {} {}",
+                "Affects GPU:".dim(),
+                if param.affects_gpu {
+                    "Yes".yellow()
+                } else {
+                    "No".dim()
+                }
+            );
+            println!(
+                "  {} {}",
+                "Requires Restart:".dim(),
+                if param.requires_restart {
+                    "Yes".red()
+                } else {
+                    "No".green()
+                }
+            );
+            println!(
+                "  {} {}",
+                "Access Count:".dim(),
+                param.access_count.to_string().cyan()
+            );
 
             if param.current != param.default {
                 println!("\n  {} Parameter has been modified", "⚠".yellow());
@@ -425,20 +553,29 @@ fn set_parameter(path: &str, value: &str, dry_run: bool) -> Result<(), Box<dyn s
     match CONFIG_REGISTRY.set(path, parsed_value.clone()) {
         Ok(()) => {
             if dry_run {
-                println!("{} Validation passed: {} = {}",
-                    "✓".green(), path, format_value(&parsed_value).yellow());
+                println!(
+                    "{} Validation passed: {} = {}",
+                    "✓".green(),
+                    path,
+                    format_value(&parsed_value).yellow()
+                );
                 println!("  (No changes applied - remove --dry-run to apply)");
             } else {
-                println!("{} Set {} = {}",
+                println!(
+                    "{} Set {} = {}",
                     "✓".green().bold(),
                     path.white().bold(),
-                    format_value(&parsed_value).yellow().bold());
+                    format_value(&parsed_value).yellow().bold()
+                );
 
                 // Check if restart required
                 let params = CONFIG_REGISTRY.parameters.read().unwrap();
                 if let Some(param) = params.get(path) {
                     if param.requires_restart {
-                        println!("{} This parameter requires restarting the pipeline", "⚠".yellow());
+                        println!(
+                            "{} This parameter requires restarting the pipeline",
+                            "⚠".yellow()
+                        );
                     }
                     if param.affects_gpu {
                         println!("{} This parameter affects GPU operations", "⚡".yellow());
@@ -455,7 +592,11 @@ fn set_parameter(path: &str, value: &str, dry_run: bool) -> Result<(), Box<dyn s
     Ok(())
 }
 
-fn verify_usage(test: bool, reset: bool, export: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+fn verify_usage(
+    test: bool,
+    reset: bool,
+    export: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
     if reset {
         // Reset all access counts
         let mut params = CONFIG_REGISTRY.parameters.write().unwrap();
@@ -480,17 +621,38 @@ fn verify_usage(test: bool, reset: bool, export: Option<String>) -> Result<(), B
     // Generate report
     let report = CONFIG_REGISTRY.generate_verification_report();
 
-    println!("\n{}", "╔══════════════════════════════════════════╗".blue());
-    println!("{} {} {}", "║".blue(), "PARAMETER VERIFICATION REPORT".white().bold(), "║".blue());
+    println!(
+        "\n{}",
+        "╔══════════════════════════════════════════╗".blue()
+    );
+    println!(
+        "{} {} {}",
+        "║".blue(),
+        "PARAMETER VERIFICATION REPORT".white().bold(),
+        "║".blue()
+    );
     println!("{}", "╚══════════════════════════════════════════╝".blue());
 
     println!("\n{} Statistics:", "►".cyan());
-    println!("  Total Parameters: {}", report.total_parameters.to_string().white().bold());
-    println!("  Accessed: {} ({}%)",
+    println!(
+        "  Total Parameters: {}",
+        report.total_parameters.to_string().white().bold()
+    );
+    println!(
+        "  Accessed: {} ({}%)",
         report.accessed_parameters.to_string().green().bold(),
-        (report.accessed_parameters * 100 / report.total_parameters).to_string().green());
-    println!("  Modified: {}", report.modified_parameters.len().to_string().yellow().bold());
-    println!("  Total Accesses: {}", report.total_accesses.to_string().cyan().bold());
+        (report.accessed_parameters * 100 / report.total_parameters)
+            .to_string()
+            .green()
+    );
+    println!(
+        "  Modified: {}",
+        report.modified_parameters.len().to_string().yellow().bold()
+    );
+    println!(
+        "  Total Accesses: {}",
+        report.total_accesses.to_string().cyan().bold()
+    );
 
     if !report.unused_parameters.is_empty() {
         println!("\n{} Unused Parameters:", "►".yellow());
@@ -505,17 +667,23 @@ fn verify_usage(test: bool, reset: bool, export: Option<String>) -> Result<(), B
     if !report.frequently_used.is_empty() {
         println!("\n{} Frequently Used:", "►".green());
         for (param, count) in &report.frequently_used[..5.min(report.frequently_used.len())] {
-            println!("  • {} ({}x)", param.white().bold(), count.to_string().cyan());
+            println!(
+                "  • {} ({}x)",
+                param.white().bold(),
+                count.to_string().cyan()
+            );
         }
     }
 
     if !report.modified_parameters.is_empty() {
         println!("\n{} Modified Parameters:", "►".yellow());
         for modif in &report.modified_parameters {
-            println!("  • {} : {} → {}",
+            println!(
+                "  • {} : {} → {}",
                 modif.path.white(),
                 format_value(&modif.default).dim(),
-                format_value(&modif.current).yellow().bold());
+                format_value(&modif.current).yellow().bold()
+            );
         }
     }
 
@@ -523,7 +691,11 @@ fn verify_usage(test: bool, reset: bool, export: Option<String>) -> Result<(), B
     if let Some(output) = export {
         let json = serde_json::to_string_pretty(&report)?;
         fs::write(&output, json)?;
-        println!("\n{} Exported report to {}", "✓".green(), output.white().bold());
+        println!(
+            "\n{} Exported report to {}",
+            "✓".green(),
+            output.white().bold()
+        );
     }
 
     Ok(())
@@ -572,7 +744,11 @@ fn apply_config(file: &str, preview: bool, merge: bool) -> Result<(), Box<dyn st
     Ok(())
 }
 
-fn generate_config(output: &str, all: bool, template: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn generate_config(
+    output: &str,
+    all: bool,
+    template: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     println!("{} Generating config file...", "►".cyan());
 
     let params = CONFIG_REGISTRY.parameters.read().unwrap();
@@ -593,7 +769,8 @@ fn generate_config(output: &str, all: bool, template: &str) -> Result<(), Box<dy
                 current.insert(part.to_string(), toml_value_from_json(&param.current));
             } else {
                 // Nested table
-                current = current.entry(part.to_string())
+                current = current
+                    .entry(part.to_string())
                     .or_insert_with(|| toml::Value::Table(toml::map::Map::new()))
                     .as_table_mut()
                     .unwrap();
@@ -604,7 +781,11 @@ fn generate_config(output: &str, all: bool, template: &str) -> Result<(), Box<dy
     let toml_str = toml::to_string_pretty(&toml::Value::Table(config))?;
     fs::write(output, toml_str)?;
 
-    println!("{} Generated config file: {}", "✓".green().bold(), output.white().bold());
+    println!(
+        "{} Generated config file: {}",
+        "✓".green().bold(),
+        output.white().bold()
+    );
 
     Ok(())
 }
@@ -654,11 +835,13 @@ fn validate_config(gpu: bool, deep: bool) -> Result<(), Box<dyn std::error::Erro
         println!("  Checking GPU memory requirements...");
 
         // Get relevant parameters
-        let replicas = params.get("thermo.replicas")
+        let replicas = params
+            .get("thermo.replicas")
             .and_then(|p| p.current.as_u64())
             .unwrap_or(56) as usize;
 
-        let batch_size = params.get("gpu.batch_size")
+        let batch_size = params
+            .get("gpu.batch_size")
             .and_then(|p| p.current.as_u64())
             .unwrap_or(1024) as usize;
 
@@ -679,12 +862,15 @@ fn validate_config(gpu: bool, deep: bool) -> Result<(), Box<dyn std::error::Erro
         println!("  Running deep validation...");
 
         // Check phase dependencies
-        if params.get("use_thermodynamic_equilibration")
+        if params
+            .get("use_thermodynamic_equilibration")
             .and_then(|p| p.current.as_bool())
             .unwrap_or(false)
-            && !params.get("gpu.enable_thermo_gpu")
+            && !params
+                .get("gpu.enable_thermo_gpu")
                 .and_then(|p| p.current.as_bool())
-                .unwrap_or(false) {
+                .unwrap_or(false)
+        {
             warnings.push("Thermodynamic enabled but GPU acceleration disabled".to_string());
         }
     }
@@ -717,7 +903,14 @@ fn validate_config(gpu: bool, deep: bool) -> Result<(), Box<dyn std::error::Erro
 
 fn tune_interactive(category: &str, smart: bool) -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "╔════════════════════════════════════════╗".blue());
-    println!("{} {} {}", "║".blue(), format!("INTERACTIVE TUNING: {}", category.to_uppercase()).white().bold(), "║".blue());
+    println!(
+        "{} {} {}",
+        "║".blue(),
+        format!("INTERACTIVE TUNING: {}", category.to_uppercase())
+            .white()
+            .bold(),
+        "║".blue()
+    );
     println!("{}", "╚════════════════════════════════════════╝".blue());
 
     // TODO: Implement interactive tuning
@@ -726,7 +919,11 @@ fn tune_interactive(category: &str, smart: bool) -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
-fn diff_configs(file1: &str, file2: &str, changes_only: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn diff_configs(
+    file1: &str,
+    file2: &str,
+    changes_only: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     println!("{} Comparing configurations...", "►".cyan());
 
     let content1 = fs::read_to_string(file1)?;
@@ -741,7 +938,11 @@ fn diff_configs(file1: &str, file2: &str, changes_only: bool) -> Result<(), Box<
     Ok(())
 }
 
-fn reset_parameters(all: bool, category: Option<String>, path: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+fn reset_parameters(
+    all: bool,
+    category: Option<String>,
+    path: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut count = 0;
     let mut params = CONFIG_REGISTRY.parameters.write().unwrap();
 
@@ -756,7 +957,250 @@ fn reset_parameters(all: bool, category: Option<String>, path: Option<String>) -
         }
     }
 
-    println!("{} Reset {} parameters to defaults", "✓".green().bold(), count);
+    println!(
+        "{} Reset {} parameters to defaults",
+        "✓".green().bold(),
+        count
+    );
 
     Ok(())
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TELEMETRY MONITORING FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+fn monitor_telemetry(
+    tail: bool,
+    summary: bool,
+    phase: Option<String>,
+    file: Option<PathBuf>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = file.or_else(find_latest_metrics_file).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "No metrics file found. Run a pipeline first or specify --file",
+        )
+    })?;
+
+    if summary {
+        show_summary(&path, phase)?;
+    } else if tail {
+        tail_metrics(&path, phase)?;
+    } else {
+        show_recent(&path, 50, phase)?;
+    }
+
+    Ok(())
+}
+
+fn find_latest_metrics_file() -> Option<PathBuf> {
+    let artifacts_dir = PathBuf::from("target/run_artifacts");
+    if !artifacts_dir.exists() {
+        eprintln!("Artifacts directory not found: {}", artifacts_dir.display());
+        return None;
+    }
+
+    std::fs::read_dir(&artifacts_dir)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            name.starts_with("live_metrics_") && name.ends_with(".jsonl")
+        })
+        .max_by_key(|e| e.metadata().ok()?.modified().ok()?)
+        .map(|e| e.path())
+}
+
+fn tail_metrics(
+    path: &Path,
+    phase_filter: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("📊 Tailing metrics from: {}", path.display());
+    println!("Press Ctrl+C to stop\n");
+
+    let mut file = File::open(path)?;
+    file.seek(SeekFrom::End(0))?;
+
+    let mut last_pos = file.metadata()?.len();
+
+    loop {
+        file.seek(SeekFrom::Start(last_pos))?;
+        let reader = BufReader::new(&file);
+
+        for line in reader.lines() {
+            let line = line?;
+            if line.trim().is_empty() || line.starts_with("---") {
+                continue;
+            }
+
+            match serde_json::from_str::<RunMetric>(&line) {
+                Ok(metric) => {
+                    if let Some(ref filter) = phase_filter {
+                        let phase_name = format!("{:?}", metric.phase).to_lowercase();
+                        if !phase_name.contains(&filter.to_lowercase()) {
+                            continue;
+                        }
+                    }
+                    println!("{}", format_metric(&metric));
+                }
+                Err(e) => {
+                    eprintln!("Failed to parse metric: {}", e);
+                }
+            }
+        }
+
+        last_pos = file.metadata()?.len();
+        thread::sleep(Duration::from_millis(500));
+    }
+}
+
+fn show_summary(
+    path: &Path,
+    phase_filter: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+
+    let mut phase_stats: HashMap<String, PhaseStats> = HashMap::new();
+    let mut total_metrics = 0;
+
+    for line in reader.lines() {
+        let line = line?;
+        if line.trim().is_empty() || line.starts_with("---") {
+            continue;
+        }
+
+        match serde_json::from_str::<RunMetric>(&line) {
+            Ok(metric) => {
+                total_metrics += 1;
+                let phase_name = format!("{:?}", metric.phase);
+
+                if let Some(ref filter) = phase_filter {
+                    if !phase_name.to_lowercase().contains(&filter.to_lowercase()) {
+                        continue;
+                    }
+                }
+
+                let stats = phase_stats.entry(phase_name).or_insert(PhaseStats::new());
+                stats.count += 1;
+                stats.total_duration += metric.duration_ms;
+                stats.durations.push(metric.duration_ms);
+                stats.min_colors = stats.min_colors.min(metric.chromatic_number);
+                stats.max_colors = stats.max_colors.max(metric.chromatic_number);
+
+                if metric.gpu_mode.is_gpu() {
+                    stats.gpu_count += 1;
+                }
+            }
+            Err(_) => continue,
+        }
+    }
+
+    println!("\n╔═══════════════════════════════════════════════════════════════════╗");
+    println!("║                    TELEMETRY SUMMARY REPORT                       ║");
+    println!("╚═══════════════════════════════════════════════════════════════════╝\n");
+    println!("📁 File: {}", path.display());
+    println!("📊 Total metrics: {}\n", total_metrics);
+
+    println!("┌─────────────────┬───────┬─────────────┬─────────────┬──────────────┬─────────┐");
+    println!("│ Phase           │ Count │ Total (ms)  │ Avg (ms)    │ Colors Range │ GPU %   │");
+    println!("├─────────────────┼───────┼─────────────┼─────────────┼──────────────┼─────────┤");
+
+    let mut phases: Vec<_> = phase_stats.iter().collect();
+    phases.sort_by_key(|(name, _)| name.as_str());
+
+    for (phase, stats) in phases {
+        let avg = stats.total_duration / stats.count as f64;
+        let gpu_percent = (stats.gpu_count as f64 / stats.count as f64) * 100.0;
+        let color_range = if stats.min_colors == usize::MAX {
+            "N/A".to_string()
+        } else if stats.min_colors == stats.max_colors {
+            format!("{}", stats.min_colors)
+        } else {
+            format!("{}-{}", stats.min_colors, stats.max_colors)
+        };
+
+        println!(
+            "│ {:<15} │ {:>5} │ {:>11.2} │ {:>11.2} │ {:>12} │ {:>6.1}% │",
+            phase, stats.count, stats.total_duration, avg, color_range, gpu_percent
+        );
+    }
+
+    println!("└─────────────────┴───────┴─────────────┴─────────────┴──────────────┴─────────┘\n");
+
+    Ok(())
+}
+
+fn show_recent(
+    path: &Path,
+    limit: usize,
+    phase_filter: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+
+    let mut metrics = Vec::new();
+
+    for line in reader.lines() {
+        let line = line?;
+        if line.trim().is_empty() || line.starts_with("---") {
+            continue;
+        }
+
+        if let Ok(metric) = serde_json::from_str::<RunMetric>(&line) {
+            if let Some(ref filter) = phase_filter {
+                let phase_name = format!("{:?}", metric.phase).to_lowercase();
+                if !phase_name.contains(&filter.to_lowercase()) {
+                    continue;
+                }
+            }
+            metrics.push(metric);
+        }
+    }
+
+    println!("\n📊 Recent metrics (last {})\n", limit.min(metrics.len()));
+
+    for metric in metrics.iter().rev().take(limit).rev() {
+        println!("{}", format_metric(metric));
+    }
+
+    Ok(())
+}
+
+fn format_metric(metric: &RunMetric) -> String {
+    let timestamp = &metric.timestamp[11..19]; // Extract HH:MM:SS
+    format!(
+        "{} [{:8}][{:15}] {:30} | 🎨 {:3} 🔴 {:4} | ⏱ {:8.2}ms",
+        timestamp,
+        format!("{:?}", metric.phase),
+        format!("{}", metric.gpu_mode),
+        metric.step,
+        metric.chromatic_number,
+        metric.conflicts,
+        metric.duration_ms
+    )
+}
+
+#[derive(Debug)]
+struct PhaseStats {
+    count: usize,
+    total_duration: f64,
+    durations: Vec<f64>,
+    gpu_count: usize,
+    min_colors: usize,
+    max_colors: usize,
+}
+
+impl PhaseStats {
+    fn new() -> Self {
+        Self {
+            count: 0,
+            total_duration: 0.0,
+            durations: Vec::new(),
+            gpu_count: 0,
+            min_colors: usize::MAX,
+            max_colors: 0,
+        }
+    }
 }
