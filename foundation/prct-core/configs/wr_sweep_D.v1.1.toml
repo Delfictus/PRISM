@@ -88,7 +88,7 @@ exchange_interval = 20
 t_min = 0.0005           # Much lower min for fine-grained annealing
 t_max = 15.0             # Higher max for aggressive exploration
 steps_per_temp = 8000    # More steps per temperature
-batch_size = 1000
+batch_size = 4096        # Match GPU batch size for 4 streams
 damping = 0.02
 schedule = "geometric"
 
@@ -118,8 +118,8 @@ efficiency_threshold = 0.5
 
 # Transfer Entropy Configuration (Phase 1)
 [transfer_entropy]
-histogram_bins = 128           # Increased from auto/10 for better precision
-time_series_steps = 200        # Increased from 100 for richer dynamics
+histogram_bins = 32            # Safe for 8GB VRAM (clamped in GPU kernel)
+time_series_steps = 100        # Safe for 8GB (200 causes OOM on RTX 5070)
 te_vs_kuramoto_weight = 0.85   # TE gets 85% weight vs Kuramoto 15%
 geodesic_weight = 0.35         # Geodesic feature weight
 
