@@ -46,9 +46,7 @@ pub enum PhaseExecMode {
     },
 
     /// CPU fallback (with reason)
-    CpuFallback {
-        reason: String,
-    },
+    CpuFallback { reason: String },
 
     /// CPU-only (GPU disabled in config)
     CpuDisabled,
@@ -60,7 +58,9 @@ impl PhaseExecMode {
     }
 
     pub fn cpu_fallback(reason: impl Into<String>) -> Self {
-        PhaseExecMode::CpuFallback { reason: reason.into() }
+        PhaseExecMode::CpuFallback {
+            reason: reason.into(),
+        }
     }
 
     pub fn cpu_disabled() -> Self {
@@ -75,11 +75,86 @@ impl PhaseExecMode {
 impl fmt::Display for PhaseExecMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PhaseExecMode::GpuSuccess { stream_id: Some(id) } => write!(f, "GPU[stream={}]", id),
+            PhaseExecMode::GpuSuccess {
+                stream_id: Some(id),
+            } => write!(f, "GPU[stream={}]", id),
             PhaseExecMode::GpuSuccess { stream_id: None } => write!(f, "GPU"),
             PhaseExecMode::CpuFallback { reason } => write!(f, "CPU[fallback: {}]", reason),
             PhaseExecMode::CpuDisabled => write!(f, "CPU[disabled]"),
         }
+    }
+}
+
+/// Optimization guidance for hypertuning
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OptimizationGuidance {
+    /// Status: "on_track", "need_tuning", "excellent", "stagnant", "critical"
+    pub status: String,
+
+    /// Specific actionable recommendations
+    pub recommendations: Vec<String>,
+
+    /// Estimated final chromatic number if current trend continues
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub estimated_final_colors: Option<usize>,
+
+    /// Confidence in guidance (0.0-1.0)
+    pub confidence: f64,
+
+    /// Gap to world record (83 colors for DSJC1000.5)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gap_to_world_record: Option<i32>,
+}
+
+impl OptimizationGuidance {
+    pub fn on_track() -> Self {
+        Self {
+            status: "on_track".to_string(),
+            recommendations: vec!["Continue with current parameters".to_string()],
+            estimated_final_colors: None,
+            confidence: 0.8,
+            gap_to_world_record: None,
+        }
+    }
+
+    pub fn excellent() -> Self {
+        Self {
+            status: "excellent".to_string(),
+            recommendations: vec!["Outstanding progress, maintain settings".to_string()],
+            estimated_final_colors: None,
+            confidence: 0.95,
+            gap_to_world_record: None,
+        }
+    }
+
+    pub fn need_tuning(recommendations: Vec<String>) -> Self {
+        Self {
+            status: "need_tuning".to_string(),
+            recommendations,
+            estimated_final_colors: None,
+            confidence: 0.7,
+            gap_to_world_record: None,
+        }
+    }
+
+    pub fn critical(recommendations: Vec<String>) -> Self {
+        Self {
+            status: "critical".to_string(),
+            recommendations,
+            estimated_final_colors: None,
+            confidence: 0.9,
+            gap_to_world_record: None,
+        }
+    }
+
+    pub fn with_estimate(mut self, estimated_colors: usize) -> Self {
+        self.estimated_final_colors = Some(estimated_colors);
+        self
+    }
+
+    pub fn with_wr_gap(mut self, current_colors: usize, world_record: usize) -> Self {
+        self.gap_to_world_record = Some((current_colors as i32) - (world_record as i32));
+        self
     }
 }
 
@@ -113,6 +188,10 @@ pub struct RunMetric {
     /// Optional notes/warnings
     #[serde(skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
+
+    /// Optimization guidance for hypertuning
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optimization_guidance: Option<OptimizationGuidance>,
 }
 
 impl RunMetric {
@@ -135,6 +214,7 @@ impl RunMetric {
             gpu_mode,
             parameters: serde_json::Value::Null,
             notes: None,
+            optimization_guidance: None,
         }
     }
 
@@ -147,6 +227,12 @@ impl RunMetric {
     /// Add notes
     pub fn with_notes(mut self, notes: impl Into<String>) -> Self {
         self.notes = Some(notes.into());
+        self
+    }
+
+    /// Add optimization guidance
+    pub fn with_guidance(mut self, guidance: OptimizationGuidance) -> Self {
+        self.optimization_guidance = Some(guidance);
         self
     }
 

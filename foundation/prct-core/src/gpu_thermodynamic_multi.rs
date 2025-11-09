@@ -9,9 +9,9 @@
 //! - Geometric temperature ladder with proper distribution
 //! - Result aggregation via best-solution selection
 
-use cudarc::driver::CudaDevice;
-use shared_types::{Graph, ColoringSolution};
 use crate::errors::*;
+use cudarc::driver::CudaDevice;
+use shared_types::{ColoringSolution, Graph};
 use std::sync::Arc;
 
 /// Distribute thermodynamic equilibration across multiple GPUs
@@ -28,6 +28,7 @@ use std::sync::Arc;
 /// * `t_min` - Minimum temperature (high precision exploration)
 /// * `t_max` - Maximum temperature (broad exploration)
 /// * `steps_per_temp` - Evolution steps at each temperature
+/// * `ai_uncertainty` - Active Inference uncertainty scores for vertex prioritization (Phase 1 output)
 ///
 /// # Returns
 /// Vec<ColoringSolution> - Best solutions from all GPUs
@@ -40,17 +41,28 @@ pub fn equilibrate_thermodynamic_multi_gpu(
     t_min: f64,
     t_max: f64,
     steps_per_temp: usize,
+    ai_uncertainty: Option<&Vec<f64>>,
 ) -> Result<Vec<ColoringSolution>> {
     let num_gpus = devices.len();
 
     if num_gpus == 0 {
-        return Err(PRCTError::GpuError("No GPUs available for multi-GPU thermodynamic".to_string()));
+        return Err(PRCTError::GpuError(
+            "No GPUs available for multi-GPU thermodynamic".to_string(),
+        ));
     }
 
-    println!("[THERMO-MULTI-GPU] Distributing {} replicas across {} GPUs",
-             total_replicas, num_gpus);
-    println!("[THERMO-MULTI-GPU] {} replicas per GPU (approx)", total_replicas / num_gpus);
-    println!("[THERMO-MULTI-GPU] {} temperature points per GPU (approx)", total_temps / num_gpus);
+    println!(
+        "[THERMO-MULTI-GPU] Distributing {} replicas across {} GPUs",
+        total_replicas, num_gpus
+    );
+    println!(
+        "[THERMO-MULTI-GPU] {} replicas per GPU (approx)",
+        total_replicas / num_gpus
+    );
+    println!(
+        "[THERMO-MULTI-GPU] {} temperature points per GPU (approx)",
+        total_temps / num_gpus
+    );
 
     let replicas_per_gpu = total_replicas / num_gpus;
     let temps_per_gpu = total_temps / num_gpus;
@@ -58,57 +70,81 @@ pub fn equilibrate_thermodynamic_multi_gpu(
     // Generate global temperature ladder
     let global_temps = generate_geometric_temp_ladder(total_temps, t_min, t_max);
 
-    println!("[THERMO-MULTI-GPU] Global temp range: [{:.6}, {:.6}]",
-             global_temps[0], global_temps[total_temps - 1]);
+    println!(
+        "[THERMO-MULTI-GPU] Global temp range: [{:.6}, {:.6}]",
+        global_temps[0],
+        global_temps[total_temps - 1]
+    );
+
+    // Clone AI uncertainty data for thread-safe sharing across GPUs
+    let ai_uncertainty_owned: Option<Vec<f64>> = ai_uncertainty.map(|v| v.clone());
 
     // Launch thermodynamic equilibration on each GPU in parallel
-    let handles: Vec<_> = devices.iter().enumerate().map(|(gpu_idx, device)| {
-        let device = device.clone();
-        let graph = graph.clone();
-        let initial = initial_solution.clone();
+    let handles: Vec<_> = devices
+        .iter()
+        .enumerate()
+        .map(|(gpu_idx, device)| {
+            let device = device.clone();
+            let graph = graph.clone();
+            let initial = initial_solution.clone();
+            let ai_unc = ai_uncertainty_owned.clone();
 
-        // Compute temperature segment for this GPU
-        let temp_start_idx = gpu_idx * temps_per_gpu;
-        let temp_end_idx = if gpu_idx == num_gpus - 1 {
-            total_temps  // Last GPU takes any remaining temps
-        } else {
-            (gpu_idx + 1) * temps_per_gpu
-        };
+            // Compute temperature segment for this GPU
+            let temp_start_idx = gpu_idx * temps_per_gpu;
+            let temp_end_idx = if gpu_idx == num_gpus - 1 {
+                total_temps // Last GPU takes any remaining temps
+            } else {
+                (gpu_idx + 1) * temps_per_gpu
+            };
 
-        let gpu_temps: Vec<f64> = global_temps[temp_start_idx..temp_end_idx].to_vec();
-        let t_min_gpu = gpu_temps[0];
-        let t_max_gpu = gpu_temps[gpu_temps.len() - 1];
+            let gpu_temps: Vec<f64> = global_temps[temp_start_idx..temp_end_idx].to_vec();
+            let t_min_gpu = gpu_temps[0];
+            let t_max_gpu = gpu_temps[gpu_temps.len() - 1];
 
-        std::thread::spawn(move || {
-            println!("[THERMO-GPU-{}] Starting {} replicas, {} temps [{:.6}, {:.6}]",
-                     gpu_idx, replicas_per_gpu, gpu_temps.len(), t_min_gpu, t_max_gpu);
+            std::thread::spawn(move || {
+                println!(
+                    "[THERMO-GPU-{}] Starting {} replicas, {} temps [{:.6}, {:.6}]",
+                    gpu_idx,
+                    replicas_per_gpu,
+                    gpu_temps.len(),
+                    t_min_gpu,
+                    t_max_gpu
+                );
 
-            let start_time = std::time::Instant::now();
+                let start_time = std::time::Instant::now();
 
-            // Create stream for this GPU (cudarc 0.9: fork_default_stream)
-            let stream = device.fork_default_stream()
-                .map_err(|e| PRCTError::GpuError(format!("GPU {}: Failed to fork stream: {}", gpu_idx, e)))?;
+                // Create stream for this GPU (cudarc 0.9: fork_default_stream)
+                let stream = device.fork_default_stream().map_err(|e| {
+                    PRCTError::GpuError(format!("GPU {}: Failed to fork stream: {}", gpu_idx, e))
+                })?;
 
-            // Run equilibration on this GPU
-            let solutions = crate::gpu_thermodynamic::equilibrate_thermodynamic_gpu(
-                &device,
-                &stream,
-                &graph,
-                &initial,
-                initial.chromatic_number,
-                t_min_gpu,
-                t_max_gpu,
-                gpu_temps.len(),
-                steps_per_temp,
-            )?;
+                // Run equilibration on this GPU with AI guidance (shared across all GPUs)
+                let solutions = crate::gpu_thermodynamic::equilibrate_thermodynamic_gpu(
+                    &device,
+                    &stream,
+                    &graph,
+                    &initial,
+                    initial.chromatic_number,
+                    t_min_gpu,
+                    t_max_gpu,
+                    gpu_temps.len(),
+                    steps_per_temp,
+                    ai_unc.as_ref(),
+                    None, // Multi-GPU does not pass telemetry to individual GPUs
+                )?;
 
-            let elapsed = start_time.elapsed();
-            println!("[THERMO-GPU-{}] ✅ Completed in {:.2}s, {} solutions",
-                     gpu_idx, elapsed.as_secs_f64(), solutions.len());
+                let elapsed = start_time.elapsed();
+                println!(
+                    "[THERMO-GPU-{}] ✅ Completed in {:.2}s, {} solutions",
+                    gpu_idx,
+                    elapsed.as_secs_f64(),
+                    solutions.len()
+                );
 
-            Ok::<(usize, Vec<ColoringSolution>), PRCTError>((gpu_idx, solutions))
+                Ok::<(usize, Vec<ColoringSolution>), PRCTError>((gpu_idx, solutions))
+            })
         })
-    }).collect();
+        .collect();
 
     // Gather results from all GPUs
     let mut all_solutions = Vec::new();
@@ -120,7 +156,10 @@ pub fn equilibrate_thermodynamic_multi_gpu(
                 // Find best chromatic number from this GPU
                 if let Some(best) = solutions.iter().min_by_key(|s| s.chromatic_number) {
                     gpu_best_chromatic[gpu_idx] = best.chromatic_number;
-                    println!("[THERMO-GPU-{}] Best chromatic: {}", gpu_idx, best.chromatic_number);
+                    println!(
+                        "[THERMO-GPU-{}] Best chromatic: {}",
+                        gpu_idx, best.chromatic_number
+                    );
                 }
 
                 all_solutions.extend(solutions);
@@ -135,19 +174,28 @@ pub fn equilibrate_thermodynamic_multi_gpu(
         }
     }
 
-    println!("[THERMO-MULTI-GPU] ✅ Gathered {} total solutions from {} GPUs",
-             all_solutions.len(), num_gpus);
+    println!(
+        "[THERMO-MULTI-GPU] ✅ Gathered {} total solutions from {} GPUs",
+        all_solutions.len(),
+        num_gpus
+    );
 
     // Print GPU performance summary
     for (gpu_idx, chromatic) in gpu_best_chromatic.iter().enumerate() {
         if *chromatic != usize::MAX {
-            println!("[THERMO-MULTI-GPU] GPU {} best: {} colors", gpu_idx, chromatic);
+            println!(
+                "[THERMO-MULTI-GPU] GPU {} best: {} colors",
+                gpu_idx, chromatic
+            );
         }
     }
 
     // Find global best
     if let Some(global_best) = all_solutions.iter().min_by_key(|s| s.chromatic_number) {
-        println!("[THERMO-MULTI-GPU] Global best: {} colors", global_best.chromatic_number);
+        println!(
+            "[THERMO-MULTI-GPU] Global best: {} colors",
+            global_best.chromatic_number
+        );
     }
 
     Ok(all_solutions)
@@ -165,11 +213,7 @@ pub fn equilibrate_thermodynamic_multi_gpu(
 ///
 /// # Returns
 /// Vector of temperatures in descending order
-fn generate_geometric_temp_ladder(
-    num_temps: usize,
-    t_min: f64,
-    t_max: f64,
-) -> Vec<f64> {
+fn generate_geometric_temp_ladder(num_temps: usize, t_min: f64, t_max: f64) -> Vec<f64> {
     if num_temps == 1 {
         return vec![t_min];
     }

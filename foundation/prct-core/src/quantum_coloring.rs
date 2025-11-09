@@ -5,13 +5,13 @@
 //!
 //! **Expected Performance**: 562 colors → 200-250 colors on DSJC1000.5
 
-use crate::errors::*;
-use crate::sparse_qubo::{SparseQUBO, ChromaticBounds};
 use crate::dsatur_backtracking::DSaturSolver;
-use crate::transfer_entropy_coloring::hybrid_te_kuramoto_ordering;
+use crate::errors::*;
 use crate::memetic_coloring::{MemeticColoringSolver, MemeticConfig};
-use shared_types::*;
+use crate::sparse_qubo::{ChromaticBounds, SparseQUBO};
+use crate::transfer_entropy_coloring::hybrid_te_kuramoto_ordering;
 use ndarray::{Array1, Array2};
+use shared_types::*;
 use std::collections::HashSet;
 
 /// Quantum coloring solver using PIMC quantum annealing
@@ -19,18 +19,23 @@ pub struct QuantumColoringSolver {
     /// GPU device for CUDA acceleration
     #[cfg(feature = "cuda")]
     gpu_device: Option<std::sync::Arc<cudarc::driver::CudaDevice>>,
+
+    /// Telemetry handle for detailed tracking
+    telemetry: Option<std::sync::Arc<crate::telemetry::TelemetryHandle>>,
 }
 
 impl QuantumColoringSolver {
     /// Create new quantum coloring solver
     pub fn new(
-        #[cfg(feature = "cuda")]
-        gpu_device: Option<std::sync::Arc<cudarc::driver::CudaDevice>>,
+        #[cfg(feature = "cuda")] gpu_device: Option<std::sync::Arc<cudarc::driver::CudaDevice>>,
     ) -> Result<Self> {
         #[cfg(feature = "cuda")]
         {
             if let Some(ref dev) = gpu_device {
-                println!("[QUANTUM][GPU] GPU acceleration ACTIVE on device {}", dev.ordinal());
+                println!(
+                    "[QUANTUM][GPU] GPU acceleration ACTIVE on device {}",
+                    dev.ordinal()
+                );
             } else {
                 println!("[QUANTUM][CPU] GPU device not provided, using CPU fallback");
             }
@@ -39,7 +44,17 @@ impl QuantumColoringSolver {
         Ok(Self {
             #[cfg(feature = "cuda")]
             gpu_device,
+            telemetry: None,
         })
+    }
+
+    /// Set telemetry handle for detailed tracking
+    pub fn with_telemetry(
+        mut self,
+        telemetry: std::sync::Arc<crate::telemetry::TelemetryHandle>,
+    ) -> Self {
+        self.telemetry = Some(telemetry);
+        self
     }
 
     /// Find optimal graph coloring using quantum annealing
@@ -69,7 +84,13 @@ impl QuantumColoringSolver {
                 println!("[QUANTUM][GPU] Using GPU acceleration for quantum coloring");
                 // Clone the Arc to avoid borrow checker issues
                 let device = self.gpu_device.as_ref().unwrap().clone();
-                return self.find_coloring_gpu(&device, graph, _phase_field, kuramoto_state, initial_estimate);
+                return self.find_coloring_gpu(
+                    &device,
+                    graph,
+                    _phase_field,
+                    kuramoto_state,
+                    initial_estimate,
+                );
             } else {
                 println!("[QUANTUM][CPU] GPU device not available, using CPU fallback");
             }
@@ -94,13 +115,25 @@ impl QuantumColoringSolver {
             return Err(PRCTError::InvalidGraph("Empty graph".into()));
         }
 
-        println!("[QUANTUM-COLORING] Starting quantum annealing for {} vertices", n);
-        println!("[QUANTUM-COLORING] Chromatic estimate: {}", initial_estimate);
+        println!(
+            "[QUANTUM-COLORING] Starting quantum annealing for {} vertices",
+            n
+        );
+        println!(
+            "[QUANTUM-COLORING] Chromatic estimate: {}",
+            initial_estimate
+        );
 
         // Step 0: Compute TDA bounds for tight chromatic estimates
         let bounds = ChromaticBounds::from_graph_tda(graph)?;
-        println!("[QUANTUM-COLORING] TDA chromatic bounds: [{}, {}]", bounds.lower, bounds.upper);
-        println!("[QUANTUM-COLORING] Max clique size: {}", bounds.max_clique_size);
+        println!(
+            "[QUANTUM-COLORING] TDA chromatic bounds: [{}, {}]",
+            bounds.lower, bounds.upper
+        );
+        println!(
+            "[QUANTUM-COLORING] Max clique size: {}",
+            bounds.max_clique_size
+        );
 
         // For dense graphs, use a conservative estimate between lower and upper
         // For sparse graphs, use closer to lower bound
@@ -113,7 +146,10 @@ impl QuantumColoringSolver {
             (bounds.lower as f64 * 1.5).ceil() as usize
         };
         println!("[QUANTUM-COLORING] Graph density: {:.4}", density);
-        println!("[QUANTUM-COLORING] Target colors: {} (adaptive strategy)", target_colors);
+        println!(
+            "[QUANTUM-COLORING] Target colors: {} (adaptive strategy)",
+            target_colors
+        );
 
         // Step 1: Generate initial solution using phase-guided greedy with adaptive relaxation
         // If target is too aggressive, gradually increase until valid coloring found
@@ -125,8 +161,10 @@ impl QuantumColoringSolver {
             initial_estimate.min(bounds.upper),
         )?;
 
-        println!("[QUANTUM-COLORING] Initial greedy: {} colors, {} conflicts (target: {})",
-                 initial_solution.chromatic_number, initial_solution.conflicts, actual_target);
+        println!(
+            "[QUANTUM-COLORING] Initial greedy: {} colors, {} conflicts (target: {})",
+            initial_solution.chromatic_number, initial_solution.conflicts, actual_target
+        );
 
         // Step 2: Iterative color reduction with color penalty QUBO
         // Start from greedy solution and try to reduce colors iteratively
@@ -134,17 +172,25 @@ impl QuantumColoringSolver {
         let mut best_chromatic = initial_solution.chromatic_number;
 
         println!("[QUANTUM-COLORING] Phase 5: Iterative color reduction");
-        println!("[QUANTUM-COLORING] Starting from: {} colors", best_chromatic);
-        println!("[QUANTUM-COLORING] Target: {} colors (TDA lower bound)", bounds.lower);
+        println!(
+            "[QUANTUM-COLORING] Starting from: {} colors",
+            best_chromatic
+        );
+        println!(
+            "[QUANTUM-COLORING] Target: {} colors (TDA lower bound)",
+            bounds.lower
+        );
 
         // Try to reduce colors iteratively from greedy down towards TDA lower bound
         let mut current_target = best_chromatic;
-        let target_min = bounds.lower.max(target_colors);  // Don't go below TDA bound or original target
+        let target_min = bounds.lower.max(target_colors); // Don't go below TDA bound or original target
 
         while current_target > target_min {
             // Reduce target by 5% or at least 1 color, but NEVER go more than 2 colors
             // below best_chromatic to avoid re-triggering "No colors available" errors
-            let reduction = ((current_target as f64 * 0.05).floor() as usize).min(5).max(1);
+            let reduction = ((current_target as f64 * 0.05).floor() as usize)
+                .min(5)
+                .max(1);
             let new_target = current_target.saturating_sub(reduction);
             let new_target = new_target.max(target_min);
 
@@ -155,14 +201,16 @@ impl QuantumColoringSolver {
             if new_target >= current_target {
                 println!("[QUANTUM-COLORING] Target {} cannot be reduced further (safe_target: {}, target_min: {})",
                          current_target, safe_target, target_min);
-                break;  // Can't reduce further
+                break; // Can't reduce further
             }
 
-            println!("[QUANTUM-COLORING] Attempting {} colors (from {}, safe margin: {} - 2 = {})...",
-                     new_target, current_target, best_chromatic, safe_target);
+            println!(
+                "[QUANTUM-COLORING] Attempting {} colors (from {}, safe margin: {} - 2 = {})...",
+                new_target, current_target, best_chromatic, safe_target
+            );
 
             // Create QUBO with color penalty to prefer lower colors
-            let color_penalty_weight = 0.1;  // Small penalty to prefer lower-numbered colors
+            let color_penalty_weight = 0.1; // Small penalty to prefer lower-numbered colors
             let sparse_qubo = SparseQUBO::from_graph_coloring_with_color_penalty(
                 graph,
                 new_target,
@@ -170,7 +218,7 @@ impl QuantumColoringSolver {
             )?;
 
             // Run multi-start annealing with this target
-            let num_starts = 2;  // 2 runs per target (faster iteration)
+            let num_starts = 2; // 2 runs per target (faster iteration)
             let mut target_best: Option<ColoringSolution> = None;
 
             for run in 0..num_starts {
@@ -178,17 +226,20 @@ impl QuantumColoringSolver {
                 match self.sparse_quantum_anneal_seeded(
                     graph,
                     &sparse_qubo,
-                    &best_solution,  // Start from best so far
+                    &best_solution, // Start from best so far
                     new_target,
                     seed,
                     run,
                 ) {
                     Ok(solution) if solution.conflicts == 0 => {
-                        if target_best.is_none() || solution.chromatic_number < target_best.as_ref().unwrap().chromatic_number {
+                        if target_best.is_none()
+                            || solution.chromatic_number
+                                < target_best.as_ref().unwrap().chromatic_number
+                        {
                             target_best = Some(solution);
                         }
                     }
-                    _ => {}  // Failed or has conflicts
+                    _ => {} // Failed or has conflicts
                 }
             }
 
@@ -197,11 +248,17 @@ impl QuantumColoringSolver {
                 best_solution = solution;
                 best_chromatic = best_solution.chromatic_number;
                 current_target = best_chromatic;
-                println!("[QUANTUM-COLORING] ✅ SUCCESS! Reduced to {} colors", best_chromatic);
+                println!(
+                    "[QUANTUM-COLORING] ✅ SUCCESS! Reduced to {} colors",
+                    best_chromatic
+                );
             } else {
                 // Failed to find valid coloring with target colors
-                println!("[QUANTUM-COLORING] ❌ Failed at {} colors, keeping {} colors", new_target, best_chromatic);
-                break;  // Stop trying to reduce
+                println!(
+                    "[QUANTUM-COLORING] ❌ Failed at {} colors, keeping {} colors",
+                    new_target, best_chromatic
+                );
+                break; // Stop trying to reduce
             }
         }
 
@@ -216,7 +273,10 @@ impl QuantumColoringSolver {
                 Some(ordering)
             }
             Err(e) => {
-                println!("[QUANTUM-COLORING] ⚠️  Transfer entropy failed: {:?}, using Kuramoto only", e);
+                println!(
+                    "[QUANTUM-COLORING] ⚠️  Transfer entropy failed: {:?}, using Kuramoto only",
+                    e
+                );
                 None
             }
         };
@@ -225,15 +285,22 @@ impl QuantumColoringSolver {
         if let Some(ref ordering) = te_ordering {
             println!("[QUANTUM-COLORING] Attempting TE-guided greedy coloring...");
             match self.te_guided_greedy_coloring(graph, ordering, best_chromatic) {
-                Ok(te_solution) if te_solution.conflicts == 0 && te_solution.chromatic_number < best_chromatic => {
-                    println!("[QUANTUM-COLORING] ✅ TE-guided greedy improved to {} colors!",
-                             te_solution.chromatic_number);
+                Ok(te_solution)
+                    if te_solution.conflicts == 0
+                        && te_solution.chromatic_number < best_chromatic =>
+                {
+                    println!(
+                        "[QUANTUM-COLORING] ✅ TE-guided greedy improved to {} colors!",
+                        te_solution.chromatic_number
+                    );
                     best_solution = te_solution;
                     best_chromatic = best_solution.chromatic_number;
                 }
                 Ok(te_solution) => {
-                    println!("[QUANTUM-COLORING] TE-guided greedy: {} colors (no improvement)",
-                             te_solution.chromatic_number);
+                    println!(
+                        "[QUANTUM-COLORING] TE-guided greedy: {} colors (no improvement)",
+                        te_solution.chromatic_number
+                    );
                 }
                 Err(e) => {
                     println!("[QUANTUM-COLORING] TE-guided greedy failed: {:?}", e);
@@ -244,7 +311,10 @@ impl QuantumColoringSolver {
         // Step 4: DSATUR backtracking refinement (Phase 8)
         // Try to improve further using DSATUR with backtracking
         println!("\n[QUANTUM-COLORING] Phase 8: DSATUR Backtracking Refinement");
-        println!("[QUANTUM-COLORING] Starting from: {} colors", best_chromatic);
+        println!(
+            "[QUANTUM-COLORING] Starting from: {} colors",
+            best_chromatic
+        );
 
         // Use TDA lower bound as target
         let dsatur_target = bounds.lower;
@@ -253,9 +323,12 @@ impl QuantumColoringSolver {
         // Limit search depth for DSJC1000: use sqrt(n) * k as heuristic
         // For 1000 vertices: ~30 * 121 = ~3600 nodes baseline
         let max_depth = ((n as f64).sqrt() * best_chromatic as f64) as usize;
-        let max_depth = max_depth.min(50000);  // Cap at 50k nodes for efficiency
+        let max_depth = max_depth.min(50000); // Cap at 50k nodes for efficiency
 
-        println!("[QUANTUM-COLORING] DSATUR target: {} colors (TDA lower bound)", dsatur_target);
+        println!(
+            "[QUANTUM-COLORING] DSATUR target: {} colors (TDA lower bound)",
+            dsatur_target
+        );
         println!("[QUANTUM-COLORING] DSATUR max depth: {} nodes", max_depth);
 
         // Create DSATUR solver with Kuramoto-guided tie-breaking
@@ -267,16 +340,23 @@ impl QuantumColoringSolver {
         match dsatur_solver.find_coloring(graph, Some(&best_solution), dsatur_target) {
             Ok(dsatur_solution) if dsatur_solution.conflicts == 0 => {
                 if dsatur_solution.chromatic_number < best_chromatic {
-                    println!("[QUANTUM-COLORING] ✅ DSATUR improved to {} colors!",
-                             dsatur_solution.chromatic_number);
+                    println!(
+                        "[QUANTUM-COLORING] ✅ DSATUR improved to {} colors!",
+                        dsatur_solution.chromatic_number
+                    );
                     best_solution = dsatur_solution;
                 } else {
-                    println!("[QUANTUM-COLORING] DSATUR did not improve beyond {} colors", best_chromatic);
+                    println!(
+                        "[QUANTUM-COLORING] DSATUR did not improve beyond {} colors",
+                        best_chromatic
+                    );
                 }
             }
             Ok(dsatur_solution) => {
-                println!("[QUANTUM-COLORING] ⚠️  DSATUR found solution with conflicts: {}",
-                         dsatur_solution.conflicts);
+                println!(
+                    "[QUANTUM-COLORING] ⚠️  DSATUR found solution with conflicts: {}",
+                    dsatur_solution.conflicts
+                );
             }
             Err(e) => {
                 println!("[QUANTUM-COLORING] ⚠️  DSATUR failed: {:?}", e);
@@ -285,22 +365,27 @@ impl QuantumColoringSolver {
 
         // Phase 9: Memetic Algorithm with TSP Guidance
         println!("\n[QUANTUM-COLORING] Phase 9: Memetic Algorithm with TSP-Guided Operators");
-        println!("[QUANTUM-COLORING] Starting from: {} colors", best_solution.chromatic_number);
+        println!(
+            "[QUANTUM-COLORING] Starting from: {} colors",
+            best_solution.chromatic_number
+        );
 
         // Configure memetic algorithm for DSJC1000.5
         let memetic_config = MemeticConfig {
-            population_size: 32,      // Moderate population for 1000 vertices
-            elite_size: 6,            // Top 20% preserved
-            generations: 50,          // 50 generations should be sufficient
-            mutation_rate: 0.15,      // 15% mutation rate
-            tournament_size: 3,       // Tournament selection of 3
-            local_search_depth: 500,  // Limited DSATUR depth per individual
-            use_tsp_guidance: true,   // Enable TSP-guided operators
-            tsp_weight: 0.2,          // 20% weight on compactness in fitness
+            population_size: 32,     // Moderate population for 1000 vertices
+            elite_size: 6,           // Top 20% preserved
+            generations: 50,         // 50 generations should be sufficient
+            mutation_rate: 0.15,     // 15% mutation rate
+            tournament_size: 3,      // Tournament selection of 3
+            local_search_depth: 500, // Limited DSATUR depth per individual
+            use_tsp_guidance: true,  // Enable TSP-guided operators
+            tsp_weight: 0.2,         // 20% weight on compactness in fitness
         };
 
-        println!("[QUANTUM-COLORING] Population: {}, Generations: {}, TSP weight: {:.2}",
-                 memetic_config.population_size, memetic_config.generations, memetic_config.tsp_weight);
+        println!(
+            "[QUANTUM-COLORING] Population: {}, Generations: {}, TSP weight: {:.2}",
+            memetic_config.population_size, memetic_config.generations, memetic_config.tsp_weight
+        );
 
         // Create initial population: best solution + TE variant + random
         let mut initial_population = Vec::new();
@@ -308,7 +393,9 @@ impl QuantumColoringSolver {
 
         // Add TE-guided greedy variant if available
         if let Some(ref ordering) = te_ordering {
-            if let Ok(te_solution) = self.te_guided_greedy_coloring(graph, ordering, best_solution.chromatic_number) {
+            if let Ok(te_solution) =
+                self.te_guided_greedy_coloring(graph, ordering, best_solution.chromatic_number)
+            {
                 if te_solution.conflicts == 0 {
                     initial_population.push(te_solution);
                 }
@@ -322,17 +409,23 @@ impl QuantumColoringSolver {
         match memetic_solver.solve(graph, initial_population) {
             Ok(memetic_solution) if memetic_solution.conflicts == 0 => {
                 if memetic_solution.chromatic_number < best_solution.chromatic_number {
-                    println!("[QUANTUM-COLORING] 🎯 Memetic+TSP improved to {} colors!",
-                             memetic_solution.chromatic_number);
+                    println!(
+                        "[QUANTUM-COLORING] 🎯 Memetic+TSP improved to {} colors!",
+                        memetic_solution.chromatic_number
+                    );
                     best_solution = memetic_solution;
                 } else {
-                    println!("[QUANTUM-COLORING] Memetic+TSP did not improve beyond {} colors",
-                             best_solution.chromatic_number);
+                    println!(
+                        "[QUANTUM-COLORING] Memetic+TSP did not improve beyond {} colors",
+                        best_solution.chromatic_number
+                    );
                 }
             }
             Ok(memetic_solution) => {
-                println!("[QUANTUM-COLORING] ⚠️  Memetic+TSP found solution with conflicts: {}",
-                         memetic_solution.conflicts);
+                println!(
+                    "[QUANTUM-COLORING] ⚠️  Memetic+TSP found solution with conflicts: {}",
+                    memetic_solution.conflicts
+                );
             }
             Err(e) => {
                 println!("[QUANTUM-COLORING] ⚠️  Memetic+TSP failed: {:?}", e);
@@ -341,8 +434,10 @@ impl QuantumColoringSolver {
 
         let elapsed = start.elapsed().as_secs_f64() * 1000.0;
 
-        println!("[QUANTUM-COLORING] Final: {} colors, {} conflicts ({:.2}ms)",
-                 best_solution.chromatic_number, best_solution.conflicts, elapsed);
+        println!(
+            "[QUANTUM-COLORING] Final: {} colors, {} conflicts ({:.2}ms)",
+            best_solution.chromatic_number, best_solution.conflicts, elapsed
+        );
 
         Ok(best_solution)
     }
@@ -361,13 +456,22 @@ impl QuantumColoringSolver {
         const MAX_RETRIES: usize = 10;
 
         println!("[QUANTUM-COLORING][DIAGNOSTICS] Starting adaptive initial solution");
-        println!("[QUANTUM-COLORING][DIAGNOSTICS]   Graph: {} vertices, {} edges",
-                 graph.num_vertices, graph.num_edges);
-        println!("[QUANTUM-COLORING][DIAGNOSTICS]   Target range: {} → {}", target_colors, max_colors);
+        println!(
+            "[QUANTUM-COLORING][DIAGNOSTICS]   Graph: {} vertices, {} edges",
+            graph.num_vertices, graph.num_edges
+        );
+        println!(
+            "[QUANTUM-COLORING][DIAGNOSTICS]   Target range: {} → {}",
+            target_colors, max_colors
+        );
 
         for retry in 0..MAX_RETRIES {
-            println!("[QUANTUM-COLORING][DIAGNOSTICS] Attempt {}/{}: Trying {} colors",
-                     retry + 1, MAX_RETRIES, current_target);
+            println!(
+                "[QUANTUM-COLORING][DIAGNOSTICS] Attempt {}/{}: Trying {} colors",
+                retry + 1,
+                MAX_RETRIES,
+                current_target
+            );
             println!("{{\"event\":\"quantum_retry\",\"attempt\":{},\"max_attempts\":{},\"target_colors\":{}}}",
                      retry + 1, MAX_RETRIES, current_target);
 
@@ -379,8 +483,10 @@ impl QuantumColoringSolver {
             ) {
                 Ok(solution) => {
                     if retry > 0 {
-                        println!("[QUANTUM-COLORING] Relaxed target from {} to {} colors (retry {})",
-                                 target_colors, current_target, retry);
+                        println!(
+                            "[QUANTUM-COLORING] Relaxed target from {} to {} colors (retry {})",
+                            target_colors, current_target, retry
+                        );
                     }
                     println!("[QUANTUM-COLORING][DIAGNOSTICS] ✅ Success: {} colors, {} conflicts, quality {:.3}",
                              solution.chromatic_number, solution.conflicts, solution.quality_score);
@@ -390,32 +496,43 @@ impl QuantumColoringSolver {
                 }
                 Err(e) => {
                     println!("[QUANTUM-COLORING][DIAGNOSTICS] ❌ Failed: {:?}", e);
-                    println!("{{\"event\":\"quantum_failed\",\"attempt\":{},\"error\":\"{}\"}}",
-                             retry + 1, e);
+                    println!(
+                        "{{\"event\":\"quantum_failed\",\"attempt\":{},\"error\":\"{}\"}}",
+                        retry + 1,
+                        e
+                    );
                     // Increase target by 20%
-                    let new_target = ((current_target as f64 * 1.2).ceil() as usize).min(max_colors);
+                    let new_target =
+                        ((current_target as f64 * 1.2).ceil() as usize).min(max_colors);
                     if new_target == current_target {
                         // Can't increase anymore, use max_colors
                         current_target = max_colors;
-                        println!("[QUANTUM-COLORING][DIAGNOSTICS]   Maxed out, using max_colors = {}", max_colors);
+                        println!(
+                            "[QUANTUM-COLORING][DIAGNOSTICS]   Maxed out, using max_colors = {}",
+                            max_colors
+                        );
                     } else {
                         current_target = new_target;
-                        println!("[QUANTUM-COLORING][DIAGNOSTICS]   Increased target to {}", current_target);
+                        println!(
+                            "[QUANTUM-COLORING][DIAGNOSTICS]   Increased target to {}",
+                            current_target
+                        );
                     }
                 }
             }
         }
 
         // Final attempt with max_colors
-        println!("[QUANTUM-COLORING][DIAGNOSTICS] Final attempt with max_colors = {}", max_colors);
-        let solution = self.phase_guided_initial_solution(
-            graph,
-            _phase_field,
-            kuramoto_state,
-            max_colors,
-        )?;
-        println!("[QUANTUM-COLORING][DIAGNOSTICS] Final solution: {} colors, {} conflicts",
-                 solution.chromatic_number, solution.conflicts);
+        println!(
+            "[QUANTUM-COLORING][DIAGNOSTICS] Final attempt with max_colors = {}",
+            max_colors
+        );
+        let solution =
+            self.phase_guided_initial_solution(graph, _phase_field, kuramoto_state, max_colors)?;
+        println!(
+            "[QUANTUM-COLORING][DIAGNOSTICS] Final solution: {} colors, {} conflicts",
+            solution.chromatic_number, solution.conflicts
+        );
         Ok((solution, max_colors))
     }
 
@@ -431,14 +548,16 @@ impl QuantumColoringSolver {
         let adjacency = build_adjacency_matrix(graph);
 
         // Order vertices by Kuramoto phase
-        let mut vertices_by_phase: Vec<(usize, f64)> = kuramoto_state.phases
+        let mut vertices_by_phase: Vec<(usize, f64)> = kuramoto_state
+            .phases
             .iter()
             .take(n)
             .enumerate()
             .map(|(i, &phase)| (i, phase))
             .collect();
 
-        vertices_by_phase.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        vertices_by_phase
+            .sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Greedy coloring
         let mut coloring = vec![usize::MAX; n];
@@ -456,17 +575,29 @@ impl QuantumColoringSolver {
                     // Enhanced diagnostics before error
                     let degree = (0..n).filter(|&u| adjacency[[vertex, u]]).count();
                     let colored_neighbors = forbidden.len();
-                    println!("[QUANTUM-COLORING][ERROR] Vertex {} failed to find color:", vertex);
+                    println!(
+                        "[QUANTUM-COLORING][ERROR] Vertex {} failed to find color:",
+                        vertex
+                    );
                     println!("[QUANTUM-COLORING][ERROR]   Degree: {}", degree);
-                    println!("[QUANTUM-COLORING][ERROR]   Colored neighbors: {}", colored_neighbors);
-                    println!("[QUANTUM-COLORING][ERROR]   Forbidden colors: {} (max_colors: {})",
-                             forbidden.len(), max_colors);
+                    println!(
+                        "[QUANTUM-COLORING][ERROR]   Colored neighbors: {}",
+                        colored_neighbors
+                    );
+                    println!(
+                        "[QUANTUM-COLORING][ERROR]   Forbidden colors: {} (max_colors: {})",
+                        forbidden.len(),
+                        max_colors
+                    );
                     if forbidden.len() <= 20 {
                         println!("[QUANTUM-COLORING][ERROR]   Forbidden set: {:?}", forbidden);
                     }
                     PRCTError::ColoringFailed(format!(
                         "No colors available for vertex {} (degree {}, forbidden {}/{})",
-                        vertex, degree, forbidden.len(), max_colors
+                        vertex,
+                        degree,
+                        forbidden.len(),
+                        max_colors
                     ))
                 })?;
 
@@ -492,11 +623,7 @@ impl QuantumColoringSolver {
     /// Constraints:
     /// 1. Each vertex gets exactly one color: Σ_c x_{v,c} = 1
     /// 2. Adjacent vertices have different colors: x_{u,c} * x_{v,c} = 0 if (u,v) ∈ E
-    fn graph_coloring_to_qubo(
-        &self,
-        graph: &Graph,
-        num_colors: usize,
-    ) -> Result<QUBOProblem> {
+    fn graph_coloring_to_qubo(&self, graph: &Graph, num_colors: usize) -> Result<QUBOProblem> {
         let n = graph.num_vertices;
         let num_vars = n * num_colors;
 
@@ -504,9 +631,7 @@ impl QuantumColoringSolver {
         let mut q_matrix = Array2::zeros((num_vars, num_vars));
 
         // Helper: variable index for (vertex, color)
-        let var_idx = |v: usize, c: usize| -> usize {
-            v * num_colors + c
-        };
+        let var_idx = |v: usize, c: usize| -> usize { v * num_colors + c };
 
         // Constraint 1: Each vertex must have exactly one color
         // Penalty: (Σ_c x_{v,c} - 1)^2
@@ -588,6 +713,8 @@ impl QuantumColoringSolver {
             2000, // increased from 1000 for better optimization
             seed,
             run_id,
+            target_colors,
+            graph,
         )?;
 
         // Convert binary solution back to coloring
@@ -604,6 +731,8 @@ impl QuantumColoringSolver {
         num_steps: usize,
         seed: u64,
         run_id: usize,
+        target_colors: usize,
+        graph: &Graph,
     ) -> Result<Vec<f64>> {
         let n = solution.len();
         let initial_temp: f64 = 10.0;
@@ -655,8 +784,88 @@ impl QuantumColoringSolver {
             }
 
             if step % 500 == 0 && step > 0 {
-                println!("  Run {} Step {}: E={:.2}, temp={:.3}, tunneling={:.3}",
-                         run_id, step, best_energy, temp, tunneling);
+                println!(
+                    "  Run {} Step {}: E={:.2}, temp={:.3}, tunneling={:.3}",
+                    run_id, step, best_energy, temp, tunneling
+                );
+            }
+
+            // Record telemetry every 250 steps for hypertuning insights
+            if step % 250 == 0 && step > 0 {
+                if let Some(ref telemetry) = self.telemetry {
+                    use crate::telemetry::{OptimizationGuidance, PhaseName, PhaseExecMode, RunMetric};
+                    use serde_json::json;
+
+                    // Convert best solution to coloring to get chromatic estimate
+                    let temp_coloring = match self.binary_to_coloring(graph, &best_solution, target_colors) {
+                        Ok(c) => c,
+                        Err(_) => continue, // Skip telemetry on error
+                    };
+
+                    let energy_improvement_rate = if step > 0 {
+                        (current_energy - best_energy).abs() / step as f64
+                    } else {
+                        0.0
+                    };
+
+                    let mut recommendations = Vec::new();
+                    let guidance_status = if energy_improvement_rate < 0.001 && step < num_steps / 2 {
+                        recommendations.push(format!(
+                            "Energy stagnant at {:.2} - consider increasing num_steps from {} to {}",
+                            best_energy, num_steps, num_steps * 2
+                        ));
+                        recommendations.push("Or increase initial_tunneling for better exploration".to_string());
+                        "need_tuning"
+                    } else if temp_coloring.conflicts > 50 {
+                        recommendations.push(format!(
+                            "Still {} conflicts at step {} - increase annealing steps",
+                            temp_coloring.conflicts, step
+                        ));
+                        "need_tuning"
+                    } else if temp_coloring.conflicts == 0 && temp_coloring.chromatic_number < target_colors {
+                        recommendations.push(format!(
+                            "EXCELLENT: Valid {}-coloring found (target was {})",
+                            temp_coloring.chromatic_number, target_colors
+                        ));
+                        "excellent"
+                    } else {
+                        recommendations.push("Annealing progressing normally".to_string());
+                        "on_track"
+                    };
+
+                    let guidance = OptimizationGuidance {
+                        status: guidance_status.to_string(),
+                        recommendations,
+                        estimated_final_colors: Some(temp_coloring.chromatic_number),
+                        confidence: if step < num_steps / 4 { 0.4 } else { 0.75 },
+                        gap_to_world_record: Some((temp_coloring.chromatic_number as i32) - 83),
+                    };
+
+                    telemetry.record(
+                        RunMetric::new(
+                            PhaseName::Quantum,
+                            format!("anneal_step_{}/{}", step, num_steps),
+                            temp_coloring.chromatic_number,
+                            temp_coloring.conflicts,
+                            0.0, // Step duration not tracked individually
+                            PhaseExecMode::gpu_success(Some(3)),
+                        )
+                        .with_parameters(json!({
+                            "step": step,
+                            "total_steps": num_steps,
+                            "energy": best_energy,
+                            "current_energy": current_energy,
+                            "temperature": temp,
+                            "tunneling": tunneling,
+                            "progress_pct": (step as f64 / num_steps as f64) * 100.0,
+                            "energy_improvement_rate": energy_improvement_rate,
+                            "run_id": run_id,
+                            "seed": seed,
+                            "target_colors": target_colors,
+                        }))
+                        .with_guidance(guidance),
+                    );
+                }
             }
         }
 
@@ -727,8 +936,10 @@ impl QuantumColoringSolver {
             }
 
             if step % 100 == 0 && step > 0 {
-                println!("  Step {}: E={:.2}, temp={:.3}, tunneling={:.3}",
-                         step, best_energy, temp, tunneling);
+                println!(
+                    "  Step {}: E={:.2}, temp={:.3}, tunneling={:.3}",
+                    step, best_energy, temp, tunneling
+                );
             }
         }
 
@@ -759,7 +970,9 @@ impl QuantumColoringSolver {
             // Find first available color
             let color = (0..max_colors)
                 .find(|c| !forbidden.contains(c))
-                .ok_or_else(|| PRCTError::ColoringFailed(format!("Vertex {} has no available colors", vertex)))?;
+                .ok_or_else(|| {
+                    PRCTError::ColoringFailed(format!("Vertex {} has no available colors", vertex))
+                })?;
 
             coloring[vertex] = color;
         }
@@ -768,7 +981,8 @@ impl QuantumColoringSolver {
         let conflicts = self.count_coloring_conflicts(graph, &coloring);
 
         // Compute chromatic number
-        let chromatic_number = coloring.iter()
+        let chromatic_number = coloring
+            .iter()
             .filter(|&&c| c != usize::MAX)
             .map(|&c| c + 1)
             .max()
@@ -796,9 +1010,10 @@ impl QuantumColoringSolver {
 
         for i in 0..n {
             for j in (i + 1)..n {
-                if graph.adjacency[i * n + j] &&
-                   coloring[i] != usize::MAX &&
-                   coloring[i] == coloring[j] {
+                if graph.adjacency[i * n + j]
+                    && coloring[i] != usize::MAX
+                    && coloring[i] == coloring[j]
+                {
                     conflicts += 1;
                 }
             }
@@ -879,7 +1094,9 @@ impl QuantumColoringSolver {
         kuramoto_state: &KuramotoState,
         initial_estimate: usize,
     ) -> Result<ColoringSolution> {
-        use crate::gpu_quantum_annealing::{gpu_qubo_simulated_annealing, qubo_solution_to_coloring};
+        use crate::gpu_quantum_annealing::{
+            gpu_qubo_simulated_annealing, qubo_solution_to_coloring,
+        };
 
         let start = std::time::Instant::now();
         let n = graph.num_vertices;
@@ -888,11 +1105,17 @@ impl QuantumColoringSolver {
             return Err(PRCTError::InvalidGraph("Empty graph".into()));
         }
 
-        println!("[PHASE 3][GPU] Starting GPU QUBO simulated annealing for {} vertices", n);
+        println!(
+            "[PHASE 3][GPU] Starting GPU QUBO simulated annealing for {} vertices",
+            n
+        );
 
         // Step 0: Compute TDA bounds (CPU - fast)
         let bounds = ChromaticBounds::from_graph_tda(graph)?;
-        println!("[PHASE 3][GPU] TDA chromatic bounds: [{}, {}]", bounds.lower, bounds.upper);
+        println!(
+            "[PHASE 3][GPU] TDA chromatic bounds: [{}, {}]",
+            bounds.lower, bounds.upper
+        );
         println!("[PHASE 3][GPU] Max clique size: {}", bounds.max_clique_size);
 
         // Compute target colors
@@ -903,7 +1126,10 @@ impl QuantumColoringSolver {
             (bounds.lower as f64 * 1.5).ceil() as usize
         };
         println!("[PHASE 3][GPU] Graph density: {:.4}", density);
-        println!("[PHASE 3][GPU] Target colors: {} (adaptive strategy)", target_colors);
+        println!(
+            "[PHASE 3][GPU] Target colors: {} (adaptive strategy)",
+            target_colors
+        );
 
         // Step 1: Generate initial solution (CPU - fast)
         let (initial_solution, actual_target) = self.adaptive_initial_solution(
@@ -914,8 +1140,10 @@ impl QuantumColoringSolver {
             initial_estimate.min(bounds.upper),
         )?;
 
-        println!("[PHASE 3][GPU] Initial greedy: {} colors, {} conflicts",
-                 initial_solution.chromatic_number, initial_solution.conflicts);
+        println!(
+            "[PHASE 3][GPU] Initial greedy: {} colors, {} conflicts",
+            initial_solution.chromatic_number, initial_solution.conflicts
+        );
 
         // Step 2: GPU QUBO annealing for refinement
         let mut best_solution = initial_solution.clone();
@@ -923,14 +1151,19 @@ impl QuantumColoringSolver {
 
         println!("[PHASE 3][GPU] Starting GPU QUBO refinement");
         println!("[PHASE 3][GPU] Initial: {} colors", best_chromatic);
-        println!("[PHASE 3][GPU] Target: {} colors (TDA lower bound)", bounds.lower);
+        println!(
+            "[PHASE 3][GPU] Target: {} colors (TDA lower bound)",
+            bounds.lower
+        );
 
         let mut current_target = best_chromatic;
         let target_min = bounds.lower.max(target_colors);
 
         // Try to reduce colors using GPU QUBO SA
         while current_target > target_min {
-            let reduction = ((current_target as f64 * 0.05).floor() as usize).min(5).max(1);
+            let reduction = ((current_target as f64 * 0.05).floor() as usize)
+                .min(5)
+                .max(1);
             let new_target = current_target.saturating_sub(reduction).max(target_min);
             let safe_target = best_chromatic.saturating_sub(2);
             let new_target = new_target.max(safe_target);
@@ -939,7 +1172,10 @@ impl QuantumColoringSolver {
                 break;
             }
 
-            println!("[PHASE 3][GPU] Attempting {} colors (from {})...", new_target, current_target);
+            println!(
+                "[PHASE 3][GPU] Attempting {} colors (from {})...",
+                new_target, current_target
+            );
 
             // Create sparse QUBO
             let color_penalty_weight = 0.1;
@@ -966,9 +1202,9 @@ impl QuantumColoringSolver {
                 cuda_device,
                 &sparse_qubo,
                 &initial_state,
-                10_000,  // iterations
-                1.0,     // T_initial
-                0.01,    // T_final
+                10_000, // iterations
+                1.0,    // T_initial
+                0.01,   // T_final
                 seed,
             ) {
                 Ok(qubo_solution) => {
@@ -977,35 +1213,56 @@ impl QuantumColoringSolver {
                         Ok(coloring) => {
                             // Validate solution
                             let conflicts = self.count_conflicts(graph, &coloring);
-                            let actual_chromatic = coloring.iter().max().map(|&c| c + 1).unwrap_or(0);
+                            let actual_chromatic =
+                                coloring.iter().max().map(|&c| c + 1).unwrap_or(0);
 
-                            println!("[PHASE 3][GPU] QUBO result: {} colors, {} conflicts", actual_chromatic, conflicts);
+                            println!(
+                                "[PHASE 3][GPU] QUBO result: {} colors, {} conflicts",
+                                actual_chromatic, conflicts
+                            );
 
                             if conflicts == 0 {
                                 best_solution = ColoringSolution {
                                     colors: coloring,
                                     chromatic_number: actual_chromatic,
                                     conflicts,
-                                    quality_score: 1.0 - (actual_chromatic as f64 / new_target as f64),
+                                    quality_score: 1.0
+                                        - (actual_chromatic as f64 / new_target as f64),
                                     computation_time_ms: 0.0,
                                 };
                                 best_chromatic = actual_chromatic;
                                 current_target = best_chromatic;
-                                println!("[PHASE 3][GPU] SUCCESS! Reduced to {} colors", best_chromatic);
+                                println!(
+                                    "[PHASE 3][GPU] SUCCESS! Reduced to {} colors",
+                                    best_chromatic
+                                );
                             } else {
-                                println!("[PHASE 3][GPU] Failed at {} colors (conflicts: {})", new_target, conflicts);
+                                println!(
+                                    "[PHASE 3][GPU] Failed at {} colors (conflicts: {})",
+                                    new_target, conflicts
+                                );
                                 break;
                             }
                         }
                         Err(e) => {
                             println!("[PHASE 3][GPU][FALLBACK] QUBO decode failed: {}", e);
-                            return self.find_coloring_cpu(graph, _phase_field, kuramoto_state, initial_estimate);
+                            return self.find_coloring_cpu(
+                                graph,
+                                _phase_field,
+                                kuramoto_state,
+                                initial_estimate,
+                            );
                         }
                     }
                 }
                 Err(e) => {
                     println!("[PHASE 3][GPU][FALLBACK] GPU QUBO SA failed: {}", e);
-                    return self.find_coloring_cpu(graph, _phase_field, kuramoto_state, initial_estimate);
+                    return self.find_coloring_cpu(
+                        graph,
+                        _phase_field,
+                        kuramoto_state,
+                        initial_estimate,
+                    );
                 }
             }
         }
@@ -1018,20 +1275,32 @@ impl QuantumColoringSolver {
                 ordering
             }
             Err(e) => {
-                println!("[PHASE 3][GPU] TE ordering failed ({}), using degree ordering", e);
+                println!(
+                    "[PHASE 3][GPU] TE ordering failed ({}), using degree ordering",
+                    e
+                );
                 self.get_degree_ordering(graph)
             }
         };
 
         let te_solution = self.greedy_with_ordering(graph, &te_ordering)?;
         if te_solution.conflicts == 0 && te_solution.chromatic_number < best_chromatic {
-            println!("[PHASE 3][GPU] TE improved: {} -> {} colors", best_chromatic, te_solution.chromatic_number);
+            println!(
+                "[PHASE 3][GPU] TE improved: {} -> {} colors",
+                best_chromatic, te_solution.chromatic_number
+            );
             best_solution = te_solution;
         }
 
         let elapsed = start.elapsed().as_secs_f64();
-        println!("[PHASE 3][GPU] GPU quantum coloring completed in {:.2}s", elapsed);
-        println!("[PHASE 3][GPU] Final: {} colors, {} conflicts", best_solution.chromatic_number, best_solution.conflicts);
+        println!(
+            "[PHASE 3][GPU] GPU quantum coloring completed in {:.2}s",
+            elapsed
+        );
+        println!(
+            "[PHASE 3][GPU] Final: {} colors, {} conflicts",
+            best_solution.chromatic_number, best_solution.conflicts
+        );
 
         Ok(best_solution)
     }
@@ -1097,7 +1366,11 @@ impl QuantumColoringSolver {
             colors,
             chromatic_number,
             conflicts,
-            quality_score: if chromatic_number > 0 { 1.0 / chromatic_number as f64 } else { 0.0 },
+            quality_score: if chromatic_number > 0 {
+                1.0 / chromatic_number as f64
+            } else {
+                0.0
+            },
             computation_time_ms: 0.0,
         })
     }
@@ -1169,11 +1442,7 @@ mod tests {
             num_vertices: 3,
             num_edges: 3,
             edges: vec![(0, 1, 1.0), (1, 2, 1.0), (0, 2, 1.0)],
-            adjacency: vec![
-                false, true, true,
-                true, false, true,
-                true, true, false,
-            ],
+            adjacency: vec![false, true, true, true, false, true, true, true, false],
             coordinates: None,
         };
 

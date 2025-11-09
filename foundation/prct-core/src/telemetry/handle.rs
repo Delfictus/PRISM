@@ -51,8 +51,9 @@ impl TelemetryHandle {
     /// Handle with background writer thread
     pub fn new(run_id: &str, buffer_len: usize) -> Result<Self> {
         let output_dir = Path::new("target/run_artifacts");
-        create_dir_all(output_dir)
-            .map_err(|e| PRCTError::ConfigError(format!("Failed to create artifacts dir: {}", e)))?;
+        create_dir_all(output_dir).map_err(|e| {
+            PRCTError::ConfigError(format!("Failed to create artifacts dir: {}", e))
+        })?;
 
         let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
         let filename = format!("live_metrics_{}_{}.jsonl", run_id, timestamp);
@@ -180,7 +181,7 @@ impl Drop for TelemetryHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::telemetry::run_metric::{PhaseName, PhaseExecMode};
+    use crate::telemetry::run_metric::{PhaseExecMode, PhaseName};
 
     #[test]
     fn test_telemetry_handle() {

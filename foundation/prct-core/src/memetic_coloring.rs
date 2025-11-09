@@ -8,12 +8,12 @@
 //!
 //! Expected performance: 115 → 85-100 colors on DSJC1000.5
 
-use crate::errors::*;
 use crate::dsatur_backtracking::DSaturSolver;
-use shared_types::*;
+use crate::errors::*;
 use ndarray::Array2;
-use rayon::prelude::*;
 use rand::prelude::*;
+use rayon::prelude::*;
+use shared_types::*;
 
 #[cfg(feature = "cuda")]
 use cudarc::driver::CudaDevice;
@@ -91,6 +91,9 @@ pub struct MemeticColoringSolver {
 
     /// Generation statistics
     generation_stats: Vec<GenerationStats>,
+
+    /// Telemetry handle for detailed tracking
+    telemetry: Option<std::sync::Arc<crate::telemetry::TelemetryHandle>>,
 }
 
 /// Statistics for a generation
@@ -114,12 +117,22 @@ impl MemeticColoringSolver {
             gpu_device: None,
             best_ever: None,
             generation_stats: Vec::new(),
+            telemetry: None,
         }
     }
 
     #[cfg(feature = "cuda")]
     pub fn with_gpu(mut self, device: Arc<CudaDevice>) -> Self {
         self.gpu_device = Some(device);
+        self
+    }
+
+    /// Set telemetry handle for detailed tracking
+    pub fn with_telemetry(
+        mut self,
+        telemetry: std::sync::Arc<crate::telemetry::TelemetryHandle>,
+    ) -> Self {
+        self.telemetry = Some(telemetry);
         self
     }
 
@@ -130,10 +143,14 @@ impl MemeticColoringSolver {
         initial_solutions: Vec<ColoringSolution>,
     ) -> Result<ColoringSolution> {
         println!("[MEMETIC] Starting memetic algorithm");
-        println!("[MEMETIC] Population: {}, Generations: {}",
-                 self.config.population_size, self.config.generations);
-        println!("[MEMETIC] TSP guidance: {}, Weight: {:.2}",
-                 self.config.use_tsp_guidance, self.config.tsp_weight);
+        println!(
+            "[MEMETIC] Population: {}, Generations: {}",
+            self.config.population_size, self.config.generations
+        );
+        println!(
+            "[MEMETIC] TSP guidance: {}, Weight: {:.2}",
+            self.config.use_tsp_guidance, self.config.tsp_weight
+        );
 
         // Initialize population
         let mut population = self.initialize_population(graph, initial_solutions)?;
@@ -141,7 +158,8 @@ impl MemeticColoringSolver {
         // Evaluate initial population
         self.evaluate_population(&mut population, graph)?;
 
-        let mut best_chromatic = population.iter()
+        let mut best_chromatic = population
+            .iter()
             .map(|ind| ind.solution.chromatic_number)
             .min()
             .expect("population is expected non-empty after initialize/evaluate");
@@ -173,14 +191,98 @@ impl MemeticColoringSolver {
 
             if stats.best_chromatic < best_chromatic {
                 best_chromatic = stats.best_chromatic;
-                println!("[MEMETIC] 🎯 Gen {}: {} colors (fitness: {:.2}, TSP: {:.3})",
-                         gen, stats.best_chromatic, stats.best_fitness, stats.best_tsp_quality);
+                println!(
+                    "[MEMETIC] 🎯 Gen {}: {} colors (fitness: {:.2}, TSP: {:.3})",
+                    gen, stats.best_chromatic, stats.best_fitness, stats.best_tsp_quality
+                );
             } else if gen % 10 == 0 {
-                println!("[MEMETIC] Gen {}: best={}, avg={:.1}, diversity={:.3}",
-                         gen, stats.best_chromatic, stats.avg_chromatic, stats.diversity);
+                println!(
+                    "[MEMETIC] Gen {}: best={}, avg={:.1}, diversity={:.3}",
+                    gen, stats.best_chromatic, stats.avg_chromatic, stats.diversity
+                );
             }
 
-            self.generation_stats.push(stats);
+            self.generation_stats.push(stats.clone());
+
+            // Record telemetry every 20 generations for hypertuning insights
+            if gen % 20 == 0 || gen < 5 || stats.best_chromatic < best_chromatic {
+                if let Some(ref telemetry) = self.telemetry {
+                    use crate::telemetry::{OptimizationGuidance, PhaseName, PhaseExecMode, RunMetric};
+                    use serde_json::json;
+
+                    let stagnation_count = self.count_stagnation();
+                    let mut recommendations = Vec::new();
+
+                    let guidance_status = if stats.diversity < 0.01 {
+                        recommendations.push(format!(
+                            "CRITICAL: Diversity collapsed to {:.4} - increase mutation_rate from {:.2} to {:.2}",
+                            stats.diversity, self.config.mutation_rate, self.config.mutation_rate * 1.5
+                        ));
+                        recommendations.push("Or trigger desperation burst (population reset)".to_string());
+                        "critical"
+                    } else if stagnation_count > 50 {
+                        recommendations.push(format!(
+                            "Stagnant for {} generations - increase population_size from {} to {}",
+                            stagnation_count, self.config.population_size, self.config.population_size + 16
+                        ));
+                        recommendations.push(format!(
+                            "Or increase local_search_depth from {} to {}",
+                            self.config.local_search_depth, self.config.local_search_depth * 2
+                        ));
+                        "need_tuning"
+                    } else if stats.best_chromatic < 90 && stats.best_chromatic > best_chromatic {
+                        recommendations.push(format!(
+                            "EXCELLENT: Improved to {} colors (was {})",
+                            stats.best_chromatic, best_chromatic
+                        ));
+                        recommendations.push("Current memetic settings are effective".to_string());
+                        "excellent"
+                    } else if stats.avg_chromatic - stats.best_chromatic as f64 > 10.0 {
+                        recommendations.push("Large gap between best and avg - increase elite_size".to_string());
+                        "need_tuning"
+                    } else {
+                        recommendations.push("Memetic evolution progressing normally".to_string());
+                        "on_track"
+                    };
+
+                    let guidance = OptimizationGuidance {
+                        status: guidance_status.to_string(),
+                        recommendations,
+                        estimated_final_colors: Some(stats.best_chromatic.saturating_sub(
+                            ((self.config.generations - gen) as f64 * 0.05) as usize
+                        )),
+                        confidence: if gen < 10 { 0.3 } else { 0.7 },
+                        gap_to_world_record: Some((stats.best_chromatic as i32) - 83),
+                    };
+
+                    telemetry.record(
+                        RunMetric::new(
+                            PhaseName::Memetic,
+                            format!("generation_{}/{}", gen, self.config.generations),
+                            stats.best_chromatic,
+                            0, // Memetic doesn't track conflicts per generation
+                            0.0, // Generation duration not tracked individually
+                            PhaseExecMode::cpu_disabled(),
+                        )
+                        .with_parameters(json!({
+                            "generation": gen,
+                            "total_generations": self.config.generations,
+                            "best_chromatic": stats.best_chromatic,
+                            "avg_chromatic": stats.avg_chromatic,
+                            "best_fitness": stats.best_fitness,
+                            "avg_fitness": stats.avg_fitness,
+                            "best_tsp_quality": stats.best_tsp_quality,
+                            "diversity": stats.diversity,
+                            "stagnation_count": stagnation_count,
+                            "population_size": self.config.population_size,
+                            "mutation_rate": self.config.mutation_rate,
+                            "elite_size": self.config.elite_size,
+                            "progress_pct": (gen as f64 / self.config.generations as f64) * 100.0,
+                        }))
+                        .with_guidance(guidance),
+                    );
+                }
+            }
 
             // Early stopping if no improvement for 20 generations
             if gen > 20 && self.check_stagnation(20) {
@@ -190,11 +292,19 @@ impl MemeticColoringSolver {
         }
 
         // Return best solution
-        let best = population.iter()
+        let best = population
+            .iter()
             .min_by_key(|ind| ind.solution.chromatic_number)
-            .ok_or_else(|| PRCTError::ColoringFailed("Population became empty before selecting final best".to_string()))?;
+            .ok_or_else(|| {
+                PRCTError::ColoringFailed(
+                    "Population became empty before selecting final best".to_string(),
+                )
+            })?;
 
-        println!("[MEMETIC] Final best: {} colors", best.solution.chromatic_number);
+        println!(
+            "[MEMETIC] Final best: {} colors",
+            best.solution.chromatic_number
+        );
 
         Ok(best.solution.clone())
     }
@@ -223,10 +333,17 @@ impl MemeticColoringSolver {
         for restart in 0..max_restarts {
             // Adaptive parameter tuning
             self.config.mutation_rate = original_mutation + (restart as f64 * 0.10);
-            self.config.generations = original_generations / 2;  // Shorter runs for restart
+            self.config.generations = original_generations / 2; // Shorter runs for restart
 
-            println!("\n[MEMETIC-RESTART] === Restart {}/{} ===", restart + 1, max_restarts);
-            println!("[MEMETIC-RESTART] Mutation rate: {:.2}", self.config.mutation_rate);
+            println!(
+                "\n[MEMETIC-RESTART] === Restart {}/{} ===",
+                restart + 1,
+                max_restarts
+            );
+            println!(
+                "[MEMETIC-RESTART] Mutation rate: {:.2}",
+                self.config.mutation_rate
+            );
             println!("[MEMETIC-RESTART] Generations: {}", self.config.generations);
 
             // Run memetic algorithm
@@ -234,10 +351,15 @@ impl MemeticColoringSolver {
 
             if solution.chromatic_number < best_ever.chromatic_number {
                 best_ever = solution.clone();
-                println!("[MEMETIC-RESTART] 🎯 New best: {} colors!", best_ever.chromatic_number);
+                println!(
+                    "[MEMETIC-RESTART] 🎯 New best: {} colors!",
+                    best_ever.chromatic_number
+                );
             } else {
-                println!("[MEMETIC-RESTART] No improvement: {} colors (best: {})",
-                         solution.chromatic_number, best_ever.chromatic_number);
+                println!(
+                    "[MEMETIC-RESTART] No improvement: {} colors (best: {})",
+                    solution.chromatic_number, best_ever.chromatic_number
+                );
             }
 
             // Early stopping if we haven't improved in 2 restarts
@@ -254,7 +376,10 @@ impl MemeticColoringSolver {
         self.config.generations = original_generations;
         self.config.mutation_rate = original_mutation;
 
-        println!("\n[MEMETIC-RESTART] Final best: {} colors", best_ever.chromatic_number);
+        println!(
+            "\n[MEMETIC-RESTART] Final best: {} colors",
+            best_ever.chromatic_number
+        );
         Ok(best_ever)
     }
 
@@ -267,7 +392,10 @@ impl MemeticColoringSolver {
         let mut population = Vec::with_capacity(self.config.population_size);
 
         // Add provided initial solutions
-        for solution in initial_solutions.into_iter().take(self.config.population_size / 2) {
+        for solution in initial_solutions
+            .into_iter()
+            .take(self.config.population_size / 2)
+        {
             population.push(Individual {
                 solution,
                 fitness: 0.0,
@@ -292,7 +420,11 @@ impl MemeticColoringSolver {
     }
 
     /// Generate random greedy solution
-    fn generate_random_solution(&self, graph: &Graph, rng: &mut ThreadRng) -> Result<ColoringSolution> {
+    fn generate_random_solution(
+        &self,
+        graph: &Graph,
+        rng: &mut ThreadRng,
+    ) -> Result<ColoringSolution> {
         let n = graph.num_vertices;
         let mut vertices: Vec<usize> = (0..n).collect();
         vertices.shuffle(rng);
@@ -312,7 +444,8 @@ impl MemeticColoringSolver {
             coloring[v] = color;
         }
 
-        let chromatic_number = coloring.iter()
+        let chromatic_number = coloring
+            .iter()
             .filter(|&&c| c != usize::MAX)
             .max()
             .map(|&c| c + 1)
@@ -361,34 +494,40 @@ impl MemeticColoringSolver {
 
     /// Compute generation statistics
     fn compute_generation_stats(&self, gen: usize, population: &[Individual]) -> GenerationStats {
-        let best_chromatic = population.iter()
+        let best_chromatic = population
+            .iter()
             .map(|ind| ind.solution.chromatic_number)
             .min()
             .expect("compute_generation_stats expects non-empty population slice");
 
-        let avg_chromatic = population.iter()
+        let avg_chromatic = population
+            .iter()
             .map(|ind| ind.solution.chromatic_number as f64)
-            .sum::<f64>() / population.len() as f64;
+            .sum::<f64>()
+            / population.len() as f64;
 
-        let best_fitness = population.iter()
+        let best_fitness = population
+            .iter()
             .map(|ind| ind.fitness)
             .fold(f64::NEG_INFINITY, f64::max);
 
-        let avg_fitness = population.iter()
-            .map(|ind| ind.fitness)
-            .sum::<f64>() / population.len() as f64;
+        let avg_fitness =
+            population.iter().map(|ind| ind.fitness).sum::<f64>() / population.len() as f64;
 
-        let best_tsp_quality = population.iter()
+        let best_tsp_quality = population
+            .iter()
             .map(|ind| ind.avg_compactness)
             .fold(f64::NEG_INFINITY, f64::max);
 
         // Diversity: variance in chromatic numbers
-        let variance = population.iter()
+        let variance = population
+            .iter()
             .map(|ind| {
                 let diff = ind.solution.chromatic_number as f64 - avg_chromatic;
                 diff * diff
             })
-            .sum::<f64>() / population.len() as f64;
+            .sum::<f64>()
+            / population.len() as f64;
         let diversity = variance.sqrt();
 
         GenerationStats {
@@ -416,34 +555,53 @@ impl MemeticColoringSolver {
         first_best == last_best
     }
 
+    /// Count consecutive generations without improvement
+    fn count_stagnation(&self) -> usize {
+        if self.generation_stats.is_empty() {
+            return 0;
+        }
+
+        let mut count = 0;
+        let current_best = self.generation_stats.last().unwrap().best_chromatic;
+
+        for stat in self.generation_stats.iter().rev() {
+            if stat.best_chromatic == current_best {
+                count += 1;
+            } else {
+                break;
+            }
+        }
+
+        count
+    }
+
     /// Evaluate fitness for all individuals in population
     fn evaluate_population(&self, population: &mut [Individual], graph: &Graph) -> Result<()> {
         // Parallel fitness evaluation
-        population.par_iter_mut()
-            .for_each(|individual| {
-                // Fitness components:
-                // 1. Chromatic number (lower is better)
-                // 2. Conflicts (0 conflicts required)
-                // 3. TSP compactness (higher is better, if enabled)
+        population.par_iter_mut().for_each(|individual| {
+            // Fitness components:
+            // 1. Chromatic number (lower is better)
+            // 2. Conflicts (0 conflicts required)
+            // 3. TSP compactness (higher is better, if enabled)
 
-                let chromatic = individual.solution.chromatic_number as f64;
-                let conflicts = individual.solution.conflicts as f64;
+            let chromatic = individual.solution.chromatic_number as f64;
+            let conflicts = individual.solution.conflicts as f64;
 
-                // Base fitness: minimize colors and conflicts
-                let mut fitness = 1000.0 / chromatic - 1000.0 * conflicts;
+            // Base fitness: minimize colors and conflicts
+            let mut fitness = 1000.0 / chromatic - 1000.0 * conflicts;
 
-                // Add TSP compactness if enabled
-                if self.config.use_tsp_guidance {
-                    // Compute average compactness (simplified for performance)
-                    let avg_compactness = self.compute_simple_compactness(&individual.solution, graph);
-                    individual.avg_compactness = avg_compactness;
+            // Add TSP compactness if enabled
+            if self.config.use_tsp_guidance {
+                // Compute average compactness (simplified for performance)
+                let avg_compactness = self.compute_simple_compactness(&individual.solution, graph);
+                individual.avg_compactness = avg_compactness;
 
-                    // Weight TSP quality into fitness
-                    fitness += self.config.tsp_weight * 100.0 * avg_compactness;
-                }
+                // Weight TSP quality into fitness
+                fitness += self.config.tsp_weight * 100.0 * avg_compactness;
+            }
 
-                individual.fitness = fitness;
-            });
+            individual.fitness = fitness;
+        });
 
         Ok(())
     }
@@ -460,7 +618,8 @@ impl MemeticColoringSolver {
         let adjacency = self.build_adjacency_matrix(graph);
 
         // For each color class, compute intra-class connectivity
-        let total_compactness: f64 = color_classes.iter()
+        let total_compactness: f64 = color_classes
+            .iter()
             .filter(|class| !class.is_empty())
             .map(|class| {
                 if class.len() <= 1 {
@@ -493,7 +652,9 @@ impl MemeticColoringSolver {
 
     /// Extract color classes quickly
     fn extract_color_classes_fast(&self, solution: &ColoringSolution) -> Vec<Vec<usize>> {
-        let max_color = solution.colors.iter()
+        let max_color = solution
+            .colors
+            .iter()
             .filter(|&&c| c != usize::MAX)
             .max()
             .copied()
@@ -533,8 +694,13 @@ impl MemeticColoringSolver {
     }
 
     /// Crossover population (TSP-guided)
-    fn crossover_population(&self, parents: &[Individual], graph: &Graph) -> Result<Vec<Individual>> {
-        let offspring: Vec<Individual> = parents.par_chunks(2)
+    fn crossover_population(
+        &self,
+        parents: &[Individual],
+        graph: &Graph,
+    ) -> Result<Vec<Individual>> {
+        let offspring: Vec<Individual> = parents
+            .par_chunks(2)
             .map(|pair| {
                 if pair.len() == 2 {
                     self.tsp_guided_crossover(&pair[0], &pair[1], graph)
@@ -549,9 +715,12 @@ impl MemeticColoringSolver {
     }
 
     /// TSP-guided crossover: preserve compact color classes
-    fn tsp_guided_crossover(&self, parent1: &Individual, parent2: &Individual, graph: &Graph)
-        -> Result<Individual> {
-
+    fn tsp_guided_crossover(
+        &self,
+        parent1: &Individual,
+        parent2: &Individual,
+        graph: &Graph,
+    ) -> Result<Individual> {
         let n = graph.num_vertices;
         let mut child_colors = vec![usize::MAX; n];
 
@@ -603,13 +772,16 @@ impl MemeticColoringSolver {
                     .map(|u| child_colors[u])
                     .collect();
 
-                let color = (0..next_color + 1).find(|c| !forbidden.contains(c)).unwrap_or(next_color);
+                let color = (0..next_color + 1)
+                    .find(|c| !forbidden.contains(c))
+                    .unwrap_or(next_color);
                 child_colors[v] = color;
                 next_color = next_color.max(color + 1);
             }
         }
 
-        let chromatic_number = child_colors.iter()
+        let chromatic_number = child_colors
+            .iter()
             .filter(|&&c| c != usize::MAX)
             .max()
             .map(|&c| c + 1)
@@ -633,17 +805,16 @@ impl MemeticColoringSolver {
 
     /// Mutate population
     fn mutate_population(&self, population: &mut [Individual], graph: &Graph) -> Result<()> {
-        use rand::SeedableRng;
         use rand::rngs::StdRng;
+        use rand::SeedableRng;
 
-        population.par_iter_mut()
-            .for_each(|individual| {
-                // Each thread gets its own RNG
-                let mut rng = StdRng::from_entropy();
-                if rng.gen::<f64>() < self.config.mutation_rate {
-                    self.tsp_guided_mutation(&mut individual.solution, graph);
-                }
-            });
+        population.par_iter_mut().for_each(|individual| {
+            // Each thread gets its own RNG
+            let mut rng = StdRng::from_entropy();
+            if rng.gen::<f64>() < self.config.mutation_rate {
+                self.tsp_guided_mutation(&mut individual.solution, graph);
+            }
+        });
 
         Ok(())
     }
@@ -700,14 +871,18 @@ impl MemeticColoringSolver {
                     .map(|u| solution.colors[u])
                     .collect();
 
-                if let Some(new_color) = (0..solution.chromatic_number).find(|c| !forbidden.contains(c)) {
+                if let Some(new_color) =
+                    (0..solution.chromatic_number).find(|c| !forbidden.contains(c))
+                {
                     solution.colors[v] = new_color;
                 }
             }
         }
 
         // Recompute chromatic number and conflicts
-        solution.chromatic_number = solution.colors.iter()
+        solution.chromatic_number = solution
+            .colors
+            .iter()
             .filter(|&&c| c != usize::MAX)
             .max()
             .map(|&c| c + 1)
@@ -724,7 +899,9 @@ impl MemeticColoringSolver {
         // Sort by fitness
         let mut indices: Vec<usize> = (0..population.len()).collect();
         indices.sort_by(|&a, &b| {
-            population[b].fitness.partial_cmp(&population[a].fitness)
+            population[b]
+                .fitness
+                .partial_cmp(&population[a].fitness)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
@@ -737,13 +914,16 @@ impl MemeticColoringSolver {
                 let current_chromatic = population[idx].solution.chromatic_number;
 
                 // Run limited DSATUR
-                let mut dsatur = DSaturSolver::new(current_chromatic, self.config.local_search_depth);
+                let mut dsatur =
+                    DSaturSolver::new(current_chromatic, self.config.local_search_depth);
 
-                let refined = dsatur.find_coloring(
-                    graph,
-                    Some(&population[idx].solution),
-                    current_chromatic.saturating_sub(5)
-                ).ok();
+                let refined = dsatur
+                    .find_coloring(
+                        graph,
+                        Some(&population[idx].solution),
+                        current_chromatic.saturating_sub(5),
+                    )
+                    .ok();
 
                 (idx, refined)
             })
@@ -753,7 +933,8 @@ impl MemeticColoringSolver {
         for (idx, refined) in refinements {
             if let Some(ref solution) = refined {
                 if solution.chromatic_number < population[idx].solution.chromatic_number
-                   && solution.conflicts == 0 {
+                    && solution.conflicts == 0
+                {
                     population[idx].solution = solution.clone();
                 }
             }
@@ -763,15 +944,26 @@ impl MemeticColoringSolver {
     }
 
     /// Select next generation (elitism)
-    fn select_next_generation(&self, parents: &[Individual], offspring: &[Individual]) -> Vec<Individual> {
+    fn select_next_generation(
+        &self,
+        parents: &[Individual],
+        offspring: &[Individual],
+    ) -> Vec<Individual> {
         let mut combined = Vec::with_capacity(parents.len() + offspring.len());
         combined.extend_from_slice(parents);
         combined.extend_from_slice(offspring);
 
         // Sort by fitness (descending)
-        combined.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap_or(std::cmp::Ordering::Equal));
+        combined.sort_by(|a, b| {
+            b.fitness
+                .partial_cmp(&a.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Take top population_size individuals
-        combined.into_iter().take(self.config.population_size).collect()
+        combined
+            .into_iter()
+            .take(self.config.population_size)
+            .collect()
     }
 }

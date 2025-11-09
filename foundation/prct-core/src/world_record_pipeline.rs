@@ -2781,6 +2781,7 @@ impl WorldRecordPipeline {
                                     self.adp_thermo_num_temps,
                                     self.config.thermo.steps_per_temp,
                                     ai_uncertainty,
+                                    self.telemetry.as_ref(),
                                 ) {
                                     Ok(states) => {
                                         self.phase_gpu_status.phase2_gpu_used = true;
@@ -2837,6 +2838,7 @@ impl WorldRecordPipeline {
                                 self.adp_thermo_num_temps,
                                 self.config.thermo.steps_per_temp,
                                 ai_uncertainty,
+                                self.telemetry.as_ref(),
                             ) {
                                 Ok(states) => {
                                     self.phase_gpu_status.phase2_gpu_used = true;
