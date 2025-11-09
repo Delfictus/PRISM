@@ -103,10 +103,26 @@ pub fn active_inference_policy_gpu(
         .htod_copy(initial_variance)
         .map_err(|e| PRCTError::GpuError(format!("Failed to upload variance: {}", e)))?;
 
-    // Compute precision (inverse variance)
-    let precision: Vec<f64> = vec![1.0; n]; // Uniform precision for simplicity
+    // Compute precision (inverse variance) based on graph structure
+    // Higher degree vertices → lower precision (more uncertainty)
+    let precision: Vec<f64> = (0..n).map(|v| {
+        let degree = graph.edges.iter()
+            .filter(|(u, w, _)| *u == v || *w == v)
+            .count();
+
+        // Precision inversely proportional to degree
+        // High degree (500) → precision 0.002 (high uncertainty)
+        // Low degree (50) → precision 0.02 (low uncertainty)
+        let max_degree = 500.0; // Approximate max for DSJC1000.5
+        let normalized_degree = (degree as f64 / max_degree).min(1.0);
+
+        // precision = 0.001 + (1.0 - normalized_degree) * 0.02
+        // Range: [0.001, 0.021]
+        0.001 + (1.0 - normalized_degree) * 0.02
+    }).collect();
+
     let d_precision = cuda_device
-        .htod_copy(precision)
+        .htod_copy(precision.clone())
         .map_err(|e| PRCTError::GpuError(format!("Failed to upload precision: {}", e)))?;
 
     // Allocate workspace for prediction errors
