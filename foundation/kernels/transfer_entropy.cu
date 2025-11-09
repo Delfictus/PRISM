@@ -330,14 +330,23 @@ extern "C" __global__ void compute_te_matrix_batched_kernel(
     int n_bins,
     double* te_matrix               // Output: [n_vertices x n_vertices]
 ) {
-    int source_id = blockIdx.y;     // Source vertex (X)
-    int target_id = blockIdx.x;     // Target vertex (Y)
+    // CRITICAL FIX: Correct mapping to match row-major output
+    // Grid launch: grid_dim = (n, n, 1) where x=target, y=source
+    int target_id = blockIdx.x;     // Target vertex (Y) - column index
+    int source_id = blockIdx.y;     // Source vertex (X) - row index
 
-    if (source_id >= n_vertices || target_id >= n_vertices) return;
+    // Bounds checking
+    if (target_id >= n_vertices || source_id >= n_vertices) return;
+
+    // Compute output index: row-major layout (source * n + target)
+    int output_idx = source_id * n_vertices + target_id;
+
+    // Safety check: ensure output index is within bounds
+    if (output_idx >= n_vertices * n_vertices) return;
 
     // Self-loops have zero TE
     if (source_id == target_id) {
-        te_matrix[source_id * n_vertices + target_id] = 0.0;
+        te_matrix[output_idx] = 0.0;
         return;
     }
 
@@ -437,8 +446,8 @@ extern "C" __global__ void compute_te_matrix_batched_kernel(
         __syncthreads();
     }
 
-    // Write result
+    // Write result (using pre-computed output_idx for safety)
     if (tid == 0) {
-        te_matrix[source_id * n_vertices + target_id] = shared_te[0];
+        te_matrix[output_idx] = shared_te[0];
     }
 }

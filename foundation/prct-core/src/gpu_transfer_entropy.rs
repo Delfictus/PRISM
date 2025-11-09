@@ -525,14 +525,15 @@ fn compute_te_matrix_batched_gpu(
     time_steps: usize,
     histogram_bins: usize,
 ) -> Result<Vec<f64>> {
-    // Clamp bins for shared memory: 128 bins requires 128KB shared mem, may exceed limits
-    // Use min(histogram_bins, 32) for batched kernel to stay within shared memory constraints
-    let n_bins = std::cmp::min(histogram_bins, 32) as i32;
+    // CRITICAL: Clamp bins to match kernel's hardcoded shared memory allocation
+    // Kernel allocates: 8^3=512 (3D), 8^2=64 (2D), 8 (1D) bins in shared memory
+    // Using more than 8 bins causes buffer overflow and CUDA_ERROR_ILLEGAL_ADDRESS
+    let n_bins = 8_i32; // FIXED: Must match kernel's hardcoded shared memory size
     const EMBEDDING_DIM: i32 = 2;
     const TAU: i32 = 1;
 
     println!("[TE-GPU-BATCHED] Starting batched TE computation");
-    println!("[TE-GPU-BATCHED] Using {} bins (requested {}, clamped for shared memory)", n_bins, histogram_bins);
+    println!("[TE-GPU-BATCHED] Using {} bins (requested {}, fixed to match kernel shared memory)", n_bins, histogram_bins);
     println!("[TE-GPU-BATCHED] Grid size: {}x{} = {} blocks", n, n, n * n);
 
     // Step 1: Flatten and upload ALL time series at once
