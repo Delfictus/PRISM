@@ -42,15 +42,20 @@ use crate::gpu_transfer_entropy;
 #[cfg(feature = "cuda")]
 use crate::gpu_thermodynamic;
 
+#[cfg(feature = "cuda")]
+use crate::gpu_active_inference;
+
 /// Runtime GPU usage tracking for each phase
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PhaseGpuStatus {
     pub phase0_gpu_used: bool,
     pub phase1_gpu_used: bool,
+    pub phase1_ai_gpu_used: bool,
     pub phase2_gpu_used: bool,
     pub phase3_gpu_used: bool,
     pub phase0_fallback_reason: Option<String>,
     pub phase1_fallback_reason: Option<String>,
+    pub phase1_ai_fallback_reason: Option<String>,
     pub phase2_fallback_reason: Option<String>,
     pub phase3_fallback_reason: Option<String>,
 }
@@ -60,10 +65,12 @@ impl Default for PhaseGpuStatus {
         Self {
             phase0_gpu_used: false,
             phase1_gpu_used: false,
+            phase1_ai_gpu_used: false,
             phase2_gpu_used: false,
             phase3_gpu_used: false,
             phase0_fallback_reason: None,
             phase1_fallback_reason: None,
+            phase1_ai_fallback_reason: None,
             phase2_fallback_reason: None,
             phase3_fallback_reason: None,
         }
@@ -634,6 +641,10 @@ pub struct WorldRecordConfig {
     #[serde(default = "default_true")]
     pub use_active_inference: bool,
 
+    /// Enable GPU-accelerated Active Inference (requires CUDA)
+    #[serde(default = "default_true")]
+    pub use_gpu_active_inference: bool,
+
     /// Enable ADP reinforcement learning
     #[serde(default = "default_true")]
     pub use_adp_learning: bool,
@@ -745,6 +756,7 @@ impl Default for WorldRecordConfig {
             target_chromatic: 83,    // DSJC1000.5 world record
             max_runtime_hours: 48.0, // 2 days maximum
             use_active_inference: true,
+            use_gpu_active_inference: true,
             use_adp_learning: true,
             use_reservoir_prediction: true,
             use_transfer_entropy: true,
@@ -2665,11 +2677,61 @@ impl WorldRecordPipeline {
 
         // Apply Active Inference to refine difficult vertices
         if self.config.use_active_inference {
-            self.active_inference_policy = Some(ActiveInferencePolicy::compute(
-                graph,
-                &te_solution.colors,
-                initial_kuramoto,
-            )?);
+            #[cfg(feature = "cuda")]
+            {
+                if self.config.use_gpu_active_inference {
+                    // Try GPU path
+                    match gpu_active_inference::active_inference_policy_gpu(
+                        &self.cuda_device,
+                        graph,
+                        &te_solution.colors,
+                        initial_kuramoto,
+                    ) {
+                        Ok(policy_gpu) => {
+                            // Convert GPU policy to CPU-compatible format
+                            let policy_cpu = ActiveInferencePolicy {
+                                uncertainty: policy_gpu.uncertainty,
+                                expected_free_energy: policy_gpu.expected_free_energy,
+                                pragmatic_value: policy_gpu.pragmatic_value,
+                                epistemic_value: policy_gpu.epistemic_value,
+                            };
+                            self.phase_gpu_status.phase1_ai_gpu_used = true;
+                            println!("[PHASE 1][GPU] ✅ Active Inference policy computed on GPU");
+                            self.active_inference_policy = Some(policy_cpu);
+                        }
+                        Err(e) => {
+                            self.phase_gpu_status.phase1_ai_fallback_reason = Some(format!("{}", e));
+                            println!("[PHASE 1][GPU→CPU FALLBACK] AI GPU failed: {}", e);
+                            // Fall back to CPU
+                            println!("[PHASE 1][CPU] Active Inference on CPU");
+                            self.active_inference_policy = Some(ActiveInferencePolicy::compute(
+                                graph,
+                                &te_solution.colors,
+                                initial_kuramoto,
+                            )?);
+                        }
+                    }
+                } else {
+                    // GPU disabled, use CPU
+                    println!("[PHASE 1][CPU] Active Inference on CPU (GPU disabled in config)");
+                    self.active_inference_policy = Some(ActiveInferencePolicy::compute(
+                        graph,
+                        &te_solution.colors,
+                        initial_kuramoto,
+                    )?);
+                }
+            }
+
+            #[cfg(not(feature = "cuda"))]
+            {
+                // No CUDA, CPU only
+                println!("[PHASE 1][CPU] Active Inference on CPU (CUDA not compiled)");
+                self.active_inference_policy = Some(ActiveInferencePolicy::compute(
+                    graph,
+                    &te_solution.colors,
+                    initial_kuramoto,
+                )?);
+            }
 
             println!("[PHASE 1] ✅ Active Inference: Computed expected free energy");
             println!("[PHASE 1] ✅ Uncertainty-guided vertex selection enabled");
@@ -2711,9 +2773,14 @@ impl WorldRecordPipeline {
                     "uncertainty_min": unc_min,
                     "uncertainty_max": unc_max,
                     "uncertainty_nonzero": policy.uncertainty.iter().any(|&u| u > 1e-6),
+                    "ai_gpu_used": self.phase_gpu_status.phase1_ai_gpu_used,
+                    "ai_gpu_fallback_reason": self.phase_gpu_status.phase1_ai_fallback_reason.clone(),
                 })
             } else {
-                json!({"uncertainty_available": false})
+                json!({
+                    "uncertainty_available": false,
+                    "ai_gpu_used": false,
+                })
             };
 
             telemetry.record(
@@ -2727,7 +2794,8 @@ impl WorldRecordPipeline {
                 )
                 .with_parameters(json!({
                     "phase": "1",
-                    "gpu_used": self.phase_gpu_status.phase1_gpu_used,
+                    "te_gpu_used": self.phase_gpu_status.phase1_gpu_used,
+                    "ai_gpu_used": self.phase_gpu_status.phase1_ai_gpu_used,
                     "active_inference_enabled": self.config.use_active_inference,
                     "ai_stats": ai_stats,
                 })),

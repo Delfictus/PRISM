@@ -33,6 +33,7 @@ enable_tda_gpu = true
 [orchestrator]
 use_reservoir_prediction = true
 use_active_inference = true
+use_gpu_active_inference = true  # GPU-accelerated Active Inference (Phase 1)
 use_transfer_entropy = true
 use_geodesic_features = true
 use_thermodynamic_equilibration = true

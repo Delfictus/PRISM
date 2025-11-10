@@ -106,7 +106,7 @@ pub use gpu_thermodynamic_multi::equilibrate_thermodynamic_multi_gpu;
 pub mod gpu_active_inference;
 #[cfg(feature = "cuda")]
 pub use gpu_active_inference::{
-    active_inference_policy_gpu, ActiveInferencePolicy as GpuActiveInferencePolicy,
+    active_inference_policy_gpu, ActiveInferencePolicyGpu,
 };
 
 #[cfg(feature = "cuda")]
