@@ -2428,8 +2428,11 @@ impl WorldRecordPipeline {
                     {
                         if let Some(ref pred) = self.conflict_predictor_gpu {
                             let scores = pred.get_conflict_scores();
-                            let mut indexed_scores: Vec<(usize, f64)> = scores.iter().enumerate().map(|(i, &s)| (i, s)).collect();
-                            indexed_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+                            let mut indexed_scores: Vec<(usize, f64)> = scores.iter().enumerate()
+                                .filter(|(_, &s)| s.is_finite())  // Filter out NaN/Inf
+                                .map(|(i, &s)| (i, s))
+                                .collect();
+                            indexed_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
                             let top_10: Vec<(usize, f64)> = indexed_scores.into_iter().take(10).collect();
 
                             println!("[PHASE 0][RESERVOIR] Top 10 difficulty vertices:");
