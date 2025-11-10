@@ -220,18 +220,20 @@ pub fn equilibrate_thermodynamic_gpu(
     let initial_chromatic = initial_solution.chromatic_number;
     let initial_conflicts = initial_solution.conflicts;
 
-    // Task B2: Generate natural frequency heterogeneity (range [0.9, 1.1])
+    // Task B2: Generate natural frequency heterogeneity
+    // CRITICAL FIX: Widened range [0.9, 1.1] → [0.5, 1.5] (5x spread)
+    // Prevents phase-locking by forcing extreme frequency diversity
     let natural_frequencies: Vec<f32> = {
         use rand::Rng;
         let mut rng = rand::thread_rng();
-        (0..n).map(|_| 0.9 + rng.gen::<f32>() * 0.2).collect()
+        (0..n).map(|_| 0.5 + rng.gen::<f32>() * 1.0).collect()
     };
     let d_natural_frequencies = cuda_device
         .htod_copy(natural_frequencies)
         .map_err(|e| PRCTError::GpuError(format!("Failed to upload natural frequencies: {}", e)))?;
 
     println!(
-        "[THERMO-GPU][TASK-B2] Generated {} natural frequencies (range: 0.9-1.1)",
+        "[THERMO-GPU][TASK-B2] Generated {} natural frequencies (AGGRESSIVE range: 0.5-1.5)",
         n
     );
 

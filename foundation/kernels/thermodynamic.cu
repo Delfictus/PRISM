@@ -57,10 +57,13 @@ extern "C" __global__ void compute_coupling_forces_kernel(
     if (idx >= n_vertices) return;
 
     // Task B1: Temperature-dependent coupling modulation
-    // At high T (exploration): weak coupling → diversity
-    // At low T (refinement): strong coupling → convergence
+    // CRITICAL FIX 2C: ZERO coupling at high temps (>30% t_max) to prevent phase-locking
+    // At high T (>30%): ZERO coupling → pure exploration
+    // At low T (<30%): strong coupling → convergence
     float temp_factor = (t_max > 0.0f) ? (temperature / t_max) : 1.0f;
-    float modulated_coupling = coupling_strength * temp_factor;
+    float modulated_coupling = (temp_factor < 0.3f)
+        ? coupling_strength * temp_factor  // Low T: enable coupling
+        : 0.0f;                            // High T: DISABLE coupling
 
     float force = 0.0;
 
@@ -192,8 +195,37 @@ extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
     // Clamp conflict force to prevent numerical instability
     conflict_force = fmaxf(-100.0f, fminf(100.0f, conflict_force));
 
-    // Combined force with natural frequency and noise
-    float total_force = coupling_force + conflict_force + natural_freq + noise;
+    // CRITICAL FIX 2B: Anti-synchronization repulsion
+    // Compute global mean phase (approximate using local sampling)
+    // Push phases AWAY from global mean to prevent phase-locking
+    float anti_sync_force = 0.0f;
+    if (temperature > 0.0f) {
+        // Approximate global mean by sampling neighbors
+        float local_mean = 0.0f;
+        int sample_count = 0;
+        for (int e = 0; e < n_edges && sample_count < 20; e++) {
+            unsigned int u = edge_u[e];
+            unsigned int w = edge_v[e];
+            if (u == idx || w == idx) {
+                int neighbor = (u == idx) ? w : u;
+                local_mean += phases[neighbor];
+                sample_count++;
+            }
+        }
+
+        if (sample_count > 0) {
+            local_mean /= (float)sample_count;
+            float mean_diff = phi - local_mean;
+
+            // Anti-sync force: push AWAY from mean
+            // Strong at high T (exploration), weak at low T (convergence)
+            float anti_sync_strength = 5.0f * (temperature / t_max);
+            anti_sync_force = -sinf(mean_diff) * anti_sync_strength;
+        }
+    }
+
+    // Combined force with natural frequency, noise, and anti-sync
+    float total_force = coupling_force + conflict_force + natural_freq + noise + anti_sync_force;
 
     // Velocity update with damping
     float damping = 0.1f;

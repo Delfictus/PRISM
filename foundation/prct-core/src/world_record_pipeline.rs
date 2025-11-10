@@ -1012,17 +1012,24 @@ impl ActiveInferencePolicy {
         let adj = build_adjacency_matrix(graph);
 
         for v in 0..n {
-            if partial_coloring[v] != usize::MAX {
-                continue; // Already colored
-            }
+            // CRITICAL FIX: Always compute uncertainty for ALL vertices
+            // Even if vertex is colored, we need its uncertainty for downstream phases
+            // (Previously skipped colored vertices, causing all-zero uncertainty)
 
             // Pragmatic value: How hard is this vertex to color?
+            // CRITICAL FIX: Use degree-based uncertainty, NOT colored_neighbors
+            // (colored_neighbors is 0 at start, causing constant uncertainty)
             let degree = (0..n).filter(|&u| adj[[v, u]]).count();
-            let colored_neighbors = (0..n)
-                .filter(|&u| adj[[v, u]] && partial_coloring[u] != usize::MAX)
-                .count();
 
-            pragmatic_value[v] = (colored_neighbors as f64) / (degree as f64 + 1.0);
+            // Degree-based uncertainty (mirrors GPU path in gpu_active_inference.rs:108-122)
+            // High degree (500) → high pragmatic value (hard to color)
+            // Low degree (50) → low pragmatic value (easy to color)
+            let max_degree = 500.0; // Approximate max for DSJC1000.5
+            let normalized_degree = (degree as f64 / max_degree).min(1.0);
+
+            // pragmatic_value = 0.1 + normalized_degree * 0.9
+            // Range: [0.1, 1.0] (high degree = high pragmatic value)
+            pragmatic_value[v] = 0.1 + normalized_degree * 0.9;
 
             // Epistemic value: How much information do we gain?
             // Use Kuramoto phase coherence as proxy for information
