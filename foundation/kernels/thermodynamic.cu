@@ -76,7 +76,7 @@ extern "C" __global__ void compute_coupling_forces_kernel(
     forces[idx] = force;
 }
 
-// Kernel 3: Evolve oscillators (Langevin dynamics) - FLOAT VERSION
+// Kernel 3: Evolve oscillators (Langevin dynamics) - FLOAT VERSION with CONFLICT FORCES
 extern "C" __global__ void evolve_oscillators_kernel(
     float* phases,               // Phases (updated in-place) - f32
     float* velocities,           // Velocities (updated in-place) - f32
@@ -97,6 +97,83 @@ extern "C" __global__ void evolve_oscillators_kernel(
     v += (force - damping * v) * dt;
 
     // Update phase based on velocity
+    phi += v * dt;
+
+    // Keep phase in [-π, π]
+    while (phi > PI) phi -= 2.0f * PI;
+    while (phi < -PI) phi += 2.0f * PI;
+
+    // Write back
+    phases[idx] = phi;
+    velocities[idx] = v;
+}
+
+// Kernel 3b: Evolve oscillators with CONFLICT-DRIVEN FORCES
+// This version adds repulsion forces for vertices with coloring conflicts
+extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
+    float* phases,               // Phases (updated in-place)
+    float* velocities,           // Velocities (updated in-place)
+    const float* forces,         // Coupling forces
+    const int* coloring,         // Current vertex colors
+    const int* conflicts,        // Conflict count per vertex
+    const float* uncertainty,    // AI uncertainty weights (optional, NULL if not used)
+    const unsigned int* edge_u,  // Edge sources
+    const unsigned int* edge_v,  // Edge targets
+    int n_edges,
+    int n_oscillators,
+    float dt,
+    float temperature
+) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= n_oscillators) return;
+
+    float phi = phases[idx];
+    float v = velocities[idx];
+    float coupling_force = forces[idx];
+
+    // Conflict-driven repulsion force
+    float conflict_force = 0.0f;
+    int vertex_conflicts = conflicts[idx];
+
+    if (vertex_conflicts > 0) {
+        // Get uncertainty weight (higher uncertainty → stronger penalty)
+        float uncertainty_weight = uncertainty ? uncertainty[idx] : 1.0f;
+
+        // Temperature-dependent penalty (stronger at low T)
+        // At high T: let natural dynamics explore
+        // At low T: force conflict resolution aggressively
+        float penalty_coefficient = 10.0f * uncertainty_weight * (1.0f + expf(-temperature));
+
+        // For each edge connected to this vertex
+        int my_color = coloring[idx];
+        for (int e = 0; e < n_edges; e++) {
+            unsigned int u = edge_u[e];
+            unsigned int w = edge_v[e];
+
+            // Check if this edge involves our vertex
+            int neighbor = -1;
+            if (u == idx) neighbor = w;
+            else if (w == idx) neighbor = u;
+
+            if (neighbor >= 0 && coloring[neighbor] == my_color) {
+                // Conflict! Push phase AWAY from conflicting neighbor
+                float phase_diff = phases[neighbor] - phi;
+                conflict_force += sinf(phase_diff) * penalty_coefficient;
+            }
+        }
+    }
+
+    // Clamp conflict force to prevent numerical instability
+    conflict_force = fmaxf(-100.0f, fminf(100.0f, conflict_force));
+
+    // Combined force
+    float total_force = coupling_force + conflict_force;
+
+    // Velocity update with damping
+    float damping = 0.1f;
+    v += (total_force - damping * v) * dt;
+
+    // Update phase
     phi += v * dt;
 
     // Keep phase in [-π, π]
@@ -240,4 +317,34 @@ extern "C" __global__ void compute_order_parameter_kernel(
         atomicAdd(order_real, shared_real[0]);
         atomicAdd(order_imag, shared_imag[0]);
     }
+}
+
+// Kernel 7: Compute conflicts per vertex on-device
+// This enables conflict-aware evolution without CPU round-trips
+extern "C" __global__ void compute_conflicts_kernel(
+    const int* coloring,         // Current vertex colors
+    const unsigned int* edge_u,  // Edge sources
+    const unsigned int* edge_v,  // Edge targets
+    int n_edges,
+    int n_vertices,
+    int* conflicts               // Output: conflict count per vertex
+) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= n_vertices) return;
+
+    int my_color = coloring[idx];
+    int conflict_count = 0;
+
+    // Count conflicts: edges where both endpoints have same color
+    for (int e = 0; e < n_edges; e++) {
+        unsigned int u = edge_u[e];
+        unsigned int w = edge_v[e];
+
+        // Check if this edge involves our vertex
+        if ((u == idx || w == idx) && coloring[u] == coloring[w]) {
+            conflict_count++;
+        }
+    }
+
+    conflicts[idx] = conflict_count;
 }

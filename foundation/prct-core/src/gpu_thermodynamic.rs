@@ -80,9 +80,11 @@ pub fn equilibrate_thermodynamic_gpu(
                 "initialize_oscillators_kernel",
                 "compute_coupling_forces_kernel",
                 "evolve_oscillators_kernel",
+                "evolve_oscillators_with_conflicts_kernel",
                 "compute_energy_kernel",
                 "compute_entropy_kernel",
                 "compute_order_parameter_kernel",
+                "compute_conflicts_kernel",
             ],
         )
         .map_err(|e| PRCTError::GpuError(format!("Failed to load thermo kernels: {}", e)))?;
@@ -184,10 +186,20 @@ pub fn equilibrate_thermodynamic_gpu(
             .get_func("thermodynamic_module", "evolve_oscillators_kernel")
             .ok_or_else(|| PRCTError::GpuError("evolve_oscillators_kernel not found".into()))?,
     );
+    let evolve_osc_conflicts = Arc::new(
+        cuda_device
+            .get_func("thermodynamic_module", "evolve_oscillators_with_conflicts_kernel")
+            .ok_or_else(|| PRCTError::GpuError("evolve_oscillators_with_conflicts_kernel not found".into()))?,
+    );
     let compute_energy = Arc::new(
         cuda_device
             .get_func("thermodynamic_module", "compute_energy_kernel")
             .ok_or_else(|| PRCTError::GpuError("compute_energy_kernel not found".into()))?,
+    );
+    let compute_conflicts = Arc::new(
+        cuda_device
+            .get_func("thermodynamic_module", "compute_conflicts_kernel")
+            .ok_or_else(|| PRCTError::GpuError("compute_conflicts_kernel not found".into()))?,
     );
     let _compute_entropy = Arc::new(
         cuda_device
@@ -367,26 +379,71 @@ pub fn equilibrate_thermodynamic_gpu(
             .dtoh_sync_copy(&d_phases)
             .map_err(|e| PRCTError::GpuError(format!("Failed to download phases: {}", e)))?;
 
-        // Convert phases to coloring
-        let colors: Vec<usize> = final_phases
+        // Convert phases to coloring with dynamic color range
+        // CRITICAL FIX: Use initial_chromatic + slack, NOT target_chromatic
+        // This prevents chromatic collapse from 127 -> 19 colors
+        let color_range = initial_chromatic + 20; // Available color buckets (e.g., 127 + 20 = 147)
+
+        println!(
+            "[THERMO-GPU][PHASE-TO-COLOR] Using color_range={} (initial={} + slack=20)",
+            color_range, initial_chromatic
+        );
+
+        let mut colors: Vec<usize> = final_phases
             .iter()
             .map(|&phase| {
                 let normalized =
                     (phase.rem_euclid(2.0 * std::f32::consts::PI)) / (2.0 * std::f32::consts::PI);
-                (normalized * target_chromatic as f32).floor() as usize % target_chromatic
+                (normalized * color_range as f32).floor() as usize % color_range
             })
             .collect();
 
-        // Compute conflicts
+        // Compact colors: renumber to sequential [0, actual_chromatic)
+        // This removes gaps and gives us the true chromatic number
+        use std::collections::HashMap;
+        let mut color_map: HashMap<usize, usize> = HashMap::new();
+        let mut next_color = 0;
+
+        for c in &mut colors {
+            let new_color = *color_map.entry(*c).or_insert_with(|| {
+                let nc = next_color;
+                next_color += 1;
+                nc
+            });
+            *c = new_color;
+        }
+
+        let actual_chromatic = next_color; // True chromatic after compaction
+
+        println!(
+            "[THERMO-GPU][COMPACTION] {} phase buckets -> {} actual colors (compaction ratio: {:.3})",
+            color_range,
+            actual_chromatic,
+            actual_chromatic as f64 / color_range as f64
+        );
+
+        // Compute conflicts and per-vertex conflict counts
         let mut conflicts = 0;
+        let mut vertex_conflicts = vec![0usize; n];
+
         for &(u, v, _) in &graph.edges {
             if colors[u] == colors[v] {
                 conflicts += 1;
+                vertex_conflicts[u] += 1;
+                vertex_conflicts[v] += 1;
             }
         }
 
+        let max_vertex_conflicts = vertex_conflicts.iter().max().copied().unwrap_or(0);
+        let stuck_vertices = vertex_conflicts.iter().filter(|&&c| c > 5).count();
+
+        println!(
+            "[THERMO-GPU] T={:.3}: {} colors, {} conflicts (max_vertex={}, stuck={})",
+            temp, actual_chromatic, conflicts, max_vertex_conflicts, stuck_vertices
+        );
+
         // Count actual chromatic number
-        let chromatic_number = colors.iter().copied().max().unwrap_or(0) + 1;
+        let chromatic_number = actual_chromatic;
 
         let solution = ColoringSolution {
             colors,
@@ -395,11 +452,6 @@ pub fn equilibrate_thermodynamic_gpu(
             quality_score: 1.0 / (conflicts + 1) as f64,
             computation_time_ms: 0.0,
         };
-
-        println!(
-            "[THERMO-GPU] T={:.3}: {} colors, {} conflicts",
-            temp, chromatic_number, conflicts
-        );
 
         // Record detailed telemetry for this temperature
         let temp_elapsed = temp_start.elapsed();
@@ -416,9 +468,30 @@ pub fn equilibrate_thermodynamic_gpu(
                 0.0
             };
 
+            // Detect issues
+            let issue_detected = if chromatic_number < 50 && conflicts > 10000 {
+                "chromatic_collapsed_with_conflicts"
+            } else if chromatic_number < initial_chromatic / 2 {
+                "chromatic_collapsed"
+            } else if conflicts > 100000 {
+                "conflicts_not_resolving"
+            } else {
+                "none"
+            };
+
             // Generate actionable recommendations
             let mut recommendations = Vec::new();
-            let guidance_status = if conflicts > 100 {
+            let guidance_status = if issue_detected != "none" {
+                recommendations.push(format!(
+                    "CRITICAL ISSUE: {} - chromatic={}, conflicts={}",
+                    issue_detected, chromatic_number, conflicts
+                ));
+                recommendations.push(format!(
+                    "Color mapping issue: phase buckets may be too narrow (current color_range={})",
+                    color_range
+                ));
+                "critical"
+            } else if conflicts > 100 {
                 recommendations.push(format!(
                     "CRITICAL: {} conflicts at temp {:.3} - increase steps_per_temp from {} to {}+",
                     conflicts, temp, steps_per_temp, steps_per_temp * 2
@@ -479,6 +552,14 @@ pub fn equilibrate_thermodynamic_gpu(
                     "steps_per_temp": steps_per_temp,
                     "t_min": t_min,
                     "t_max": t_max,
+                    // Enhanced metrics from color mapping fix
+                    "color_range": color_range,
+                    "chromatic_before_compaction": color_range,
+                    "chromatic_after_compaction": chromatic_number,
+                    "compaction_ratio": chromatic_number as f64 / color_range as f64,
+                    "max_vertex_conflicts": max_vertex_conflicts,
+                    "stuck_vertices": stuck_vertices,
+                    "issue_detected": issue_detected,
                 }))
                 .with_guidance(guidance),
             );
