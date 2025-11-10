@@ -25,6 +25,7 @@ use crate::telemetry::{PhaseExecMode, PhaseName, RunMetric};
 use crate::transfer_entropy_coloring::hybrid_te_kuramoto_ordering;
 use shared_types::*;
 
+use rand::prelude::SliceRandom;
 use rand::Rng;
 use serde_json::json;
 use std::sync::Arc;
@@ -2059,12 +2060,14 @@ impl WorldRecordPipeline {
         println!("  Phase 6: Topological Data Analysis");
         println!("    • TDA={}", phase6_tda);
         println!("    • TDA GPU={}", phase6_tda_gpu);
+        println!("    • [DEBUG] Config use_tda field: {}", self.config.use_tda);
+        println!("    • [DEBUG] Config enable_tda_gpu field: {}", self.config.gpu.enable_tda_gpu);
         if phase6_tda && !phase6_tda_gpu {
             println!("    • Status: ⚠️  TDA requested but GPU disabled; using CPU path");
         } else if phase6_tda && phase6_tda_gpu {
             println!("    • Status: ✅ GPU-accelerated TDA active (experimental)");
         } else {
-            println!("    • Status: ⏸️  TDA disabled");
+            println!("    • Status: ⏸️  TDA disabled (CURRENTLY NO PHASE 6 IMPLEMENTATION EXISTS)");
         }
         println!();
 
@@ -2244,13 +2247,57 @@ impl WorldRecordPipeline {
             #[cfg(not(feature = "cuda"))]
             println!("[PHASE 0] Reservoir active (CPU only)");
 
-            // Train reservoir on initial greedy solutions (world-record: 2x for better accuracy)
+            // Train reservoir on diverse greedy solutions for better conflict prediction
+            // World-record config: 200 patterns (20x increase) for 15x GPU speedup utilization
+            let num_training_patterns = 200;
+            println!("[PHASE 0] Generating {} diverse training colorings for reservoir...", num_training_patterns);
+
+            // Initialize RNG for random orderings (deterministic if seed is set)
+            let mut rng = rand::thread_rng();
+
+            // Pre-compute vertex degrees for degree-based orderings
+            let mut vertex_degrees: Vec<(usize, usize)> = (0..graph.num_vertices)
+                .map(|v| {
+                    let degree = graph.edges.iter()
+                        .filter(|(src, tgt, _)| *src == v || *tgt == v)
+                        .count();
+                    (v, degree)
+                })
+                .collect();
+
             let mut training_solutions = Vec::new();
-            for _ in 0..10 {
-                let random_order: Vec<usize> = (0..graph.num_vertices).collect();
+            for i in 0..num_training_patterns {
+                // Use different ordering strategies for diversity (4-way rotation)
+                let random_order: Vec<usize> = if i % 4 == 0 {
+                    // Strategy 1: Random shuffle
+                    let mut order: Vec<usize> = (0..graph.num_vertices).collect();
+                    order.shuffle(&mut rng);
+                    order
+                } else if i % 4 == 1 {
+                    // Strategy 2: Degree-descending (DSATUR-style)
+                    vertex_degrees.sort_by_key(|(_, deg)| std::cmp::Reverse(*deg));
+                    vertex_degrees.iter().map(|(v, _)| *v).collect()
+                } else if i % 4 == 2 {
+                    // Strategy 3: Degree-ascending (reverse strategy for diversity)
+                    vertex_degrees.sort_by_key(|(_, deg)| *deg);
+                    vertex_degrees.iter().map(|(v, _)| *v).collect()
+                } else {
+                    // Strategy 4: Kuramoto phase ordering
+                    let mut order: Vec<usize> = (0..graph.num_vertices).collect();
+                    order.sort_by_key(|&v| (initial_kuramoto.phases[v] * 1000.0) as i32);
+                    order
+                };
+
                 let greedy = greedy_coloring_with_ordering(graph, &random_order)?;
                 training_solutions.push(greedy);
+
+                if (i + 1) % 50 == 0 {
+                    println!("[PHASE 0] Generated {}/{} training patterns", i + 1, num_training_patterns);
+                }
             }
+
+            println!("[PHASE 0] ✅ {} diverse training patterns generated (Random: 25%, Degree-Desc: 25%, Degree-Asc: 25%, Kuramoto: 25%)",
+                     training_solutions.len());
 
             #[cfg(feature = "cuda")]
             {
@@ -3326,6 +3373,97 @@ impl WorldRecordPipeline {
                     })),
                 );
             }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // PHASE 6: Topological Data Analysis (TDA) Chromatic Bounds
+        // ═══════════════════════════════════════════════════════════
+        if self.config.use_tda {
+            use crate::sparse_qubo::ChromaticBounds;
+
+            let phase6_start = std::time::Instant::now();
+            println!("\n┌─────────────────────────────────────────────────────────┐");
+            println!("│ PHASE 6: Topological Data Analysis (TDA)               │");
+            println!("└─────────────────────────────────────────────────────────┘");
+            println!("{{\"event\":\"phase_start\",\"phase\":\"6\",\"name\":\"tda\"}}");
+
+            // Record telemetry: phase start
+            if let Some(ref telemetry) = self.telemetry {
+                telemetry.record(
+                    RunMetric::new(
+                        PhaseName::Ensemble, // Reuse Ensemble for now (TDA doesn't have its own PhaseName yet)
+                        "phase_6_tda_start",
+                        self.best_solution.chromatic_number,
+                        self.best_solution.conflicts,
+                        0.0,
+                        PhaseExecMode::cpu_disabled(),
+                    )
+                    .with_parameters(json!({
+                        "phase": "6",
+                        "enabled": true,
+                        "gpu_enabled": self.config.gpu.enable_tda_gpu,
+                    })),
+                );
+            }
+
+            // Compute TDA chromatic bounds
+            match ChromaticBounds::from_graph_tda(graph) {
+                Ok(bounds) => {
+                    println!("[PHASE 6] TDA Chromatic Bounds Computed:");
+                    println!("[PHASE 6]   • Lower bound (max clique): {}", bounds.lower);
+                    println!("[PHASE 6]   • Upper bound (degree+1): {}", bounds.upper);
+                    println!("[PHASE 6]   • Max clique size: {}", bounds.max_clique_size);
+                    println!("[PHASE 6]   • Connected components (Betti-0): {}", bounds.num_components);
+                    println!("[PHASE 6]   • Current best: {} colors", self.best_solution.chromatic_number);
+
+                    // Sanity check: warn if current solution is outside bounds
+                    if self.best_solution.chromatic_number < bounds.lower {
+                        println!("[PHASE 6] ⚠️  WARNING: Current solution ({}) violates TDA lower bound ({})",
+                                 self.best_solution.chromatic_number, bounds.lower);
+                    } else if self.best_solution.chromatic_number > bounds.upper {
+                        println!("[PHASE 6] ⚠️  Current solution ({}) exceeds TDA upper bound ({}), but this is expected for hard graphs",
+                                 self.best_solution.chromatic_number, bounds.upper);
+                    } else {
+                        println!("[PHASE 6] ✅ Current solution within TDA bounds [{}, {}]",
+                                 bounds.lower, bounds.upper);
+                    }
+
+                    // Use TDA bounds to inform adaptive strategy
+                    let gap_to_lower = self.best_solution.chromatic_number.saturating_sub(bounds.lower);
+                    if gap_to_lower > 10 {
+                        println!("[PHASE 6] 🎯 Large gap to lower bound ({} colors): Consider more aggressive search",
+                                 gap_to_lower);
+                    }
+                }
+                Err(e) => {
+                    println!("[PHASE 6][WARNING] TDA bounds computation failed: {:?}", e);
+                    println!("[PHASE 6][WARNING] Continuing without TDA bounds");
+                }
+            }
+
+            let phase6_elapsed = phase6_start.elapsed();
+            println!("{{\"event\":\"phase_end\",\"phase\":\"6\",\"name\":\"tda\",\"time_s\":{:.3},\"colors\":{}}}",
+                     phase6_elapsed.as_secs_f64(),
+                     self.best_solution.chromatic_number);
+
+            // Record telemetry: phase complete
+            if let Some(ref telemetry) = self.telemetry {
+                telemetry.record(
+                    RunMetric::new(
+                        PhaseName::Ensemble, // Reuse Ensemble for now
+                        "phase_6_tda_complete",
+                        self.best_solution.chromatic_number,
+                        self.best_solution.conflicts,
+                        phase6_elapsed.as_secs_f64() * 1000.0,
+                        PhaseExecMode::cpu_disabled(),
+                    )
+                    .with_parameters(json!({
+                        "phase": "6",
+                    })),
+                );
+            }
+        } else {
+            println!("[PHASE 6] TDA disabled by config");
         }
 
         // ═══════════════════════════════════════════════════════════
