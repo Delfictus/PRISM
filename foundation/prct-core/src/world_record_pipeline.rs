@@ -1675,6 +1675,9 @@ pub struct WorldRecordPipeline {
     /// Runtime GPU usage tracking
     phase_gpu_status: PhaseGpuStatus,
 
+    /// Reservoir difficulty scores (Task A3: thread through all phases)
+    reservoir_difficulty_scores: Option<Vec<f64>>,
+
     adp_epsilon: f64,
 
     /// ADP-tuned solver parameters
@@ -1769,6 +1772,7 @@ impl WorldRecordPipeline {
             gpu_state,
             telemetry: None,
             phase_gpu_status: PhaseGpuStatus::default(),
+            reservoir_difficulty_scores: None,
             adp_epsilon: config.adp.epsilon,
             adp_dsatur_depth: config.orchestrator.adp_dsatur_depth,
             adp_quantum_iterations: config.orchestrator.adp_quantum_iterations,
@@ -1824,6 +1828,7 @@ impl WorldRecordPipeline {
             adp_q_table: std::collections::HashMap::new(),
             telemetry: None,
             phase_gpu_status: PhaseGpuStatus::default(),
+            reservoir_difficulty_scores: None,
             adp_epsilon: config.adp.epsilon,
             adp_dsatur_depth: config.orchestrator.adp_dsatur_depth,
             adp_quantum_iterations: config.orchestrator.adp_quantum_iterations,
@@ -2492,6 +2497,28 @@ impl WorldRecordPipeline {
                         "difficulty_zones": difficulty_stats,
                     })),
                 );
+            }
+
+            // Task A3: Store reservoir difficulty scores for threading through pipeline
+            #[cfg(feature = "cuda")]
+            {
+                if let Some(ref pred) = self.conflict_predictor_gpu {
+                    self.reservoir_difficulty_scores = Some(pred.get_conflict_scores().to_vec());
+                    println!(
+                        "[PHASE 0][THREAD-SCORES] Stored {} reservoir difficulty scores for downstream phases",
+                        self.reservoir_difficulty_scores.as_ref().map(|s| s.len()).unwrap_or(0)
+                    );
+                }
+            }
+            #[cfg(not(feature = "cuda"))]
+            {
+                if let Some(ref pred) = self.conflict_predictor {
+                    self.reservoir_difficulty_scores = Some(pred.conflict_scores.clone());
+                    println!(
+                        "[PHASE 0][THREAD-SCORES] Stored {} reservoir difficulty scores for downstream phases",
+                        self.reservoir_difficulty_scores.as_ref().map(|s| s.len()).unwrap_or(0)
+                    );
+                }
             }
         } else {
             println!("[PHASE 0] disabled by config");

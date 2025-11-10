@@ -52,7 +52,7 @@ adp_thermo_num_temps = 56    # Match increased thermo temps
 
 [neuromorphic]
 enabled = true
-reservoir_size = 1500  # Boosted from 1000 for better conflict predictions
+reservoir_size = 2000  # Increased from 1500 for enhanced conflict predictions (Task A1)
 spectral_radius = 0.9
 leak_rate = 0.3
 input_scaling = 0.5

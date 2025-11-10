@@ -8,33 +8,33 @@
 //! - Infrastructure adapters implement ports
 //! - Dependency arrows point INWARD to domain
 
-pub mod ports;
+pub mod adapters;
 pub mod algorithm;
-pub mod drpp_algorithm;
+pub mod coloring;
 pub mod coupling;
 pub mod cpu_init;
-pub mod coloring;
-pub mod simulated_annealing;
-pub mod tsp;
-pub mod errors;
 pub mod dimacs_parser;
-pub mod adapters; // ADDED: Adapter implementations
+pub mod drpp_algorithm;
+pub mod errors;
+pub mod ports;
+pub mod simulated_annealing;
+pub mod tsp; // ADDED: Adapter implementations
 
 // Re-export main types
-pub use ports::*;
 pub use algorithm::*;
-pub use drpp_algorithm::*;
+pub use coloring::{greedy_coloring_with_ordering, phase_guided_coloring};
 pub use coupling::*;
 pub use cpu_init::init_rayon_threads;
-pub use coloring::{phase_guided_coloring, greedy_coloring_with_ordering};
-pub use simulated_annealing::*;
+pub use dimacs_parser::{parse_dimacs_file, parse_graph_file, parse_mtx_file};
+pub use drpp_algorithm::*;
 pub use errors::*;
-pub use dimacs_parser::{parse_dimacs_file, parse_mtx_file, parse_graph_file};
+pub use ports::*;
+pub use simulated_annealing::*;
 
 // Re-export adapters
 #[cfg(feature = "cuda")]
 pub use adapters::NeuromorphicAdapter;
-pub use adapters::{QuantumAdapter, CouplingAdapter};
+pub use adapters::{CouplingAdapter, QuantumAdapter};
 
 // Re-export shared types for convenience
 pub use shared_types::*;
@@ -55,15 +55,14 @@ pub mod quantum_coloring;
 pub use quantum_coloring::QuantumColoringSolver;
 
 pub mod sparse_qubo;
-pub use sparse_qubo::{SparseQUBO, ChromaticBounds};
+pub use sparse_qubo::{ChromaticBounds, SparseQUBO};
 
 pub mod dsatur_backtracking;
 pub use dsatur_backtracking::DSaturSolver;
 
 pub mod transfer_entropy_coloring;
 pub use transfer_entropy_coloring::{
-    compute_transfer_entropy_ordering,
-    hybrid_te_kuramoto_ordering,
+    compute_transfer_entropy_ordering, hybrid_te_kuramoto_ordering,
 };
 
 pub mod memetic_coloring;
@@ -76,18 +75,9 @@ pub use cascading_pipeline::CascadingPipeline;
 
 pub mod world_record_pipeline;
 pub use world_record_pipeline::{
-    WorldRecordPipeline,
-    WorldRecordConfig,
-    GpuConfig,
-    ThermoConfig,
-    QuantumConfig,
-    AdpConfig,
-    OrchestratorConfig,
-    ActiveInferencePolicy,
-    ReservoirConflictPredictor,
-    ThermodynamicEquilibrator,
-    QuantumClassicalHybrid,
-    EnsembleConsensus,
+    ActiveInferencePolicy, AdpConfig, EnsembleConsensus, GpuConfig, OrchestratorConfig,
+    QuantumClassicalHybrid, QuantumConfig, ReservoirConflictPredictor, ThermoConfig,
+    ThermodynamicEquilibrator, WorldRecordConfig, WorldRecordPipeline,
 };
 
 pub mod config_io;
@@ -115,26 +105,30 @@ pub use gpu_thermodynamic_multi::equilibrate_thermodynamic_multi_gpu;
 #[cfg(feature = "cuda")]
 pub mod gpu_active_inference;
 #[cfg(feature = "cuda")]
-pub use gpu_active_inference::{active_inference_policy_gpu, ActiveInferencePolicy as GpuActiveInferencePolicy};
+pub use gpu_active_inference::{
+    active_inference_policy_gpu, ActiveInferencePolicy as GpuActiveInferencePolicy,
+};
 
 #[cfg(feature = "cuda")]
 pub mod gpu_quantum_annealing;
 #[cfg(feature = "cuda")]
-pub use gpu_quantum_annealing::{gpu_qubo_simulated_annealing, qubo_solution_to_coloring, GpuQuboSolver};
+pub use gpu_quantum_annealing::{
+    gpu_qubo_simulated_annealing, qubo_solution_to_coloring, GpuQuboSolver,
+};
 
 #[cfg(feature = "cuda")]
 pub mod gpu_quantum_multi;
 #[cfg(feature = "cuda")]
-pub use gpu_quantum_multi::{quantum_annealing_multi_gpu, extract_coloring_from_qubo};
+pub use gpu_quantum_multi::{extract_coloring_from_qubo, quantum_annealing_multi_gpu};
 
 // GPU stream management and telemetry
 #[cfg(feature = "cuda")]
 pub mod gpu;
 #[cfg(feature = "cuda")]
-pub use gpu::{PipelineGpuState, CudaStreamPool, EventRegistry, MultiGpuDevicePool};
+pub use gpu::{CudaStreamPool, EventRegistry, MultiGpuDevicePool, PipelineGpuState};
 
 pub mod telemetry;
-pub use telemetry::{RunMetric, PhaseName, PhaseExecMode, TelemetryHandle};
+pub use telemetry::{PhaseExecMode, PhaseName, RunMetric, TelemetryHandle};
 
 pub mod initial_coloring;
 pub use initial_coloring::{compute_initial_coloring, InitialColoringStrategy};
@@ -143,4 +137,7 @@ pub mod iterative_controller;
 pub use iterative_controller::{run_iterative_pipeline, IterativeConfig};
 
 pub mod hypertune;
-pub use hypertune::{HypertuneController, AdpControl};
+pub use hypertune::{AdpControl, HypertuneController};
+
+pub mod reservoir_sampling;
+pub use reservoir_sampling::{select_diverse_training_set, select_training_set};

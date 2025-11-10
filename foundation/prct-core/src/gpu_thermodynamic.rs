@@ -220,6 +220,21 @@ pub fn equilibrate_thermodynamic_gpu(
     let initial_chromatic = initial_solution.chromatic_number;
     let initial_conflicts = initial_solution.conflicts;
 
+    // Task B2: Generate natural frequency heterogeneity (range [0.9, 1.1])
+    let natural_frequencies: Vec<f32> = {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        (0..n).map(|_| 0.9 + rng.gen::<f32>() * 0.2).collect()
+    };
+    let d_natural_frequencies = cuda_device
+        .htod_copy(natural_frequencies)
+        .map_err(|e| PRCTError::GpuError(format!("Failed to upload natural frequencies: {}", e)))?;
+
+    println!(
+        "[THERMO-GPU][TASK-B2] Generated {} natural frequencies (range: 0.9-1.1)",
+        n
+    );
+
     // Process each temperature
     for (temp_idx, &temp) in temperatures.iter().enumerate() {
         let temp_start = std::time::Instant::now();
@@ -283,7 +298,7 @@ pub fn equilibrate_thermodynamic_gpu(
         let coupling_strength = 1.0f32 / (n as f32).sqrt();
 
         for step in 0..steps_per_temp {
-            // Compute coupling forces
+            // Compute coupling forces (Task B1: temperature-dependent coupling)
             unsafe {
                 (*compute_coupling)
                     .clone()
@@ -301,6 +316,8 @@ pub fn equilibrate_thermodynamic_gpu(
                             graph.num_edges as i32,
                             n as i32,
                             coupling_strength,
+                            temp as f32,        // Task B1: current temperature
+                            t_max as f32,       // Task B1: max temperature for modulation
                             &d_coupling_forces,
                         ),
                     )
@@ -414,15 +431,62 @@ pub fn equilibrate_thermodynamic_gpu(
         }
 
         let actual_chromatic = next_color; // True chromatic after compaction
+        let compaction_ratio = actual_chromatic as f64 / color_range as f64;
+        let unique_buckets = color_map.len(); // Number of distinct phase buckets used
 
         println!(
-            "[THERMO-GPU][COMPACTION] {} phase buckets -> {} actual colors (compaction ratio: {:.3})",
+            "[THERMO-GPU][COMPACTION] {} phase buckets -> {} actual colors (ratio: {:.3})",
             color_range,
             actual_chromatic,
-            actual_chromatic as f64 / color_range as f64
+            compaction_ratio
         );
 
-        // Compute conflicts and per-vertex conflict counts
+        // Compute conflicts FIRST (before guards)
+        let mut conflicts_temp = 0;
+        for &(u, v, _) in &graph.edges {
+            if colors[u] == colors[v] {
+                conflicts_temp += 1;
+            }
+        }
+
+        // Task B5: De-sync burst detection
+        let bucket_collapse_risk = if unique_buckets < (color_range / 2) {
+            "high"
+        } else {
+            "low"
+        };
+
+        // Task B6: Compaction guard - prevent catastrophic chromatic collapse
+        let collapse_threshold = (initial_chromatic as f64 * 0.5) as usize; // 50% of initial
+        let compaction_guard_triggered = actual_chromatic < collapse_threshold && conflicts_temp > 1000;
+
+        if compaction_guard_triggered {
+            eprintln!(
+                "[THERMO-GPU][COMPACTION-GUARD] CRITICAL: Chromatic collapsed to {} (from {}), reverting compaction",
+                actual_chromatic, initial_chromatic
+            );
+            eprintln!(
+                "[THERMO-GPU][COMPACTION-GUARD] This indicates phase-locking - {} unique buckets used (expected ~{})",
+                unique_buckets, color_range
+            );
+
+            // Revert to original colors - use pre-compaction bucket assignments
+            colors = final_phases
+                .iter()
+                .map(|&phase| {
+                    let normalized =
+                        (phase.rem_euclid(2.0 * std::f32::consts::PI)) / (2.0 * std::f32::consts::PI);
+                    (normalized * color_range as f32).floor() as usize % color_range
+                })
+                .collect();
+
+            println!(
+                "[THERMO-GPU][COMPACTION-GUARD] Reverted to bucket assignments (chromatic = {})",
+                color_range
+            );
+        }
+
+        // Compute conflicts and per-vertex conflict counts (final computation)
         let mut conflicts = 0;
         let mut vertex_conflicts = vec![0usize; n];
 
@@ -556,10 +620,16 @@ pub fn equilibrate_thermodynamic_gpu(
                     "color_range": color_range,
                     "chromatic_before_compaction": color_range,
                     "chromatic_after_compaction": chromatic_number,
-                    "compaction_ratio": chromatic_number as f64 / color_range as f64,
+                    "compaction_ratio": compaction_ratio,
                     "max_vertex_conflicts": max_vertex_conflicts,
                     "stuck_vertices": stuck_vertices,
                     "issue_detected": issue_detected,
+                    // Task B7: Phase diversity metrics
+                    "unique_buckets": unique_buckets,
+                    "bucket_collapse_risk": bucket_collapse_risk,
+                    "coupling_modulation": temp as f64 / t_max,  // Temperature-dependent coupling factor
+                    "natural_freq_enabled": true,
+                    "compaction_guard_triggered": compaction_guard_triggered,
                 }))
                 .with_guidance(guidance),
             );
