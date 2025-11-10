@@ -103,11 +103,24 @@ pub fn equilibrate_thermodynamic_gpu(
             "[THERMO-GPU][AI-GUIDED] Using Active Inference uncertainty for vertex perturbation"
         );
 
-        // Normalize to perturbation probabilities: weight[v] = uncertainty[v] + epsilon
-        let epsilon = 1e-3;
-        let mut weights: Vec<f64> = uncertainty.iter().map(|&u| u + epsilon).collect();
+        // CRITICAL FIX: Preserve raw uncertainty for band classification
+        let raw_unc: Vec<f64> = uncertainty.to_vec();  // Raw [0.0, 1.0] values
 
-        // Normalize to sum to 1.0
+        // Classify bands using RAW uncertainty (before normalization)
+        let strong_band = raw_unc.iter().filter(|&&u| u > 0.66).count();
+        let weak_band = raw_unc.iter().filter(|&&u| u < 0.33).count();
+        let neutral_band = n - strong_band - weak_band;
+
+        println!(
+            "[THERMO-GPU][TWEAK-2] Phase bands (from RAW uncertainty): strong={} ({}%), neutral={} ({}%), weak={} ({}%)",
+            strong_band, strong_band * 100 / n,
+            neutral_band, neutral_band * 100 / n,
+            weak_band, weak_band * 100 / n
+        );
+
+        // NOW normalize for perturbation probability (after band classification)
+        let epsilon = 1e-3;
+        let mut weights: Vec<f64> = raw_unc.iter().map(|&u| u + epsilon).collect();
         let sum: f64 = weights.iter().sum();
         for w in &mut weights {
             *w /= sum;
@@ -115,12 +128,9 @@ pub fn equilibrate_thermodynamic_gpu(
 
         println!(
             "[THERMO-GPU][AI-GUIDED] Uncertainty range: [{:.6}, {:.6}], mean: {:.6}",
-            uncertainty.iter().cloned().fold(f64::INFINITY, f64::min),
-            uncertainty
-                .iter()
-                .cloned()
-                .fold(f64::NEG_INFINITY, f64::max),
-            uncertainty.iter().sum::<f64>() / uncertainty.len() as f64
+            raw_unc.iter().cloned().fold(f64::INFINITY, f64::min),
+            raw_unc.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+            raw_unc.iter().sum::<f64>() / raw_unc.len() as f64
         );
 
         // Convert to f32 for GPU upload (thermodynamic kernels use f32)
@@ -134,17 +144,6 @@ pub fn equilibrate_thermodynamic_gpu(
     // Upload vertex weights to GPU if available
     let d_vertex_weights =
         if let Some(ref weights) = vertex_perturbation_weights {
-            // TWEAK 2: Count vertices in difficulty bands
-            let strong_band = weights.iter().filter(|&&w| w > 0.8).count();
-            let weak_band = weights.iter().filter(|&&w| w < 0.2).count();
-            let neutral_band = n - strong_band - weak_band;
-
-            println!(
-                "[THERMO-GPU][TWEAK-2] Phase bands: strong={} ({}%), neutral={} ({}%), weak={} ({}%)",
-                strong_band, strong_band * 100 / n,
-                neutral_band, neutral_band * 100 / n,
-                weak_band, weak_band * 100 / n
-            );
 
             Some(cuda_device.htod_copy(weights.clone()).map_err(|e| {
                 PRCTError::GpuError(format!("Failed to copy vertex weights: {}", e))
