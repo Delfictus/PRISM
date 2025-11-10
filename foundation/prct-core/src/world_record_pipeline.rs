@@ -225,6 +225,14 @@ pub struct ThermoConfig {
     /// VRAM-safe maximum temperatures for 8GB devices (default: 56)
     #[serde(default = "default_replicas")]
     pub num_temps_max_safe: usize,
+
+    /// TWEAK 1: Temperature at which conflict forces start activating (default: 5.0)
+    #[serde(default = "default_force_start_temp")]
+    pub force_start_temp: f64,
+
+    /// TWEAK 1: Temperature at which conflict forces reach full strength (default: 1.0)
+    #[serde(default = "default_force_full_strength_temp")]
+    pub force_full_strength_temp: f64,
 }
 
 fn default_t_min() -> f64 {
@@ -239,6 +247,14 @@ fn default_steps_per_temp() -> usize {
     5000
 }
 
+fn default_force_start_temp() -> f64 {
+    5.0
+}
+
+fn default_force_full_strength_temp() -> f64 {
+    1.0
+}
+
 impl Default for ThermoConfig {
     fn default() -> Self {
         Self {
@@ -250,6 +266,8 @@ impl Default for ThermoConfig {
             steps_per_temp: 5000,
             replicas_max_safe: 56,
             num_temps_max_safe: 56,
+            force_start_temp: 5.0,
+            force_full_strength_temp: 1.0,
         }
     }
 }
@@ -2866,6 +2884,8 @@ impl WorldRecordPipeline {
                                     self.config.thermo.steps_per_temp,
                                     ai_uncertainty,
                                     self.telemetry.as_ref(),
+                                    self.config.thermo.force_start_temp,
+                                    self.config.thermo.force_full_strength_temp,
                                 ) {
                                     Ok(states) => {
                                         self.phase_gpu_status.phase2_gpu_used = true;
@@ -2923,6 +2943,8 @@ impl WorldRecordPipeline {
                                 self.config.thermo.steps_per_temp,
                                 ai_uncertainty,
                                 self.telemetry.as_ref(),
+                                self.config.thermo.force_start_temp,
+                                self.config.thermo.force_full_strength_temp,
                             ) {
                                 Ok(states) => {
                                     self.phase_gpu_status.phase2_gpu_used = true;
@@ -3020,6 +3042,36 @@ impl WorldRecordPipeline {
             println!("{{\"event\":\"phase_end\",\"phase\":\"2\",\"name\":\"thermodynamic\",\"time_s\":{:.3},\"colors\":{}}}",
                      phase2_elapsed.as_secs_f64(),
                      self.best_solution.chromatic_number);
+
+            // TWEAK 5: ADP telemetry-aware adjustments based on compaction guard events
+            if self.config.use_adp_learning {
+                // Count compaction guard triggers across all temperatures
+                let initial_chromatic = self.best_solution.chromatic_number;
+                let guard_count = equilibrium_states.iter().filter(|s| {
+                    // Heuristic: if chromatic is very low but conflicts are high, guard likely triggered
+                    s.chromatic_number < (initial_chromatic / 2) && s.conflicts > 1000
+                }).count();
+
+                if guard_count > 2 {
+                    println!("[TWEAK-5][ADP][TELEMETRY-DRIVEN] Detected {} guard triggers, adjusting parameters", guard_count);
+
+                    // Add more temperature steps to allow better equilibration
+                    let additional_steps = 2000 * guard_count;
+                    let old_temps = self.adp_thermo_num_temps;
+                    self.adp_thermo_num_temps = (self.adp_thermo_num_temps + 8).min(self.config.thermo.num_temps);
+
+                    println!("[TWEAK-5][ADP][TELEMETRY-DRIVEN] Increased temps from {} to {} (wanted {})",
+                             old_temps, self.adp_thermo_num_temps, old_temps + 8);
+                    println!("[TWEAK-5][ADP][TELEMETRY-DRIVEN] Would add {} steps/temp (logged for future config tuning)",
+                             additional_steps);
+
+                    // Increase exploration to escape phase-locking basins
+                    let old_epsilon = self.adp_epsilon;
+                    self.adp_epsilon = (self.adp_epsilon + 0.2).min(1.0);
+                    println!("[TWEAK-5][ADP][TELEMETRY-DRIVEN] Increased epsilon from {:.3} to {:.3}",
+                             old_epsilon, self.adp_epsilon);
+                }
+            }
 
             // Record telemetry: phase complete
             if let Some(ref telemetry) = self.telemetry {

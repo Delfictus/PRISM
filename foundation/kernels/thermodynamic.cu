@@ -124,6 +124,7 @@ extern "C" __global__ void evolve_oscillators_kernel(
 // This version adds repulsion forces for vertices with coloring conflicts
 // Task B2: Natural frequency heterogeneity
 // Task B3: Enhanced conflict-driven repulsion
+// TWEAK 1: Temperature-blended conflict force activation
 extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
     float* phases,               // Phases (updated in-place)
     float* velocities,           // Velocities (updated in-place)
@@ -138,7 +139,9 @@ extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
     float dt,
     float temperature,
     const float* natural_frequencies,  // Task B2: Per-vertex natural frequencies
-    float t_max                         // Task B2: Max temperature for noise scaling
+    float t_max,                        // Task B2: Max temperature for noise scaling
+    float force_start_temp,             // TWEAK 1: Temp at which forces start
+    float force_full_strength_temp      // TWEAK 1: Temp at which forces reach full strength
 ) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= n_oscillators) return;
@@ -158,11 +161,25 @@ extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
     unsigned int seed = idx * 214013 + 2531011; // Simple LCG
     float noise = ((seed % 1000) / 500.0f - 1.0f) * noise_amplitude;
 
+    // TWEAK 1: Compute force blend factor based on temperature
+    // Linear ramp: 0.0 at force_start_temp → 1.0 at force_full_strength_temp
+    float force_blend_factor = 0.0f;
+    if (temperature <= force_start_temp) {
+        if (force_start_temp > force_full_strength_temp) {
+            force_blend_factor = 1.0f - (temperature - force_full_strength_temp) /
+                                         (force_start_temp - force_full_strength_temp);
+            force_blend_factor = fmaxf(0.0f, fminf(1.0f, force_blend_factor));
+        } else {
+            force_blend_factor = 1.0f; // Full strength if range is invalid
+        }
+    }
+
     // Task B3: Conflict-driven repulsion force (ENHANCED)
+    // TWEAK 1: Apply force_blend_factor to modulate conflict forces
     float conflict_force = 0.0f;
     int vertex_conflicts = conflicts[idx];
 
-    if (vertex_conflicts > 0) {
+    if (vertex_conflicts > 0 && force_blend_factor > 0.0f) {
         // Get uncertainty weight (higher uncertainty → stronger penalty)
         float uncertainty_weight = uncertainty ? uncertainty[idx] : 1.0f;
 
@@ -190,6 +207,9 @@ extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
                 conflict_force += sinf(phase_diff) * penalty_coefficient;
             }
         }
+
+        // TWEAK 1: Apply force blend factor to modulate conflict repulsion
+        conflict_force *= force_blend_factor;
     }
 
     // Clamp conflict force to prevent numerical instability

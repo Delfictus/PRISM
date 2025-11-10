@@ -73,4 +73,15 @@ pub struct EvolutionParams {
     pub temperature: f64,
 }
 
+/// Force modulation parameters for thermodynamic evolution
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ForceModulationParams {
+    /// Temperature at which conflict forces start activating (default: 5.0)
+    pub force_start_temp: f64,
+
+    /// Temperature at which conflict forces reach full strength (default: 1.0)
+    pub force_full_strength_temp: f64,
+}
+
 extern crate alloc;
