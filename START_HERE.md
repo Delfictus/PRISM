@@ -4,6 +4,7 @@ Welcome to the isolated FluxNet RL implementation worktree!
 
 ## Quick Links
 
+🚨 **[GPU_MANDATE.md](GPU_MANDATE.md)** - **READ FIRST: NEVER DISABLE GPU - FIX BUGS PROPERLY**
 📖 **[FLUXNET_GETTING_STARTED.md](FLUXNET_GETTING_STARTED.md)** - Comprehensive guide
 ✅ **[FLUXNET_IMPLEMENTATION_CHECKLIST.md](FLUXNET_IMPLEMENTATION_CHECKLIST.md)** - Step-by-step tasks
 🔧 **[FLUXNET_INTEGRATION_REFERENCE.md](FLUXNET_INTEGRATION_REFERENCE.md)** - Code snippets
