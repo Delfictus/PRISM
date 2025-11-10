@@ -141,3 +141,9 @@ pub use hypertune::{AdpControl, HypertuneController};
 
 pub mod reservoir_sampling;
 pub use reservoir_sampling::{select_diverse_training_set, select_training_set};
+
+// FluxNet RL force profile system (GPU-accelerated)
+#[cfg(feature = "cuda")]
+pub mod fluxnet;
+#[cfg(feature = "cuda")]
+pub use fluxnet::{ForceBand, ForceBandStats, ForceProfile};
