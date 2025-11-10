@@ -45,13 +45,11 @@
 
 pub mod profile;
 pub mod command;
+pub mod config;
 
 pub use profile::{ForceBand, ForceBandStats, ForceProfile};
 pub use command::{ForceCommand, CommandResult};
-
-// TODO: Phase A.3 - FluxNetConfig
-// pub mod config;
-// pub use config::FluxNetConfig;
+pub use config::{FluxNetConfig, MemoryTier, ForceProfileConfig, RLConfig, PersistenceConfig};
 
 // TODO: Phase D - RL Controller
 // pub mod controller;
