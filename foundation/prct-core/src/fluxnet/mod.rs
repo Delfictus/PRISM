@@ -44,12 +44,10 @@
 //! - `config`: FluxNetConfig for TOML configuration (Phase A.3) [TODO]
 
 pub mod profile;
+pub mod command;
 
 pub use profile::{ForceBand, ForceBandStats, ForceProfile};
-
-// TODO: Phase A.2 - ForceCommand
-// pub mod command;
-// pub use command::ForceCommand;
+pub use command::{ForceCommand, CommandResult};
 
 // TODO: Phase A.3 - FluxNetConfig
 // pub mod config;

@@ -312,9 +312,34 @@ impl ForceProfile {
     /// Apply a force command from RL controller
     ///
     /// # Arguments
-    /// - `band`: Which band to modify (Strong, Neutral, or Weak)
-    /// - `multiplier`: Adjustment factor (e.g., 1.1 = 10% increase)
-    pub fn apply_command(&mut self, band: ForceBand, multiplier: f32) -> Result<()> {
+    /// - `command`: ForceCommand specifying which band to modify and direction
+    ///
+    /// # Returns
+    /// CommandResult with before/after stats for reward computation
+    ///
+    /// # Note
+    /// Automatically syncs to device after applying command
+    pub fn apply_force_command(&mut self, command: &super::command::ForceCommand) -> Result<super::command::CommandResult> {
+        use super::command::{ForceCommand, CommandResult};
+
+        // Capture stats before modification
+        let stats_before = self.compute_stats();
+
+        // Handle NoOp case
+        if command.is_noop() {
+            return Ok(CommandResult::new(
+                *command,
+                stats_before.clone(),
+                stats_before,
+                false,
+            ));
+        }
+
+        // Get target band and multiplier
+        let band = command.target_band().unwrap(); // Safe: non-NoOp commands always have a target
+        let multiplier = command.multiplier();
+
+        // Apply command to appropriate band
         match band {
             ForceBand::Strong => {
                 for i in 0..self.n_vertices {
@@ -348,7 +373,15 @@ impl ForceProfile {
         // Sync to device
         self.to_device()?;
 
-        Ok(())
+        // Capture stats after modification
+        let stats_after = self.compute_stats();
+
+        Ok(CommandResult::new(
+            *command,
+            stats_before,
+            stats_after,
+            true,
+        ))
     }
 
     /// Synchronize host buffers to device (Host → Device)

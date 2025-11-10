@@ -146,4 +146,4 @@ pub use reservoir_sampling::{select_diverse_training_set, select_training_set};
 #[cfg(feature = "cuda")]
 pub mod fluxnet;
 #[cfg(feature = "cuda")]
-pub use fluxnet::{ForceBand, ForceBandStats, ForceProfile};
+pub use fluxnet::{ForceBand, ForceBandStats, ForceProfile, ForceCommand, CommandResult};
