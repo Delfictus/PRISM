@@ -142,14 +142,17 @@ pub fn equilibrate_thermodynamic_gpu(
     };
 
     // Upload vertex weights to GPU if available
+    // MOVE 5: Always create buffer (uniform weights if AI not available) for coupling kernel
     let d_vertex_weights =
         if let Some(ref weights) = vertex_perturbation_weights {
-
-            Some(cuda_device.htod_copy(weights.clone()).map_err(|e| {
+            cuda_device.htod_copy(weights.clone()).map_err(|e| {
                 PRCTError::GpuError(format!("Failed to copy vertex weights: {}", e))
-            })?)
+            })?
         } else {
-            None
+            // Create uniform weights (0.5) for vertices without AI guidance
+            cuda_device.htod_copy(vec![0.5f32; n]).map_err(|e| {
+                PRCTError::GpuError(format!("Failed to create uniform weights: {}", e))
+            })?
         };
 
     // Geometric temperature ladder
@@ -242,6 +245,7 @@ pub fn equilibrate_thermodynamic_gpu(
     // TWEAK 3: Dynamic slack tracking
     let mut consecutive_guards = 0;
     let mut current_slack = 20;
+    let mut stable_temps = 0; // MOVE 3: Track stable temperatures for slack decay
 
     // TWEAK 6: Track best snapshot across all temperatures
     let mut best_snapshot: Option<(usize, ColoringSolution, f64)> = None; // (temp_idx, solution, quality_score)
@@ -290,7 +294,8 @@ pub fn equilibrate_thermodynamic_gpu(
 
         // Initialize oscillators from current coloring with AI-guided perturbation
         // TWEAK 2: Use reservoir scores to create phase bands (strong/neutral/weak force zones)
-        let color_phases: Vec<f32> = if let Some(ref weights) = vertex_perturbation_weights {
+        let color_phases: Vec<f32> = if vertex_perturbation_weights.is_some() {
+            let weights = vertex_perturbation_weights.as_ref().unwrap();
             // AI-guided: add weighted random perturbation to high-uncertainty vertices
             use rand::Rng;
             let mut rng = rand::thread_rng();
@@ -332,6 +337,7 @@ pub fn equilibrate_thermodynamic_gpu(
 
         for step in 0..steps_per_temp {
             // Compute coupling forces (Task B1: temperature-dependent coupling)
+            // MOVE 5: Pass uncertainty for band-aware coupling redistribution
             unsafe {
                 (*compute_coupling)
                     .clone()
@@ -351,6 +357,7 @@ pub fn equilibrate_thermodynamic_gpu(
                             coupling_strength,
                             temp as f32,        // Task B1: current temperature
                             t_max as f32,       // Task B1: max temperature for modulation
+                            &d_vertex_weights,  // MOVE 5: Pass uncertainty for band-aware coupling
                             &d_coupling_forces,
                         ),
                     )
@@ -498,18 +505,30 @@ pub fn equilibrate_thermodynamic_gpu(
         let mut post_shake_conflicts_count = 0;
         let mut slack_expanded = false;
 
-        // TWEAK 3: Track consecutive guard triggers and expand slack
+        // MOVE 3: Immediate slack expansion on first guard
         if compaction_guard_triggered {
             consecutive_guards += 1;
 
-            if consecutive_guards >= 2 && current_slack < 40 {
+            if consecutive_guards == 1 {
+                // MOVE 3: Jump to max slack immediately on first guard
                 let old_slack = current_slack;
-                current_slack += 10;
+                current_slack = 40;
                 slack_expanded = true;
                 println!(
-                    "[THERMO-GPU][TWEAK-3][SLACK-EXPAND] Increasing slack from +{} to +{} after {} consecutive guards",
-                    old_slack, current_slack, consecutive_guards
+                    "[THERMO-GPU][MOVE-3][SLACK-EXPAND] IMMEDIATE expansion from +{} to +40 on first guard",
+                    old_slack
                 );
+            }
+
+            // MOVE 4: Snapshot re-seeding - inject best solution before continuing
+            if let Some((best_temp_idx, ref best_sol, best_q)) = best_snapshot {
+                println!(
+                    "[THERMO-GPU][MOVE-4][SNAPSHOT-RESET] Re-injecting best snapshot from temp {} ({} colors, {} conflicts, quality={:.6})",
+                    best_temp_idx, best_sol.chromatic_number, best_sol.conflicts, best_q
+                );
+
+                // Reset to best snapshot state
+                colors = best_sol.colors.clone();
             }
         } else {
             consecutive_guards = 0; // Reset on success
@@ -540,7 +559,7 @@ pub fn equilibrate_thermodynamic_gpu(
                 color_range
             );
 
-            // TWEAK 4: Smart shake - identify and perturb high-conflict vertices
+            // MOVE 3: Escalated shake - identify and perturb high-conflict vertices
             let mut vertex_conflicts_shake: Vec<(usize, usize)> = (0..n)
                 .map(|v| {
                     let mut v_conflicts = 0;
@@ -554,14 +573,20 @@ pub fn equilibrate_thermodynamic_gpu(
                 .collect();
 
             vertex_conflicts_shake.sort_by_key(|(_, c)| std::cmp::Reverse(*c));
-            let shake_count = vertex_conflicts_shake.iter().take(50).filter(|(_, c)| *c > 0).count();
+
+            // MOVE 3: Double shake count to 100, shake across strong AND neutral bands
+            let raw_unc = ai_uncertainty.map(|u| u.to_vec()).unwrap_or_else(|| vec![0.5; n]);
+            let shake_count = vertex_conflicts_shake.iter()
+                .take(100)  // MOVE 3: Increased from 50 to 100
+                .filter(|(v, c)| *c > 0 && raw_unc[*v] > 0.33)  // Strong or neutral band
+                .count();
 
             if shake_count > 0 {
                 shake_invoked = true;
                 shake_vertices_count = shake_count;
 
                 println!(
-                    "[THERMO-GPU][TWEAK-4][SHAKE] Shaking {} high-conflict vertices to break symmetry",
+                    "[THERMO-GPU][MOVE-3][SHAKE] Shaking {} high-conflict vertices (strong+neutral bands) to break symmetry",
                     shake_count
                 );
 
@@ -569,8 +594,8 @@ pub fn equilibrate_thermodynamic_gpu(
                 let mut rng = rand::thread_rng();
                 let mut final_phases_mut = final_phases.clone();
 
-                for &(v, conf) in vertex_conflicts_shake.iter().take(50) {
-                    if conf > 0 {
+                for &(v, conf) in vertex_conflicts_shake.iter().take(100) {
+                    if conf > 0 && raw_unc[v] > 0.33 {  // MOVE 3: Strong or neutral band
                         let offset = rng.gen_range(0.0..(2.0 * std::f32::consts::PI));
                         final_phases_mut[v] = (final_phases_mut[v] + offset).rem_euclid(2.0 * std::f32::consts::PI);
                     }
@@ -608,6 +633,23 @@ pub fn equilibrate_thermodynamic_gpu(
 
         let max_vertex_conflicts = vertex_conflicts.iter().max().copied().unwrap_or(0);
         let stuck_vertices = vertex_conflicts.iter().filter(|&&c| c > 5).count();
+
+        // MOVE 3: Slack decay - only decay after 2 stable temps without guards
+        if compaction_ratio > 0.7 && !compaction_guard_triggered {
+            stable_temps += 1;
+            if stable_temps >= 2 {
+                let old_slack = current_slack;
+                current_slack = (current_slack - 5).max(20);
+                if old_slack != current_slack {
+                    println!(
+                        "[THERMO-GPU][MOVE-3][SLACK-DECAY] Gradual decay from +{} to +{} after {} stable temps",
+                        old_slack, current_slack, stable_temps
+                    );
+                }
+            }
+        } else {
+            stable_temps = 0;
+        }
 
         println!(
             "[THERMO-GPU] T={:.3}: {} colors, {} conflicts (max_vertex={}, stuck={})",
@@ -773,6 +815,10 @@ pub fn equilibrate_thermodynamic_gpu(
                     "force_start_temp": force_start_temp,
                     "force_full_strength_temp": force_full_strength_temp,
                     "force_active": force_blend_factor > 0.0,
+                    // MOVE 5: Coupling gain redistribution metrics
+                    "coupling_strong_gain": if temp >= 3.0 && temp <= 8.0 { 0.5 } else { 1.0 },
+                    "coupling_weak_gain": if temp >= 3.0 && temp <= 8.0 { 1.2 } else { 1.0 },
+                    "coupling_redistribution_active": temp >= 3.0 && temp <= 8.0,
                     // TWEAK 4: Shake metrics
                     "shake_invoked": shake_invoked,
                     "shake_vertices": shake_vertices_count,
@@ -784,6 +830,8 @@ pub fn equilibrate_thermodynamic_gpu(
                     // TWEAK 6: Snapshot metrics
                     "is_best_snapshot": is_new_best,
                     "best_snapshot_temp_idx": best_snapshot.as_ref().map(|(idx, _, _)| *idx).unwrap_or(0),
+                    // MOVE 4: Snapshot re-seeding tracking
+                    "snapshot_reseeded": compaction_guard_triggered && best_snapshot.is_some(),
                 }))
                 .with_guidance(guidance),
             );

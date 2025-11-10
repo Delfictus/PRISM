@@ -41,6 +41,7 @@ extern "C" __global__ void initialize_oscillators_kernel(
 // Kernel 2: Compute coupling forces (SPARSE EDGE LIST VERSION)
 // Uses edge list representation for O(E) complexity instead of O(V²)
 // Task B1: Temperature-dependent coupling to prevent phase-locking
+// MOVE 5: Added uncertainty parameter for band-aware coupling redistribution
 extern "C" __global__ void compute_coupling_forces_kernel(
     const float* phases,           // Current phases (f32 as per Rust code)
     const unsigned int* edge_u,    // Edge source vertices
@@ -51,6 +52,7 @@ extern "C" __global__ void compute_coupling_forces_kernel(
     float coupling_strength,       // Base coupling strength
     float temperature,             // Current temperature (Task B1)
     float t_max,                   // Maximum temperature (Task B1)
+    const float* uncertainty,      // MOVE 5: AI uncertainty for band-aware coupling
     float* forces                  // Output: coupling forces
 ) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -61,9 +63,20 @@ extern "C" __global__ void compute_coupling_forces_kernel(
     // At high T (>30%): ZERO coupling → pure exploration
     // At low T (<30%): strong coupling → convergence
     float temp_factor = (t_max > 0.0f) ? (temperature / t_max) : 1.0f;
+
+    // MOVE 5: Band-aware coupling redistribution in collapse zone (T=[3.0, 8.0])
+    float coupling_gain = 1.0f;
+    if (temperature >= 3.0f && temperature <= 8.0f) {
+        if (uncertainty && uncertainty[idx] > 0.66f) {
+            coupling_gain = 0.5f;  // Strong band: half coupling to reduce over-coupling
+        } else if (uncertainty && uncertainty[idx] < 0.33f) {
+            coupling_gain = 1.2f;  // Weak band: slight boost to aid convergence
+        }
+    }
+
     float modulated_coupling = (temp_factor < 0.3f)
-        ? coupling_strength * temp_factor  // Low T: enable coupling
-        : 0.0f;                            // High T: DISABLE coupling
+        ? coupling_strength * temp_factor * coupling_gain  // Low T: enable coupling with band gain
+        : 0.0f;                                             // High T: DISABLE coupling
 
     float force = 0.0;
 
@@ -208,8 +221,19 @@ extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
             }
         }
 
-        // TWEAK 1: Apply force blend factor to modulate conflict repulsion
-        conflict_force *= force_blend_factor;
+        // MOVE 1: Band-aware force gains
+        // Strong band (uncertainty > 0.66): 40% boost
+        // Weak band (uncertainty < 0.33): 35% reduction
+        // Neutral band: no change
+        float band_gain = 1.0f;
+        if (uncertainty && uncertainty[idx] > 0.66f) {
+            band_gain = 1.4f;  // Strong band: 40% boost
+        } else if (uncertainty && uncertainty[idx] < 0.33f) {
+            band_gain = 0.65f;  // Weak band: 35% reduction
+        }
+
+        // TWEAK 1: Apply force blend factor and band gain to modulate conflict repulsion
+        conflict_force *= force_blend_factor * band_gain;
     }
 
     // Clamp conflict force to prevent numerical instability
