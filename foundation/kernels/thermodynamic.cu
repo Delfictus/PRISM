@@ -64,13 +64,16 @@ extern "C" __global__ void compute_coupling_forces_kernel(
     // At low T (<30%): strong coupling → convergence
     float temp_factor = (t_max > 0.0f) ? (temperature / t_max) : 1.0f;
 
-    // MOVE 5: Band-aware coupling redistribution in collapse zone (T=[3.0, 8.0])
+    // MOVE 4: AGGRESSIVE band-aware coupling redistribution at high temps (T>3.0)
+    // Strong band (>66%): 15% coupling (0.15x gain)
+    // Weak band (<33%): 40% boost (1.40x gain)
+    // Neutral band: standard 1.0x
     float coupling_gain = 1.0f;
-    if (temperature >= 3.0f && temperature <= 8.0f) {
+    if (temperature > 3.0f) {  // MOVE 4: Active at all T>3.0 (was T=[3.0, 8.0])
         if (uncertainty && uncertainty[idx] > 0.66f) {
-            coupling_gain = 0.5f;  // Strong band: half coupling to reduce over-coupling
+            coupling_gain = 0.15f;  // MOVE 4: Strong band -> 15% coupling (was 50%)
         } else if (uncertainty && uncertainty[idx] < 0.33f) {
-            coupling_gain = 1.2f;  // Weak band: slight boost to aid convergence
+            coupling_gain = 1.40f;  // MOVE 4: Weak band -> 40% boost (was 20%)
         }
     }
 
@@ -138,6 +141,7 @@ extern "C" __global__ void evolve_oscillators_kernel(
 // Task B2: Natural frequency heterogeneity
 // Task B3: Enhanced conflict-driven repulsion
 // TWEAK 1: Temperature-blended conflict force activation
+// MOVE 5: Guard boost multiplier for enhanced repulsion after collapse detection
 extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
     float* phases,               // Phases (updated in-place)
     float* velocities,           // Velocities (updated in-place)
@@ -154,7 +158,8 @@ extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
     const float* natural_frequencies,  // Task B2: Per-vertex natural frequencies
     float t_max,                        // Task B2: Max temperature for noise scaling
     float force_start_temp,             // TWEAK 1: Temp at which forces start
-    float force_full_strength_temp      // TWEAK 1: Temp at which forces reach full strength
+    float force_full_strength_temp,     // TWEAK 1: Temp at which forces reach full strength
+    float guard_boost_multiplier        // MOVE 5: Repulsion boost after guard fires (1.0 = normal, 1.5 = boosted)
 ) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= n_oscillators) return;
@@ -233,7 +238,8 @@ extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
         }
 
         // TWEAK 1: Apply force blend factor and band gain to modulate conflict repulsion
-        conflict_force *= force_blend_factor * band_gain;
+        // MOVE 5: Apply guard boost multiplier for enhanced repulsion after collapse
+        conflict_force *= force_blend_factor * band_gain * guard_boost_multiplier;
     }
 
     // Clamp conflict force to prevent numerical instability

@@ -84,16 +84,16 @@ tsp_weight = 0.20
 
 [thermo]
 replicas = 56            # Push harder to avoid Phase 2 stalls
-num_temps = 64           # MOVE 2: Increased from 56 (14% increase for better coverage)
+num_temps = 76           # AGGRESSIVE: Increased from 64 (19% increase for deeper exploration)
 exchange_interval = 20
 t_min = 0.0005           # Much lower min for fine-grained annealing
 t_max = 15.0             # Higher max for aggressive exploration
-steps_per_temp = 12000   # MOVE 2: Increased from 8000 (50% increase for better resolution)
+steps_per_temp = 20000   # AGGRESSIVE: Increased from 12000 (67% increase for thorough equilibration)
 batch_size = 4096        # Match GPU batch size for 4 streams
 damping = 0.02
 schedule = "geometric"
-force_start_temp = 6.5   # MOVE 1: Start force activation earlier (was 5.0)
-force_full_strength_temp = 2.5  # MOVE 1: Steeper ramp to full strength (was 1.0)
+force_start_temp = 9.5   # AGGRESSIVE: Start force activation much earlier (was 6.5)
+force_full_strength_temp = 3.0  # AGGRESSIVE: Steeper ramp to full strength (was 2.5)
 
 [pimc]
 replicas = 48

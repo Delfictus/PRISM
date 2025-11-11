@@ -242,10 +242,20 @@ pub fn equilibrate_thermodynamic_gpu(
     let initial_chromatic = initial_solution.chromatic_number;
     let initial_conflicts = initial_solution.conflicts;
 
-    // TWEAK 3: Dynamic slack tracking
+    // MOVE 3: Dynamic slack tracking with aggressive initial slack
     let mut consecutive_guards = 0;
-    let mut current_slack = 20;
-    let mut stable_temps = 0; // MOVE 3: Track stable temperatures for slack decay
+    let mut current_slack = 60; // MOVE 3: Start with aggressive slack=60
+    let mut stable_temps = 0;   // MOVE 3: Track stable temperatures for slack decay
+
+    // MOVE 5: Guard boost tracking - 1.5x repulsion for 2 temps after guard fires
+    let mut temps_since_guard = 999; // Start high so boost is inactive initially
+    let guard_boost_duration = 2;    // Number of temps to apply boost after guard
+    let guard_boost_multiplier = 1.5; // 1.5x repulsion strength
+
+    // MOVE 6: Adaptive reheat detection
+    let mut prev_chromatic = initial_chromatic;
+    let mut stall_counter = 0;
+    let reheat_stall_threshold = 5; // Temps without improvement before suggesting reheat
 
     // TWEAK 6: Track best snapshot across all temperatures
     let mut best_snapshot: Option<(usize, ColoringSolution, f64)> = None; // (temp_idx, solution, quality_score)
@@ -505,33 +515,73 @@ pub fn equilibrate_thermodynamic_gpu(
         let mut post_shake_conflicts_count = 0;
         let mut slack_expanded = false;
 
-        // MOVE 3: Immediate slack expansion on first guard
+        // MOVE 3: Immediate slack expansion on guard (already at max=60, maintain it)
         if compaction_guard_triggered {
             consecutive_guards += 1;
+            temps_since_guard = 0; // MOVE 5: Reset guard boost counter
 
             if consecutive_guards == 1 {
-                // MOVE 3: Jump to max slack immediately on first guard
+                // MOVE 3: Already at max slack=60, ensure it stays there
                 let old_slack = current_slack;
-                current_slack = 40;
+                current_slack = 60; // Maintain aggressive slack
                 slack_expanded = true;
                 println!(
-                    "[THERMO-GPU][MOVE-3][SLACK-EXPAND] IMMEDIATE expansion from +{} to +40 on first guard",
-                    old_slack
+                    "[THERMO-GPU][MOVE-3][SLACK-EXPAND] Maintaining aggressive slack={} on first guard (was {})",
+                    current_slack, old_slack
                 );
             }
 
-            // MOVE 4: Snapshot re-seeding - inject best solution before continuing
+            // MOVE 5: Guard boost activated
+            println!(
+                "[THERMO-GPU][MOVE-5][GUARD-BOOST] Activating {:.1}x repulsion boost for next {} temps",
+                guard_boost_multiplier, guard_boost_duration
+            );
+
+            // MOVE 2: Snapshot re-seeding - inject best solution and reset oscillator phases
             if let Some((best_temp_idx, ref best_sol, best_q)) = best_snapshot {
                 println!(
-                    "[THERMO-GPU][MOVE-4][SNAPSHOT-RESET] Re-injecting best snapshot from temp {} ({} colors, {} conflicts, quality={:.6})",
+                    "[THERMO-GPU][MOVE-2][SNAPSHOT-RESET] Re-injecting best snapshot from temp {} ({} colors, {} conflicts, quality={:.6})",
                     best_temp_idx, best_sol.chromatic_number, best_sol.conflicts, best_q
                 );
 
                 // Reset to best snapshot state
                 colors = best_sol.colors.clone();
+
+                // MOVE 2: Reset oscillator phases to best snapshot to restart dynamics
+                // Convert best coloring back to phases for clean restart
+                let reset_phases: Vec<f32> = best_sol
+                    .colors
+                    .iter()
+                    .map(|&c| (c as f32 / target_chromatic as f32) * 2.0 * std::f32::consts::PI)
+                    .collect();
+
+                cuda_device
+                    .htod_copy_into(reset_phases.clone(), &mut d_phases)
+                    .map_err(|e| PRCTError::GpuError(format!("Failed to reset phases: {}", e)))?;
+
+                println!(
+                    "[THERMO-GPU][MOVE-2][SNAPSHOT-RESET] Reset {} oscillator phases to best snapshot",
+                    n
+                );
             }
         } else {
             consecutive_guards = 0; // Reset on success
+            temps_since_guard += 1; // MOVE 5: Increment temps since last guard
+        }
+
+        // MOVE 5: Check if guard boost is active
+        let guard_boost_active = temps_since_guard < guard_boost_duration;
+        let current_guard_boost = if guard_boost_active {
+            guard_boost_multiplier as f32
+        } else {
+            1.0f32
+        };
+
+        if guard_boost_active {
+            println!(
+                "[THERMO-GPU][MOVE-5][GUARD-BOOST] ACTIVE (temp {} after guard): {:.1}x repulsion multiplier",
+                temps_since_guard + 1, current_guard_boost
+            );
         }
 
         if compaction_guard_triggered {
@@ -559,7 +609,7 @@ pub fn equilibrate_thermodynamic_gpu(
                 color_range
             );
 
-            // MOVE 3: Escalated shake - identify and perturb high-conflict vertices
+            // MOVE 3: AGGRESSIVE shake - identify and perturb 150 high-conflict vertices
             let mut vertex_conflicts_shake: Vec<(usize, usize)> = (0..n)
                 .map(|v| {
                     let mut v_conflicts = 0;
@@ -574,10 +624,10 @@ pub fn equilibrate_thermodynamic_gpu(
 
             vertex_conflicts_shake.sort_by_key(|(_, c)| std::cmp::Reverse(*c));
 
-            // MOVE 3: Double shake count to 100, shake across strong AND neutral bands
+            // MOVE 3: AGGRESSIVE shake count to 150, shake across strong AND neutral bands
             let raw_unc = ai_uncertainty.map(|u| u.to_vec()).unwrap_or_else(|| vec![0.5; n]);
             let shake_count = vertex_conflicts_shake.iter()
-                .take(100)  // MOVE 3: Increased from 50 to 100
+                .take(150)  // MOVE 3: AGGRESSIVE - Increased from 100 to 150
                 .filter(|(v, c)| *c > 0 && raw_unc[*v] > 0.33)  // Strong or neutral band
                 .count();
 
@@ -586,7 +636,7 @@ pub fn equilibrate_thermodynamic_gpu(
                 shake_vertices_count = shake_count;
 
                 println!(
-                    "[THERMO-GPU][MOVE-3][SHAKE] Shaking {} high-conflict vertices (strong+neutral bands) to break symmetry",
+                    "[THERMO-GPU][MOVE-3][SHAKE] AGGRESSIVE: Shaking {} high-conflict vertices (strong+neutral bands) to break symmetry",
                     shake_count
                 );
 
@@ -594,7 +644,7 @@ pub fn equilibrate_thermodynamic_gpu(
                 let mut rng = rand::thread_rng();
                 let mut final_phases_mut = final_phases.clone();
 
-                for &(v, conf) in vertex_conflicts_shake.iter().take(100) {
+                for &(v, conf) in vertex_conflicts_shake.iter().take(150) {  // MOVE 3: 150 vertices
                     if conf > 0 && raw_unc[v] > 0.33 {  // MOVE 3: Strong or neutral band
                         let offset = rng.gen_range(0.0..(2.0 * std::f32::consts::PI));
                         final_phases_mut[v] = (final_phases_mut[v] + offset).rem_euclid(2.0 * std::f32::consts::PI);
@@ -634,26 +684,50 @@ pub fn equilibrate_thermodynamic_gpu(
         let max_vertex_conflicts = vertex_conflicts.iter().max().copied().unwrap_or(0);
         let stuck_vertices = vertex_conflicts.iter().filter(|&&c| c > 5).count();
 
-        // MOVE 3: Slack decay - only decay after 2 stable temps without guards
+        // MOVE 3: Slack decay - only decay after 3 stable temps without guards (slower decay)
         if compaction_ratio > 0.7 && !compaction_guard_triggered {
             stable_temps += 1;
-            if stable_temps >= 2 {
+            if stable_temps >= 3 {  // MOVE 3: Increased from 2 to 3 for slower decay
                 let old_slack = current_slack;
-                current_slack = (current_slack - 5).max(20);
+                current_slack = (current_slack - 5).max(40);  // MOVE 3: Min slack increased to 40 (was 20)
                 if old_slack != current_slack {
                     println!(
-                        "[THERMO-GPU][MOVE-3][SLACK-DECAY] Gradual decay from +{} to +{} after {} stable temps",
+                        "[THERMO-GPU][MOVE-3][SLACK-DECAY] Gradual decay from +{} to +{} after {} stable temps (min=40)",
                         old_slack, current_slack, stable_temps
                     );
                 }
+                stable_temps = 0; // Reset counter after decay
             }
         } else {
             stable_temps = 0;
         }
 
+        // MOVE 6: Adaptive reheat detection - track progress and detect stalls
+        let chromatic_improved = actual_chromatic < prev_chromatic;
+        let reheat_recommended = if chromatic_improved {
+            stall_counter = 0; // Reset on improvement
+            false
+        } else {
+            stall_counter += 1;
+            stall_counter >= reheat_stall_threshold
+        };
+
+        if reheat_recommended {
+            println!(
+                "[THERMO-GPU][MOVE-6][ADAPTIVE-REHEAT] STALL DETECTED: No chromatic improvement for {} temps (current={}, was={})",
+                stall_counter, actual_chromatic, prev_chromatic
+            );
+            println!(
+                "[THERMO-GPU][MOVE-6][ADAPTIVE-REHEAT] RECOMMENDATION: Consider reheating or increasing steps_per_temp from {} to {}",
+                steps_per_temp, steps_per_temp * 2
+            );
+        }
+
+        prev_chromatic = actual_chromatic; // Update for next iteration
+
         println!(
-            "[THERMO-GPU] T={:.3}: {} colors, {} conflicts (max_vertex={}, stuck={})",
-            temp, actual_chromatic, conflicts, max_vertex_conflicts, stuck_vertices
+            "[THERMO-GPU] T={:.3}: {} colors, {} conflicts (max_vertex={}, stuck={}, stall={})",
+            temp, actual_chromatic, conflicts, max_vertex_conflicts, stuck_vertices, stall_counter
         );
 
         // Count actual chromatic number
@@ -775,6 +849,64 @@ pub fn equilibrate_thermodynamic_gpu(
                 gap_to_world_record: Some((chromatic_number as i32) - 83), // DSJC1000.5 WR = 83
             };
 
+            // Split parameters into multiple json! blocks to avoid recursion limit
+            let mut params = serde_json::Map::new();
+
+            // Basic temperature metrics
+            params.insert("temperature".to_string(), json!(temp));
+            params.insert("temp_index".to_string(), json!(temp_idx));
+            params.insert("total_temps".to_string(), json!(num_temps));
+            params.insert("chromatic_delta".to_string(), json!(chromatic_delta));
+            params.insert("conflict_delta".to_string(), json!(conflict_delta));
+            params.insert("effectiveness".to_string(), json!(effectiveness));
+            params.insert("cumulative_improvement".to_string(), json!(initial_chromatic.saturating_sub(chromatic_number)));
+            params.insert("improvement_rate_per_temp".to_string(), json!(effectiveness));
+            params.insert("steps_per_temp".to_string(), json!(steps_per_temp));
+            params.insert("t_min".to_string(), json!(t_min));
+            params.insert("t_max".to_string(), json!(t_max));
+
+            // Color mapping metrics
+            params.insert("color_range".to_string(), json!(color_range));
+            params.insert("chromatic_after_compaction".to_string(), json!(chromatic_number));
+            params.insert("compaction_ratio".to_string(), json!(compaction_ratio));
+            params.insert("max_vertex_conflicts".to_string(), json!(max_vertex_conflicts));
+            params.insert("stuck_vertices".to_string(), json!(stuck_vertices));
+            params.insert("issue_detected".to_string(), json!(issue_detected));
+            params.insert("unique_buckets".to_string(), json!(unique_buckets));
+            params.insert("bucket_collapse_risk".to_string(), json!(bucket_collapse_risk));
+            params.insert("compaction_guard_triggered".to_string(), json!(compaction_guard_triggered));
+
+            // Force and coupling metrics
+            params.insert("force_blend_factor".to_string(), json!(force_blend_factor));
+            params.insert("force_start_temp".to_string(), json!(force_start_temp));
+            params.insert("force_full_strength_temp".to_string(), json!(force_full_strength_temp));
+            params.insert("coupling_strong_gain".to_string(), json!(if temp > 3.0 { 0.15 } else { 1.0 }));
+            params.insert("coupling_weak_gain".to_string(), json!(if temp > 3.0 { 1.40 } else { 1.0 }));
+
+            // Shake metrics
+            params.insert("shake_invoked".to_string(), json!(shake_invoked));
+            params.insert("shake_vertices".to_string(), json!(shake_vertices_count));
+            params.insert("post_shake_conflicts".to_string(), json!(post_shake_conflicts_count));
+
+            // Slack metrics
+            params.insert("current_slack".to_string(), json!(current_slack));
+            params.insert("slack_expanded".to_string(), json!(slack_expanded));
+            params.insert("consecutive_guards".to_string(), json!(consecutive_guards));
+
+            // Snapshot metrics
+            params.insert("is_best_snapshot".to_string(), json!(is_new_best));
+            params.insert("snapshot_reseeded".to_string(), json!(compaction_guard_triggered && best_snapshot.is_some()));
+
+            // Guard boost metrics (MOVE 5)
+            params.insert("guard_boost_active".to_string(), json!(guard_boost_active));
+            params.insert("guard_boost_multiplier".to_string(), json!(current_guard_boost));
+            params.insert("temps_since_guard".to_string(), json!(temps_since_guard));
+
+            // Reheat metrics (MOVE 6)
+            params.insert("reheat_stall_counter".to_string(), json!(stall_counter));
+            params.insert("reheat_recommended".to_string(), json!(reheat_recommended));
+            params.insert("chromatic_improved".to_string(), json!(chromatic_improved));
+
             telemetry.record(
                 RunMetric::new(
                     PhaseName::Thermodynamic,
@@ -784,55 +916,7 @@ pub fn equilibrate_thermodynamic_gpu(
                     temp_elapsed.as_secs_f64() * 1000.0,
                     PhaseExecMode::gpu_success(Some(2)),
                 )
-                .with_parameters(json!({
-                    "temperature": temp,
-                    "temp_index": temp_idx,
-                    "total_temps": num_temps,
-                    "chromatic_delta": chromatic_delta,
-                    "conflict_delta": conflict_delta,
-                    "effectiveness": effectiveness,
-                    "cumulative_improvement": initial_chromatic.saturating_sub(chromatic_number),
-                    "improvement_rate_per_temp": effectiveness,
-                    "steps_per_temp": steps_per_temp,
-                    "t_min": t_min,
-                    "t_max": t_max,
-                    // Enhanced metrics from color mapping fix
-                    "color_range": color_range,
-                    "chromatic_before_compaction": color_range,
-                    "chromatic_after_compaction": chromatic_number,
-                    "compaction_ratio": compaction_ratio,
-                    "max_vertex_conflicts": max_vertex_conflicts,
-                    "stuck_vertices": stuck_vertices,
-                    "issue_detected": issue_detected,
-                    // Task B7: Phase diversity metrics
-                    "unique_buckets": unique_buckets,
-                    "bucket_collapse_risk": bucket_collapse_risk,
-                    "coupling_modulation": temp as f64 / t_max,  // Temperature-dependent coupling factor
-                    "natural_freq_enabled": true,
-                    "compaction_guard_triggered": compaction_guard_triggered,
-                    // TWEAK 1: Force activation metrics
-                    "force_blend_factor": force_blend_factor,
-                    "force_start_temp": force_start_temp,
-                    "force_full_strength_temp": force_full_strength_temp,
-                    "force_active": force_blend_factor > 0.0,
-                    // MOVE 5: Coupling gain redistribution metrics
-                    "coupling_strong_gain": if temp >= 3.0 && temp <= 8.0 { 0.5 } else { 1.0 },
-                    "coupling_weak_gain": if temp >= 3.0 && temp <= 8.0 { 1.2 } else { 1.0 },
-                    "coupling_redistribution_active": temp >= 3.0 && temp <= 8.0,
-                    // TWEAK 4: Shake metrics
-                    "shake_invoked": shake_invoked,
-                    "shake_vertices": shake_vertices_count,
-                    "post_shake_conflicts": post_shake_conflicts_count,
-                    // TWEAK 3: Slack expansion metrics
-                    "current_slack": current_slack,
-                    "slack_expanded": slack_expanded,
-                    "consecutive_guards": consecutive_guards,
-                    // TWEAK 6: Snapshot metrics
-                    "is_best_snapshot": is_new_best,
-                    "best_snapshot_temp_idx": best_snapshot.as_ref().map(|(idx, _, _)| *idx).unwrap_or(0),
-                    // MOVE 4: Snapshot re-seeding tracking
-                    "snapshot_reseeded": compaction_guard_triggered && best_snapshot.is_some(),
-                }))
+                .with_parameters(serde_json::Value::Object(params))
                 .with_guidance(guidance),
             );
         }
