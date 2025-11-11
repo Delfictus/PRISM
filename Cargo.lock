@@ -2489,6 +2489,7 @@ name = "prct-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bincode",
  "chrono",
  "crossbeam-channel",
  "cudarc",
