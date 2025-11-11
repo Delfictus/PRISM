@@ -30,6 +30,8 @@ use std::sync::Arc;
 /// * `num_temps` - Number of temperature replicas
 /// * `steps_per_temp` - Evolution steps at each temperature
 /// * `ai_uncertainty` - Active Inference uncertainty scores for vertex prioritization (Phase 1 output)
+/// * `fluxnet_config` - Optional FluxNet RL configuration for adaptive force profiles
+/// * `difficulty_scores` - Optional reservoir difficulty scores for ForceProfile initialization (Phase 0 output)
 /// * `force_start_temp` - TWEAK 1: Temperature at which conflict forces start activating
 /// * `force_full_strength_temp` - TWEAK 1: Temperature at which conflict forces reach full strength
 ///
@@ -48,8 +50,13 @@ pub fn equilibrate_thermodynamic_gpu(
     steps_per_temp: usize,
     ai_uncertainty: Option<&Vec<f64>>,
     telemetry: Option<&Arc<crate::telemetry::TelemetryHandle>>,
+<<<<<<< HEAD
+    fluxnet_config: Option<&crate::fluxnet::FluxNetConfig>,
+    difficulty_scores: Option<&Vec<f32>>,
+=======
     force_start_temp: f64,
     force_full_strength_temp: f64,
+>>>>>>> main
 ) -> Result<Vec<ColoringSolution>> {
     // Note: cudarc 0.9 doesn't support async stream execution, but we accept the parameter
     // for API consistency and future cudarc 0.17+ upgrade
@@ -277,6 +284,85 @@ pub fn equilibrate_thermodynamic_gpu(
         n
     );
 
+    // FluxNet RL: Initialize ForceProfile and RLController if enabled
+    let mut fluxnet_state: Option<(crate::fluxnet::ForceProfile, crate::fluxnet::RLController)> = None;
+
+    if let Some(config) = fluxnet_config {
+        if config.enabled {
+            println!("[FLUXNET] Initializing FluxNet RL controller");
+            println!("[FLUXNET] Memory tier: {:?}", config.memory_tier);
+            println!("[FLUXNET] Learning rate: {}", config.rl.learning_rate);
+            println!("[FLUXNET] Epsilon: {} → {}", config.rl.epsilon_start, config.rl.epsilon_min);
+
+            // Initialize ForceProfile from difficulty scores (Phase 0 output) or defaults
+            let mut force_profile = if let Some(scores) = difficulty_scores {
+                println!("[FLUXNET] Initializing ForceProfile from reservoir difficulty scores");
+                crate::fluxnet::ForceProfile::from_difficulty_scores(scores, cuda_device.clone())
+                    .map_err(|e| PRCTError::GpuError(format!("Failed to create ForceProfile: {}", e)))?
+            } else {
+                println!("[FLUXNET] Initializing ForceProfile with uniform baseline forces");
+                crate::fluxnet::ForceProfile::new(n, cuda_device.clone())
+                    .map_err(|e| PRCTError::GpuError(format!("Failed to create ForceProfile: {}", e)))?
+            };
+
+            // Update ForceProfile with AI uncertainty (Phase 1 output) if available
+            if let Some(uncertainty) = ai_uncertainty {
+                println!("[FLUXNET] Updating ForceProfile with AI uncertainty scores");
+                let uncertainty_f32: Vec<f32> = uncertainty.iter().map(|&x| x as f32).collect();
+                force_profile.update_from_uncertainty(&uncertainty_f32)
+                    .map_err(|e| PRCTError::GpuError(format!("Failed to update ForceProfile: {}", e)))?;
+            }
+
+            // Initialize RL Controller
+            let num_states = config.rl.get_qtable_states(config.memory_tier);
+            let replay_capacity = config.rl.get_replay_capacity(config.memory_tier);
+            let max_conflicts = n; // Assume max conflicts ~ num_vertices
+            let max_chromatic = n; // Assume max colors ~ num_vertices
+            let compact = config.memory_tier == crate::fluxnet::MemoryTier::Compact;
+
+            let mut rl_controller = crate::fluxnet::RLController::new(
+                config.rl.clone(),
+                num_states,
+                replay_capacity,
+                max_conflicts,
+                max_chromatic,
+                compact,
+            );
+
+            // Load pre-trained Q-table if available
+            if config.persistence.load_pretrained {
+                if let Some(ref pretrained_path) = config.persistence.pretrained_path {
+                    if pretrained_path.exists() {
+                        println!("[FLUXNET] Loading pre-trained Q-table from {:?}", pretrained_path);
+                        match rl_controller.load_qtable(pretrained_path) {
+                            Ok(_) => println!("[FLUXNET] Successfully loaded pre-trained Q-table"),
+                            Err(e) => println!("[FLUXNET] Warning: Failed to load Q-table: {}", e),
+                        }
+                    } else {
+                        println!("[FLUXNET] No pre-trained Q-table found at {:?}", pretrained_path);
+                    }
+                }
+            }
+
+            // Sync ForceProfile to GPU device buffers
+            force_profile.to_device()
+                .map_err(|e| PRCTError::GpuError(format!("Failed to sync ForceProfile to device: {}", e)))?;
+
+            let stats = force_profile.compute_stats();
+            println!("[FLUXNET] ForceProfile initialized:");
+            println!("[FLUXNET]   Strong band: {:.1}%", stats.strong_fraction * 100.0);
+            println!("[FLUXNET]   Neutral band: {:.1}%", stats.neutral_fraction * 100.0);
+            println!("[FLUXNET]   Weak band: {:.1}%", stats.weak_fraction * 100.0);
+            println!("[FLUXNET]   Mean force: {:.3}", stats.mean_force);
+
+            fluxnet_state = Some((force_profile, rl_controller));
+        } else {
+            println!("[FLUXNET] FluxNet disabled in config");
+        }
+    } else {
+        println!("[FLUXNET] No FluxNet config provided, running baseline thermodynamic");
+    }
+
     // Process each temperature
     for (temp_idx, &temp) in temperatures.iter().enumerate() {
         let temp_start = std::time::Instant::now();
@@ -287,6 +373,82 @@ pub fn equilibrate_thermodynamic_gpu(
             num_temps,
             temp
         );
+
+        // FluxNet RL: Per-temperature decision-making
+        // Store telemetry before this temperature for reward computation
+        let telemetry_before = if let Some((ref force_profile, ref rl_controller)) = fluxnet_state {
+            if temp_idx > 0 {
+                // Get telemetry from previous temperature solution
+                let prev_solution = equilibrium_states.last().unwrap();
+                let prev_chromatic = prev_solution.chromatic_number;
+                let prev_conflicts = prev_solution.conflicts;
+
+                // Compute compaction_ratio placeholder (will be refined with actual telemetry)
+                let prev_compaction = 0.75f32; // Default placeholder
+
+                Some((prev_chromatic, prev_conflicts, prev_compaction))
+            } else {
+                // First temperature: use initial solution
+                Some((initial_chromatic, initial_conflicts, 0.5f32))
+            }
+        } else {
+            None
+        };
+
+        // FluxNet RL: Select and apply force command at start of temperature
+        let mut fluxnet_command: Option<crate::fluxnet::ForceCommand> = None;
+        let mut rl_state_before: Option<crate::fluxnet::RLState> = None;
+
+        if let Some((ref mut force_profile, ref mut rl_controller)) = fluxnet_state {
+            if let Some((chromatic_before, conflicts_before, compaction_before)) = telemetry_before {
+                // Create RL state from previous telemetry
+                let state = crate::fluxnet::RLState::from_telemetry(
+                    conflicts_before,
+                    chromatic_before,
+                    compaction_before,
+                    n, // max_conflicts
+                    n, // max_chromatic
+                );
+
+                // Store state for Q-table update at end of temperature
+                rl_state_before = Some(state.clone());
+
+                // Select action via epsilon-greedy
+                let command = rl_controller.select_action(&state);
+
+                println!(
+                    "[FLUXNET][T={}] State: conflicts={}, chromatic={}, compaction={:.2}",
+                    temp_idx, conflicts_before, chromatic_before, compaction_before
+                );
+                println!(
+                    "[FLUXNET][T={}] Action: {} (ε={:.3})",
+                    temp_idx,
+                    command.description(),
+                    rl_controller.epsilon()
+                );
+
+                // Apply command to force profile
+                match force_profile.apply_force_command(&command) {
+                    Ok(result) => {
+                        println!(
+                            "[FLUXNET][T={}] Applied {}: mean_force {:.3} → {:.3}",
+                            temp_idx,
+                            command.telemetry_code(),
+                            result.stats_before.mean_force,
+                            result.stats_after.mean_force
+                        );
+                        fluxnet_command = Some(command);
+                    }
+                    Err(e) => {
+                        eprintln!("[FLUXNET][T={}] Error applying command: {}", temp_idx, e);
+                    }
+                }
+
+                // Force buffers are already synced to GPU in apply_force_command()
+                // NOTE: Passing force buffers to kernel requires CUDA kernel modification (Phase C.2)
+                // For now, forces are prepared on GPU but not yet used by kernel
+            }
+        }
 
         // Initialize oscillator phases on GPU
         let d_phases = cuda_device
@@ -921,6 +1083,62 @@ pub fn equilibrate_thermodynamic_gpu(
             );
         }
 
+        // FluxNet RL: Compute reward and update Q-table after temperature completes
+        if let Some((ref mut _force_profile, ref mut rl_controller)) = fluxnet_state {
+            if let (Some(cmd), Some(state_before), Some((chromatic_before, conflicts_before, compaction_before)))
+                = (fluxnet_command, rl_state_before, telemetry_before) {
+
+                // Compute reward from telemetry delta
+                let reward = rl_controller.compute_reward(
+                    conflicts_before,
+                    conflicts,
+                    chromatic_before,
+                    chromatic_number,
+                    compaction_before,
+                    compaction_ratio,
+                );
+
+                // Create next state from current telemetry
+                let next_state = crate::fluxnet::RLState::from_telemetry(
+                    conflicts,
+                    chromatic_number,
+                    compaction_ratio,
+                    n, // max_conflicts
+                    n, // max_chromatic
+                );
+
+                // Determine if this is a terminal state (last temperature)
+                let is_terminal = temp_idx == num_temps - 1;
+
+                // Update Q-table with experience
+                rl_controller.update(state_before, cmd, reward, next_state, is_terminal);
+
+                println!(
+                    "[FLUXNET][T={}] Reward: {:.3}, Q-table updated (ε={:.3})",
+                    temp_idx, reward, rl_controller.epsilon()
+                );
+
+                // Save Q-table at intervals if configured
+                if let Some(config) = fluxnet_config {
+                    if config.persistence.save_interval_temps > 0
+                        && temp_idx % config.persistence.save_interval_temps == 0
+                        && temp_idx > 0 {
+
+                        let save_path = format!(
+                            "{}/qtable_checkpoint_temp{}.bin",
+                            config.persistence.save_dir,
+                            temp_idx
+                        );
+
+                        match rl_controller.save_qtable(&save_path) {
+                            Ok(_) => println!("[FLUXNET] Q-table saved to: {}", save_path),
+                            Err(e) => eprintln!("[FLUXNET] Failed to save Q-table: {}", e),
+                        }
+                    }
+                }
+            }
+        }
+
         equilibrium_states.push(solution);
     }
 
@@ -931,12 +1149,33 @@ pub fn equilibrate_thermodynamic_gpu(
         elapsed.as_secs_f64() * 1000.0
     );
 
+<<<<<<< HEAD
+    // FluxNet RL: Save final Q-table after equilibration completes
+    if let Some((ref _force_profile, ref mut rl_controller)) = fluxnet_state {
+        if let Some(config) = fluxnet_config {
+            if config.persistence.save_final {
+                let final_path = format!("{}/qtable_final.bin", config.persistence.save_dir);
+                match rl_controller.save_qtable(&final_path) {
+                    Ok(_) => println!("[FLUXNET] Final Q-table saved to: {}", final_path),
+                    Err(e) => eprintln!("[FLUXNET] Failed to save final Q-table: {}", e),
+                }
+            }
+
+            // Print learning statistics
+            println!(
+                "[FLUXNET] Training complete: {} experiences, ε={:.3}",
+                rl_controller.replay_buffer_size(),
+                rl_controller.epsilon()
+            );
+        }
+=======
     // TWEAK 6: Report best snapshot found
     if let Some((best_idx, best_sol, best_q)) = &best_snapshot {
         println!(
             "[THERMO-GPU][TWEAK-6] Best snapshot: temp {} with {} colors, {} conflicts (quality={:.6})",
             best_idx, best_sol.chromatic_number, best_sol.conflicts, best_q
         );
+>>>>>>> main
     }
 
     Ok(equilibrium_states)

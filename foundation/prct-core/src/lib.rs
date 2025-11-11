@@ -150,4 +150,5 @@ pub use fluxnet::{
     ForceBand, ForceBandStats, ForceProfile,
     ForceCommand, CommandResult,
     FluxNetConfig, MemoryTier, ForceProfileConfig, RLConfig, PersistenceConfig,
+    RLController, RLState, QTable, Experience, ReplayBuffer,
 };
