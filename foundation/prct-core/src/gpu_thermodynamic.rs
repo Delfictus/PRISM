@@ -364,9 +364,14 @@ pub fn equilibrate_thermodynamic_gpu(
         // FluxNet RL: Select and apply force command at start of temperature
         let mut fluxnet_command: Option<crate::fluxnet::ForceCommand> = None;
         let mut rl_state_before: Option<crate::fluxnet::RLState> = None;
+        let mut rl_telemetry: Option<(f32, bool)> = None; // (q_value, was_exploration)
+        let mut force_band_stats_before: Option<crate::fluxnet::ForceBandStats> = None;
 
         if let Some((ref mut force_profile, ref mut rl_controller)) = fluxnet_state {
             if let Some((chromatic_before, conflicts_before, compaction_before)) = telemetry_before {
+                // Capture force band stats before RL action
+                force_band_stats_before = Some(force_profile.compute_stats());
+
                 // Create RL state from previous telemetry
                 let state = crate::fluxnet::RLState::from_telemetry(
                     conflicts_before,
@@ -377,20 +382,25 @@ pub fn equilibrate_thermodynamic_gpu(
                 );
 
                 // Store state for Q-table update at end of temperature
-                rl_state_before = Some(state.clone());
+                rl_state_before = Some(state);
 
-                // Select action via epsilon-greedy
-                let command = rl_controller.select_action(&state);
+                // Select action via epsilon-greedy with telemetry capture
+                let (command, q_value, was_exploration) = rl_controller.select_action_with_telemetry(&state);
+
+                // Store telemetry data
+                rl_telemetry = Some((q_value, was_exploration));
 
                 println!(
                     "[FLUXNET][T={}] State: conflicts={}, chromatic={}, compaction={:.2}",
                     temp_idx, conflicts_before, chromatic_before, compaction_before
                 );
                 println!(
-                    "[FLUXNET][T={}] Action: {} (ε={:.3})",
+                    "[FLUXNET][T={}] Action: {} (Q={:.3}, ε={:.3}, explore={})",
                     temp_idx,
                     command.description(),
-                    rl_controller.epsilon()
+                    q_value,
+                    rl_controller.epsilon(),
+                    was_exploration
                 );
 
                 // Apply command to force profile
@@ -799,6 +809,70 @@ pub fn equilibrate_thermodynamic_gpu(
                 gap_to_world_record: Some((chromatic_number as i32) - 83), // DSJC1000.5 WR = 83
             };
 
+            // Construct telemetry parameters (base + optional FluxNet)
+            let mut params = json!({
+                "temperature": temp,
+                "temp_index": temp_idx,
+                "total_temps": num_temps,
+                "chromatic_delta": chromatic_delta,
+                "conflict_delta": conflict_delta,
+                "effectiveness": effectiveness,
+                "cumulative_improvement": initial_chromatic.saturating_sub(chromatic_number),
+                "improvement_rate_per_temp": effectiveness,
+                "steps_per_temp": steps_per_temp,
+                "t_min": t_min,
+                "t_max": t_max,
+                // Enhanced metrics from color mapping fix
+                "color_range": color_range,
+                "chromatic_before_compaction": color_range,
+                "chromatic_after_compaction": chromatic_number,
+                "compaction_ratio": compaction_ratio,
+                "max_vertex_conflicts": max_vertex_conflicts,
+                "stuck_vertices": stuck_vertices,
+                "issue_detected": issue_detected,
+                // Task B7: Phase diversity metrics
+                "unique_buckets": unique_buckets,
+                "bucket_collapse_risk": bucket_collapse_risk,
+                "coupling_modulation": temp as f64 / t_max,  // Temperature-dependent coupling factor
+                "natural_freq_enabled": true,
+                "compaction_guard_triggered": compaction_guard_triggered,
+            });
+
+            // Add FluxNet telemetry if enabled
+            if let (Some((ref force_profile, ref rl_controller)), Some(cmd), Some(state), Some((q_value, was_exploration)), Some(stats_before)) =
+                (&fluxnet_state, fluxnet_command, rl_state_before, rl_telemetry, force_band_stats_before) {
+
+                if let Some(config) = fluxnet_config {
+                    use crate::fluxnet::telemetry::*;
+
+                    let force_bands = ForceBandTelemetry::from_force_band_stats(&force_profile.compute_stats());
+
+                    let rl_decision = RLDecisionTelemetry::new(
+                        temp_idx,
+                        &state,
+                        cmd,
+                        q_value,
+                        rl_controller.epsilon(),
+                        was_exploration,
+                    );
+
+                    let config_snapshot = FluxNetConfigSnapshot::from_config(config);
+
+                    let fluxnet_telem = FluxNetTelemetry::new(
+                        force_bands,
+                        rl_decision,
+                        None, // Q-update telemetry will be added after RL update below
+                        config_snapshot,
+                    );
+
+                    if let Ok(fluxnet_json) = serde_json::to_value(&fluxnet_telem) {
+                        if let Some(obj) = params.as_object_mut() {
+                            obj.insert("fluxnet".to_string(), fluxnet_json);
+                        }
+                    }
+                }
+            }
+
             telemetry.record(
                 RunMetric::new(
                     PhaseName::Thermodynamic,
@@ -808,33 +882,7 @@ pub fn equilibrate_thermodynamic_gpu(
                     temp_elapsed.as_secs_f64() * 1000.0,
                     PhaseExecMode::gpu_success(Some(2)),
                 )
-                .with_parameters(json!({
-                    "temperature": temp,
-                    "temp_index": temp_idx,
-                    "total_temps": num_temps,
-                    "chromatic_delta": chromatic_delta,
-                    "conflict_delta": conflict_delta,
-                    "effectiveness": effectiveness,
-                    "cumulative_improvement": initial_chromatic.saturating_sub(chromatic_number),
-                    "improvement_rate_per_temp": effectiveness,
-                    "steps_per_temp": steps_per_temp,
-                    "t_min": t_min,
-                    "t_max": t_max,
-                    // Enhanced metrics from color mapping fix
-                    "color_range": color_range,
-                    "chromatic_before_compaction": color_range,
-                    "chromatic_after_compaction": chromatic_number,
-                    "compaction_ratio": compaction_ratio,
-                    "max_vertex_conflicts": max_vertex_conflicts,
-                    "stuck_vertices": stuck_vertices,
-                    "issue_detected": issue_detected,
-                    // Task B7: Phase diversity metrics
-                    "unique_buckets": unique_buckets,
-                    "bucket_collapse_risk": bucket_collapse_risk,
-                    "coupling_modulation": temp as f64 / t_max,  // Temperature-dependent coupling factor
-                    "natural_freq_enabled": true,
-                    "compaction_guard_triggered": compaction_guard_triggered,
-                }))
+                .with_parameters(params)
                 .with_guidance(guidance),
             );
         }
@@ -866,12 +914,18 @@ pub fn equilibrate_thermodynamic_gpu(
                 // Determine if this is a terminal state (last temperature)
                 let is_terminal = temp_idx == num_temps - 1;
 
-                // Update Q-table with experience
-                rl_controller.update(state_before, cmd, reward, next_state, is_terminal);
+                // Update Q-table with experience and capture telemetry
+                let (q_old, q_new, q_delta) = rl_controller.update_with_telemetry(
+                    state_before,
+                    cmd,
+                    reward,
+                    next_state,
+                    is_terminal
+                );
 
                 println!(
-                    "[FLUXNET][T={}] Reward: {:.3}, Q-table updated (ε={:.3})",
-                    temp_idx, reward, rl_controller.epsilon()
+                    "[FLUXNET][T={}] Reward: {:.3}, Q: {:.3} → {:.3} (Δ={:.3}), ε={:.3}",
+                    temp_idx, reward, q_old, q_new, q_delta, rl_controller.epsilon()
                 );
 
                 // Save Q-table at intervals if configured

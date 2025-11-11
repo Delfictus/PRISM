@@ -39,20 +39,22 @@
 //! # Modules
 //!
 //! - `profile`: ForceProfile, ForceBand, ForceBandStats (Phase A.1)
-//! - `command`: ForceCommand for RL actions (Phase A.2) [TODO]
-//! - `controller`: Q-learning RL controller (Phase D) [TODO]
-//! - `config`: FluxNetConfig for TOML configuration (Phase A.3) [TODO]
+//! - `command`: ForceCommand for RL actions (Phase A.2)
+//! - `controller`: Q-learning RL controller (Phase D)
+//! - `config`: FluxNetConfig for TOML configuration (Phase A.3)
+//! - `telemetry`: FluxNet telemetry data structures (Phase E)
 
 pub mod profile;
 pub mod command;
 pub mod config;
 pub mod controller;
+pub mod telemetry;
 
 pub use profile::{ForceBand, ForceBandStats, ForceProfile};
 pub use command::{ForceCommand, CommandResult};
 pub use config::{FluxNetConfig, MemoryTier, ForceProfileConfig, RLConfig, PersistenceConfig};
 pub use controller::{RLController, RLState, QTable, Experience, ReplayBuffer};
-
-// TODO: Phase E - Telemetry Integration
-// pub mod telemetry_ext;
-// pub use telemetry_ext::FluxNetTelemetry;
+pub use telemetry::{
+    FluxNetTelemetry, ForceBandTelemetry, RLDecisionTelemetry, RLStateTelemetry,
+    QUpdateTelemetry, FluxNetConfigSnapshot,
+};
