@@ -8,15 +8,13 @@ version = "1.1.0"
 target_chromatic = 83
 deterministic = false
 max_runtime_hours = 48.0
+use_tda = true
 
 [cpu]
 threads = 24
 pin_pool = false
 work_steal = true
 parallel_io = true
-
-[initial_coloring]
-strategy = "greedy"  # Options: greedy, spectral, community, randomized
 
 [gpu]
 device_id = 0
@@ -38,7 +36,6 @@ mask_width = 128
 [orchestrator]
 use_reservoir_prediction = true
 use_active_inference = true
-use_gpu_active_inference = true  # GPU-accelerated Active Inference (Phase 1)
 use_transfer_entropy = true
 use_geodesic_features = true
 use_thermodynamic_equilibration = true
@@ -46,7 +43,6 @@ use_pimc = true
 use_quantum_classical_hybrid = true
 use_gnn_screening = true
 use_adp_learning = true
-use_tda = true
 use_multiscale_analysis = true
 use_ensemble_consensus = true
 restarts = 10
@@ -56,6 +52,10 @@ checkpoint_minutes = 15
 adp_dsatur_depth = 50000
 adp_quantum_iterations = 30
 adp_thermo_num_temps = 48
+dsatur_target_offset = 3                    # DSATUR target: best_colors - offset
+adp_min_history_for_thermo = 3              # Min history for thermo loopback
+adp_min_history_for_quantum = 2             # Min history for quantum loopback
+adp_min_history_for_loopback = 5            # Min history for full loopback
 
 [neuromorphic]
 enabled = true
@@ -63,6 +63,7 @@ reservoir_size = 1000
 spectral_radius = 0.9
 leak_rate = 0.3
 input_scaling = 0.5
+phase_threshold = 0.5                # Phase threshold for difficulty zone clustering (radians)
 
 [dsatur]
 geodesic_weight = 0.30
@@ -93,18 +94,15 @@ tsp_weight = 0.0
 
 [thermo]
 replicas = 48
-num_temps = 58  # Part B: Was 48, +10 for midband density
-steps_per_temp = 20000  # Part B: Was 5000, increased for midband (T=3-7)
-swaps_per_temp = 100
-temperature_max = 10.0
-temperature_min = 0.001
-t_min = 0.001
-t_max = 10.0
-damping = 0.02
-schedule = "geometric"
-force_start_temp = 9.0  # Part B: Was 12.0, force ramp starts earlier
-force_full_strength_temp = 3.0  # Part B: Was 5.0, full strength reached earlier
-aggressive_midband = true  # Part B: Enable +10 temps in T=7→3 range
+num_temps = 48
+swaps_per_temp = 100               # IGNORED (not wired up)
+temperature_max = 10.0              # Now: t_max
+temperature_min = 0.001             # Now: t_min
+damping = 0.02                      # IGNORED (not wired up)
+schedule = "geometric"              # IGNORED (always geometric)
+steps_per_temp = 5000               # Steps per temperature for equilibration
+replicas_max_safe = 56              # VRAM-safe max replicas for 8GB devices
+num_temps_max_safe = 56             # VRAM-safe max temperatures for 8GB devices
 
 [pimc]
 replicas = 48
@@ -121,34 +119,6 @@ alpha = 0.1             # Learning rate
 gamma = 0.95            # Discount factor
 replay_buffer_size = 1000
 
-[fluxnet]
-enabled = true
-memory_tier = "extended"
-verbose = true
-
-[fluxnet.force_profile]
-f_strong_initial = 1.8
-f_neutral_initial = 1.0
-f_weak_initial = 0.5
-update_interval_temps = 4
-
-[fluxnet.rl]
-learning_rate = 0.15
-discount_factor = 0.98
-epsilon_start = 1.0
-epsilon_end = 0.05
-epsilon_decay = 0.995
-replay_buffer_size = 10000
-batch_size = 64
-
-[fluxnet.persistence]
-cache_dir = "target/fluxnet_cache"
-load_pretrained = true
-save_interval_temps = 4  # Save checkpoint every 4 temps
-save_final = true
-
-[fluxnet.phase_control]
-control_phase0 = true
-control_phase1 = true
-control_phase2 = true
-control_phase3 = true
+[transfer_entropy]
+geodesic_weight = 0.20              # Weight for geodesic features in TE computation
+te_vs_kuramoto_weight = 0.70        # TE weight in hybrid (70% TE + 30% Kuramoto)

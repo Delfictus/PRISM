@@ -47,11 +47,15 @@ pub mod profile;
 pub mod command;
 pub mod config;
 pub mod controller;
+pub mod unified_state;
+pub mod reward;
 
 pub use profile::{ForceBand, ForceBandStats, ForceProfile};
-pub use command::{ForceCommand, CommandResult};
+pub use command::{FluxNetAction, AdjustDirection, ActionResult};
 pub use config::{FluxNetConfig, MemoryTier, ForceProfileConfig, RLConfig, PersistenceConfig};
-pub use controller::{RLController, RLState, QTable, Experience, ReplayBuffer};
+pub use controller::{MultiPhaseRLController, QTable, Experience, ReplayBuffer};
+pub use unified_state::UnifiedRLState;
+pub use reward::compute_reward;
 
 // TODO: Phase E - Telemetry Integration
 // pub mod telemetry_ext;

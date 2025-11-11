@@ -1,0 +1,106 @@
+
+Use GPU EFE/uncertainty to adapt temperature schedules:
+
+- **Replica Weighting:** Assign more replicas or steps to high-EFE vertices.
+- **Exchange Probability Bias:** When swapping replicas, weight acceptance probability by aggregated uncertainty.
+- **GPU Implementation:** Extend thermodynamic kernels to accept `d_uncertainty`:
+  - Precompute per-replica scaling factors on GPU.
+  - Example: `steps_per_temp = base_steps * (1.0 + uncertainty_scale[v])`.
+
+### 3.2 Phase 3: Quantum-Classical Hybrid (GPU)
+
+- Already uses EFE for DSATUR tie-breaks; enhance by:
+  - Incorporating EFE into QUBO penalties (e.g., higher penalty for miscoloring high-EFE vertices).
+  - Upload `d_expected_free_energy` to QUBO kernel (extra array).
+  - Modify `gpu_qubo_simulated_annealing` to read EFE when computing ΔE (weight flips involving high-EFE vertices more strongly).
+
+### 3.3 Phase 4: Memetic/ADP
+
+- **Mutation Bias:** Increase mutation probability for high-uncertainty vertices.
+- **Local Search Depth:** allocate more depth to subgraphs containing high-EFE nodes.
+- Implementation: when generating offspring, sample vertices with probability proportional to EFE.
+
+### 3.4 Iterative Passes
+
+- On restart, re-run Active Inference using the latest best solution.
+- Carry over GPU buffers between passes to avoid reallocations.
+
+---
+
+## 4. GPU Stream & Concurrency Management
+
+### 4.1 Stream Strategy
+
+- Maintain dedicated CUDA streams:
+  - `stream_ai`: Active Inference
+  - `stream_te`: Transfer Entropy
+  - `stream_thermo`, `stream_quantum`, `stream_memetic`
+- When `enable_active_inference_gpu` is true, `stream_ai` runs concurrently with TE kernels where possible (respect dependencies).
+- Use CUDA events to signal when EFE buffers are ready; phases wait on events before consuming.
+
+### 4.2 Configurable Mode
+
+- New config `gpu.active_inference_stream_mode`:
+  - `sequential` (default on constrained GPUs)
+  - `parallel` (launch Active Inference kernels asynchronously; requires enough SMs/memory)
+- When all GPU streams are “fully available” (flag or detection), pipeline schedules TE and Active Inference overlapped to reduce Phase 1 wall time.
+
+---
+
+## 5. Telemetry & Visualization Hooks
+
+- Emit telemetry events with stats (mean/max EFE, top-k vertices).
+- GUI can visualize EFE/uncertainty via neural map.
+- Record how downstream phases used EFE (e.g., “Thermo allocated +12 steps to high-EFE region”).
+
+---
+
+## 6. Testing & Validation
+
+1. **Unit tests:** Ensure Active Inference view exposes correct host/device data.
+2. **Integration tests:** Run pipeline with GPU Active Inference enabled and confirm:
+   - Thermo steps change based on EFE (check telemetry).
+   - Quantum kernels receive EFE pointer (assert in logs).
+   - Memetic mutation probabilities shift accordingly.
+3. **Performance:** Benchmark Phase 1 runtime with sequential vs parallel stream modes.
+4. **Correctness:** Compare chromatic results on small graphs before/after integration to ensure no regression; ideally show improved convergence.
+
+---
+
+## 7. Implementation Steps
+
+1. **Pipeline GPU State**
+   - Create `PipelineGpuState` struct storing device buffers, streams, events.
+2. **Phase Interfaces**
+   - Add methods `set_active_inference_view(...)`, `get_active_inference_view()`.
+3. **Kernel Updates**
+   - Thermo GPU kernels accept additional `const float* d_uncertainty`.
+   - Quantum annealer kernels accept `const float* d_efe`.
+4. **Memetic CPU logic**
+   - Use host arrays for mutation bias.
+5. **Config & CLI**
+   - Add `gpu.enable_active_inference_gpu`, `gpu.active_inference_stream_mode`.
+   - CLI surfaces new options and shows whether data is reused downstream.
+6. **Telemetry**
+   - Extend metrics to log EFE usage per phase.
+
+---
+
+## 8. Benefits
+
+- Shared understanding of “hard” regions across all phases.
+- Reduced redundant computation (Active Inference runs once).
+- Faster Phase 1 via stream overlap on powerful GPUs.
+- More targeted thermodynamic/quantum/memetic effort, improving convergence.
+
+---
+
+## 9. Acceptance Criteria
+
+1. Active Inference outputs are produced on GPU and referenced by Thermo/Quantum/Memetic phases without re-computation.
+2. Phases adjust behavior based on EFE/uncertainty (telemetry confirms).
+3. Stream management allows TE + Active Inference overlap when configured, and reverts to sequential mode otherwise.
+4. System remains stable on lower-end GPUs (fall back to CPU data if necessary).
+5. Documentation updated to describe the new data flow and configuration.
+
+---

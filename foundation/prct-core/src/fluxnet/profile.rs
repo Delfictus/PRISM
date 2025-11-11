@@ -309,80 +309,83 @@ impl ForceProfile {
         Ok(())
     }
 
-    /// Apply a force command from RL controller
-    ///
-    /// # Arguments
-    /// - `command`: ForceCommand specifying which band to modify and direction
-    ///
-    /// # Returns
-    /// CommandResult with before/after stats for reward computation
-    ///
-    /// # Note
-    /// Automatically syncs to device after applying command
-    pub fn apply_force_command(&mut self, command: &super::command::ForceCommand) -> Result<super::command::CommandResult> {
-        use super::command::{ForceCommand, CommandResult};
-
-        // Capture stats before modification
-        let stats_before = self.compute_stats();
-
-        // Handle NoOp case
-        if command.is_noop() {
-            return Ok(CommandResult::new(
-                *command,
-                stats_before.clone(),
-                stats_before,
-                false,
-            ));
-        }
-
-        // Get target band and multiplier
-        let band = command.target_band().unwrap(); // Safe: non-NoOp commands always have a target
-        let multiplier = command.multiplier();
-
-        // Apply command to appropriate band
-        match band {
-            ForceBand::Strong => {
-                for i in 0..self.n_vertices {
-                    // Adjust vertices in strong band (f_strong > 1.2)
-                    if self.f_strong[i] > 1.2 {
-                        self.f_strong[i] *= multiplier;
-                        self.f_strong[i] = self.f_strong[i].clamp(0.5, 2.0);
-                    }
-                }
-            }
-            ForceBand::Weak => {
-                for i in 0..self.n_vertices {
-                    // Adjust vertices in weak band (f_weak < 0.8)
-                    if self.f_weak[i] < 0.8 {
-                        self.f_weak[i] *= multiplier;
-                        self.f_weak[i] = self.f_weak[i].clamp(0.5, 2.0);
-                    }
-                }
-            }
-            ForceBand::Neutral => {
-                // Adjust baseline for all neutral vertices
-                for i in 0..self.n_vertices {
-                    if self.f_strong[i] <= 1.2 && self.f_strong[i] >= 0.8 {
-                        self.f_strong[i] *= multiplier;
-                        self.f_strong[i] = self.f_strong[i].clamp(0.5, 2.0);
-                    }
-                }
-            }
-        }
-
-        // Sync to device
-        self.to_device()?;
-
-        // Capture stats after modification
-        let stats_after = self.compute_stats();
-
-        Ok(CommandResult::new(
-            *command,
-            stats_before,
-            stats_after,
-            true,
-        ))
-    }
+    // NOTE: Old Phase 2-only FluxNet API - commented out during multi-phase RL refactor
+    // Use FluxNetAction.apply(&mut config) for new multi-phase RL instead
+    //
+    // /// Apply a force command from RL controller
+    // ///
+    // /// # Arguments
+    // /// - `command`: ForceCommand specifying which band to modify and direction
+    // ///
+    // /// # Returns
+    // /// CommandResult with before/after stats for reward computation
+    // ///
+    // /// # Note
+    // /// Automatically syncs to device after applying command
+    // pub fn apply_force_command(&mut self, command: &super::command::ForceCommand) -> Result<super::command::CommandResult> {
+    //     use super::command::{ForceCommand, CommandResult};
+    //
+    //     // Capture stats before modification
+    //     let stats_before = self.compute_stats();
+    //
+    //     // Handle NoOp case
+    //     if command.is_noop() {
+    //         return Ok(CommandResult::new(
+    //             *command,
+    //             stats_before.clone(),
+    //             stats_before,
+    //             false,
+    //         ));
+    //     }
+    //
+    //     // Get target band and multiplier
+    //     let band = command.target_band().unwrap(); // Safe: non-NoOp commands always have a target
+    //     let multiplier = command.multiplier();
+    //
+    //     // Apply command to appropriate band
+    //     match band {
+    //         ForceBand::Strong => {
+    //             for i in 0..self.n_vertices {
+    //                 // Adjust vertices in strong band (f_strong > 1.2)
+    //                 if self.f_strong[i] > 1.2 {
+    //                     self.f_strong[i] *= multiplier;
+    //                     self.f_strong[i] = self.f_strong[i].clamp(0.5, 2.0);
+    //                 }
+    //             }
+    //         }
+    //         ForceBand::Weak => {
+    //             for i in 0..self.n_vertices {
+    //                 // Adjust vertices in weak band (f_weak < 0.8)
+    //                 if self.f_weak[i] < 0.8 {
+    //                     self.f_weak[i] *= multiplier;
+    //                     self.f_weak[i] = self.f_weak[i].clamp(0.5, 2.0);
+    //                 }
+    //             }
+    //         }
+    //         ForceBand::Neutral => {
+    //             // Adjust baseline for all neutral vertices
+    //             for i in 0..self.n_vertices {
+    //                 if self.f_strong[i] <= 1.2 && self.f_strong[i] >= 0.8 {
+    //                     self.f_strong[i] *= multiplier;
+    //                     self.f_strong[i] = self.f_strong[i].clamp(0.5, 2.0);
+    //                 }
+    //             }
+    //         }
+    //     }
+    //
+    //     // Sync to device
+    //     self.to_device()?;
+    //
+    //     // Capture stats after modification
+    //     let stats_after = self.compute_stats();
+    //
+    //     Ok(CommandResult::new(
+    //         *command,
+    //         stats_before,
+    //         stats_after,
+    //         true,
+    //     ))
+    // }
 
     /// Synchronize host buffers to device (Host → Device)
     ///

@@ -1,0 +1,12 @@
+{
+  "phase0_gpu_used": true,
+  "phase1_gpu_used": true,
+  "phase1_ai_gpu_used": true,
+  "phase2_gpu_used": true,
+  "phase3_gpu_used": true,
+  "phase0_fallback_reason": null,
+  "phase1_fallback_reason": null,
+  "phase1_ai_fallback_reason": null,
+  "phase2_fallback_reason": null,
+  "phase3_fallback_reason": null
+}

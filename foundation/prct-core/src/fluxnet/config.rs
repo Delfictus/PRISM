@@ -59,8 +59,8 @@ impl MemoryTier {
     /// Get Q-table state space size for this tier
     pub fn qtable_states(&self) -> usize {
         match self {
-            MemoryTier::Compact => 256,   // 256 states × 7 actions = 1,792 Q-values
-            MemoryTier::Extended => 1024, // 1K states × 7 actions = 7,168 Q-values
+            MemoryTier::Compact => 4096,   // 4K states (4-bit quantization: 16^3 = 4096)
+            MemoryTier::Extended => 1024, // 1K states × 37 actions = 37,888 Q-values
         }
     }
 
