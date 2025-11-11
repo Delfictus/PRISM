@@ -18,16 +18,22 @@ use std::sync::Arc;
 ///
 /// Represents the expected free energy for different actions,
 /// guiding policy selection during graph coloring.
+///
+/// NOTE: This struct must match the CPU version in world_record_pipeline.rs
+/// to ensure compatibility across GPU/CPU execution paths.
 #[derive(Debug, Clone)]
-pub struct ActiveInferencePolicy {
+pub struct ActiveInferencePolicyGpu {
+    /// Vertex uncertainty scores (higher = more uncertain)
+    pub uncertainty: Vec<f64>,
+
     /// Expected free energy for each vertex
     pub expected_free_energy: Vec<f64>,
 
-    /// Policy confidence (0.0 = uncertain, 1.0 = confident)
-    pub confidence: f64,
+    /// Pragmatic value (goal-directed)
+    pub pragmatic_value: Vec<f64>,
 
-    /// Computational time (milliseconds)
-    pub computation_time_ms: f64,
+    /// Epistemic value (information-seeking)
+    pub epistemic_value: Vec<f64>,
 }
 
 /// Compute active inference policy on GPU
@@ -49,7 +55,7 @@ pub fn active_inference_policy_gpu(
     graph: &Graph,
     coloring: &[usize],
     kuramoto_state: &KuramotoState,
-) -> Result<ActiveInferencePolicy> {
+) -> Result<ActiveInferencePolicyGpu> {
     let n = graph.num_vertices;
 
     println!(
@@ -169,54 +175,65 @@ pub fn active_inference_policy_gpu(
         .dtoh_sync_copy(&d_pred_error)
         .map_err(|e| PRCTError::GpuError(format!("Failed to download pred_errors: {}", e)))?;
 
-    // Expected free energy = |prediction error|
-    // Higher error → higher free energy → should color this vertex first
-    let mut expected_free_energy: Vec<f64> = pred_errors.iter().map(|&e| e.abs()).collect();
+    // Compute pragmatic value from precision (degree-based)
+    // Higher precision → lower pragmatic value (easier to color)
+    // Lower precision → higher pragmatic value (harder to color)
+    let pragmatic_value: Vec<f64> = precision.iter().map(|&p| {
+        // Invert precision to get pragmatic value
+        // precision range: [0.001, 0.021]
+        // pragmatic range: [0.1, 1.0]
+        let normalized_prec = (p - 0.001) / (0.021 - 0.001);
+        0.1 + (1.0 - normalized_prec) * 0.9
+    }).collect();
 
-    // Z-score normalization with clamp to [0, 1]
-    let mean_unc = expected_free_energy.iter().sum::<f64>() / expected_free_energy.len() as f64;
-    let variance = expected_free_energy.iter().map(|u| (u - mean_unc).powi(2)).sum::<f64>() / expected_free_energy.len() as f64;
-    let std_dev = variance.sqrt();
+    // Compute epistemic value from phase variance
+    // Already captured in prediction errors, use abs(pred_errors) as proxy
+    let epistemic_value: Vec<f64> = pred_errors.iter().map(|&e| e.abs()).collect();
 
-    if std_dev > 1e-10 {
-        // Valid distribution, apply z-score normalization
-        for efe in &mut expected_free_energy {
-            *efe = (*efe - mean_unc) / std_dev;
+    // Uncertainty: Combination of pragmatic and epistemic
+    let mut uncertainty: Vec<f64> = pragmatic_value.iter().zip(epistemic_value.iter())
+        .map(|(&prag, &epist)| prag * (1.0 + epist))
+        .collect();
+
+    // Expected free energy: Balance pragmatic and epistemic
+    let mut expected_free_energy: Vec<f64> = pragmatic_value.iter().zip(epistemic_value.iter())
+        .map(|(&prag, &epist)| prag - 0.5 * epist)
+        .collect();
+
+    // Normalize uncertainty using min-max scaling to [0, 1]
+    let min_unc = uncertainty.iter().cloned().fold(f64::INFINITY, f64::min);
+    let max_unc = uncertainty.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+
+    if (max_unc - min_unc).abs() > 1e-10 {
+        // Valid range, normalize
+        for u in &mut uncertainty {
+            *u = (*u - min_unc) / (max_unc - min_unc);
         }
-
-        // Clamp to [0, 1] range (3-sigma → [0, 1])
-        let min_z = expected_free_energy.iter().cloned().fold(f64::INFINITY, f64::min);
-        let max_z = expected_free_energy.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-
-        if (max_z - min_z).abs() > 1e-10 {
-            for efe in &mut expected_free_energy {
-                *efe = (*efe - min_z) / (max_z - min_z);
-            }
-        }
-
         println!("[AI-GPU] Normalized uncertainty: mean={:.6}, std={:.6}, range=[{:.6}, {:.6}]",
-                 mean_unc, std_dev, min_z, max_z);
+                 uncertainty.iter().sum::<f64>() / uncertainty.len() as f64,
+                 {
+                     let mean = uncertainty.iter().sum::<f64>() / uncertainty.len() as f64;
+                     let variance = uncertainty.iter().map(|u| (u - mean).powi(2)).sum::<f64>() / uncertainty.len() as f64;
+                     variance.sqrt()
+                 },
+                 min_unc, max_unc);
     } else {
-        // Only warn if using fallback (truly constant)
-        eprintln!("[AI-GPU][FALLBACK] Uncertainty vector has zero variance, using uniform distribution");
-        let uniform_value = 1.0 / expected_free_energy.len() as f64;
-        for efe in &mut expected_free_energy {
-            *efe = uniform_value;
+        // All values same or zero
+        eprintln!("[AI-GPU][FALLBACK] Uncertainty vector is constant (all {:.6})! Using uniform fallback.", min_unc);
+        let uniform_value = 1.0 / uncertainty.len() as f64;
+        for u in &mut uncertainty {
+            *u = uniform_value;
         }
     }
 
-    // Compute confidence as inverse of mean squared error
-    let mse: f64 = expected_free_energy.iter().map(|&e| e * e).sum::<f64>() / n as f64;
-    let confidence = 1.0 / (1.0 + mse);
-
     let elapsed = start_time.elapsed().as_secs_f64() * 1000.0;
     println!("[ACTIVE-INFERENCE-GPU] Policy computed in {:.2}ms", elapsed);
-    println!("[ACTIVE-INFERENCE-GPU] Confidence: {:.3}", confidence);
 
-    Ok(ActiveInferencePolicy {
+    Ok(ActiveInferencePolicyGpu {
+        uncertainty,
         expected_free_energy,
-        confidence,
-        computation_time_ms: elapsed,
+        pragmatic_value,
+        epistemic_value,
     })
 }
 
@@ -257,26 +274,29 @@ fn compute_observations(
     Ok(observations)
 }
 
-/// CPU fallback for active inference policy
+/// CPU fallback for active inference policy (when CUDA not compiled)
 #[cfg(not(feature = "cuda"))]
 pub fn active_inference_policy_gpu(
     _cuda_device: &Arc<CudaDevice>,
     graph: &Graph,
     coloring: &[usize],
     kuramoto_state: &KuramotoState,
-) -> Result<ActiveInferencePolicy> {
+) -> Result<ActiveInferencePolicyGpu> {
     let n = graph.num_vertices;
 
-    println!("[WARNING] CUDA not available, using CPU fallback for active inference");
+    println!("[WARNING] CUDA not available, GPU Active Inference requires --features cuda");
 
-    // Simple CPU fallback: use uniform free energy
+    // Simple CPU fallback: use uniform values
+    let uncertainty = vec![1.0 / n as f64; n];
     let expected_free_energy = vec![1.0; n];
-    let confidence = 0.5;
+    let pragmatic_value = vec![0.5; n];
+    let epistemic_value = vec![0.5; n];
 
-    Ok(ActiveInferencePolicy {
+    Ok(ActiveInferencePolicyGpu {
+        uncertainty,
         expected_free_energy,
-        confidence,
-        computation_time_ms: 0.0,
+        pragmatic_value,
+        epistemic_value,
     })
 }
 

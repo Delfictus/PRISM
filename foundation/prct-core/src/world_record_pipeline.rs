@@ -42,15 +42,20 @@ use crate::gpu_transfer_entropy;
 #[cfg(feature = "cuda")]
 use crate::gpu_thermodynamic;
 
+#[cfg(feature = "cuda")]
+use crate::gpu_active_inference;
+
 /// Runtime GPU usage tracking for each phase
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PhaseGpuStatus {
     pub phase0_gpu_used: bool,
     pub phase1_gpu_used: bool,
+    pub phase1_ai_gpu_used: bool,
     pub phase2_gpu_used: bool,
     pub phase3_gpu_used: bool,
     pub phase0_fallback_reason: Option<String>,
     pub phase1_fallback_reason: Option<String>,
+    pub phase1_ai_fallback_reason: Option<String>,
     pub phase2_fallback_reason: Option<String>,
     pub phase3_fallback_reason: Option<String>,
 }
@@ -60,10 +65,12 @@ impl Default for PhaseGpuStatus {
         Self {
             phase0_gpu_used: false,
             phase1_gpu_used: false,
+            phase1_ai_gpu_used: false,
             phase2_gpu_used: false,
             phase3_gpu_used: false,
             phase0_fallback_reason: None,
             phase1_fallback_reason: None,
+            phase1_ai_fallback_reason: None,
             phase2_fallback_reason: None,
             phase3_fallback_reason: None,
         }
@@ -225,6 +232,14 @@ pub struct ThermoConfig {
     /// VRAM-safe maximum temperatures for 8GB devices (default: 56)
     #[serde(default = "default_replicas")]
     pub num_temps_max_safe: usize,
+
+    /// TWEAK 1: Temperature at which conflict forces start activating (default: 5.0)
+    #[serde(default = "default_force_start_temp")]
+    pub force_start_temp: f64,
+
+    /// TWEAK 1: Temperature at which conflict forces reach full strength (default: 1.0)
+    #[serde(default = "default_force_full_strength_temp")]
+    pub force_full_strength_temp: f64,
 }
 
 fn default_t_min() -> f64 {
@@ -239,6 +254,14 @@ fn default_steps_per_temp() -> usize {
     5000
 }
 
+fn default_force_start_temp() -> f64 {
+    5.0
+}
+
+fn default_force_full_strength_temp() -> f64 {
+    1.0
+}
+
 impl Default for ThermoConfig {
     fn default() -> Self {
         Self {
@@ -250,6 +273,8 @@ impl Default for ThermoConfig {
             steps_per_temp: 5000,
             replicas_max_safe: 56,
             num_temps_max_safe: 56,
+            force_start_temp: 5.0,
+            force_full_strength_temp: 1.0,
         }
     }
 }
@@ -616,6 +641,10 @@ pub struct WorldRecordConfig {
     #[serde(default = "default_true")]
     pub use_active_inference: bool,
 
+    /// Enable GPU-accelerated Active Inference (requires CUDA)
+    #[serde(default = "default_true")]
+    pub use_gpu_active_inference: bool,
+
     /// Enable ADP reinforcement learning
     #[serde(default = "default_true")]
     pub use_adp_learning: bool,
@@ -727,6 +756,7 @@ impl Default for WorldRecordConfig {
             target_chromatic: 83,    // DSJC1000.5 world record
             max_runtime_hours: 48.0, // 2 days maximum
             use_active_inference: true,
+            use_gpu_active_inference: true,
             use_adp_learning: true,
             use_reservoir_prediction: true,
             use_transfer_entropy: true,
@@ -2647,11 +2677,61 @@ impl WorldRecordPipeline {
 
         // Apply Active Inference to refine difficult vertices
         if self.config.use_active_inference {
-            self.active_inference_policy = Some(ActiveInferencePolicy::compute(
-                graph,
-                &te_solution.colors,
-                initial_kuramoto,
-            )?);
+            #[cfg(feature = "cuda")]
+            {
+                if self.config.use_gpu_active_inference {
+                    // Try GPU path
+                    match gpu_active_inference::active_inference_policy_gpu(
+                        &self.cuda_device,
+                        graph,
+                        &te_solution.colors,
+                        initial_kuramoto,
+                    ) {
+                        Ok(policy_gpu) => {
+                            // Convert GPU policy to CPU-compatible format
+                            let policy_cpu = ActiveInferencePolicy {
+                                uncertainty: policy_gpu.uncertainty,
+                                expected_free_energy: policy_gpu.expected_free_energy,
+                                pragmatic_value: policy_gpu.pragmatic_value,
+                                epistemic_value: policy_gpu.epistemic_value,
+                            };
+                            self.phase_gpu_status.phase1_ai_gpu_used = true;
+                            println!("[PHASE 1][GPU] ✅ Active Inference policy computed on GPU");
+                            self.active_inference_policy = Some(policy_cpu);
+                        }
+                        Err(e) => {
+                            self.phase_gpu_status.phase1_ai_fallback_reason = Some(format!("{}", e));
+                            println!("[PHASE 1][GPU→CPU FALLBACK] AI GPU failed: {}", e);
+                            // Fall back to CPU
+                            println!("[PHASE 1][CPU] Active Inference on CPU");
+                            self.active_inference_policy = Some(ActiveInferencePolicy::compute(
+                                graph,
+                                &te_solution.colors,
+                                initial_kuramoto,
+                            )?);
+                        }
+                    }
+                } else {
+                    // GPU disabled, use CPU
+                    println!("[PHASE 1][CPU] Active Inference on CPU (GPU disabled in config)");
+                    self.active_inference_policy = Some(ActiveInferencePolicy::compute(
+                        graph,
+                        &te_solution.colors,
+                        initial_kuramoto,
+                    )?);
+                }
+            }
+
+            #[cfg(not(feature = "cuda"))]
+            {
+                // No CUDA, CPU only
+                println!("[PHASE 1][CPU] Active Inference on CPU (CUDA not compiled)");
+                self.active_inference_policy = Some(ActiveInferencePolicy::compute(
+                    graph,
+                    &te_solution.colors,
+                    initial_kuramoto,
+                )?);
+            }
 
             println!("[PHASE 1] ✅ Active Inference: Computed expected free energy");
             println!("[PHASE 1] ✅ Uncertainty-guided vertex selection enabled");
@@ -2693,9 +2773,14 @@ impl WorldRecordPipeline {
                     "uncertainty_min": unc_min,
                     "uncertainty_max": unc_max,
                     "uncertainty_nonzero": policy.uncertainty.iter().any(|&u| u > 1e-6),
+                    "ai_gpu_used": self.phase_gpu_status.phase1_ai_gpu_used,
+                    "ai_gpu_fallback_reason": self.phase_gpu_status.phase1_ai_fallback_reason.clone(),
                 })
             } else {
-                json!({"uncertainty_available": false})
+                json!({
+                    "uncertainty_available": false,
+                    "ai_gpu_used": false,
+                })
             };
 
             telemetry.record(
@@ -2709,7 +2794,8 @@ impl WorldRecordPipeline {
                 )
                 .with_parameters(json!({
                     "phase": "1",
-                    "gpu_used": self.phase_gpu_status.phase1_gpu_used,
+                    "te_gpu_used": self.phase_gpu_status.phase1_gpu_used,
+                    "ai_gpu_used": self.phase_gpu_status.phase1_ai_gpu_used,
                     "active_inference_enabled": self.config.use_active_inference,
                     "ai_stats": ai_stats,
                 })),
@@ -2866,6 +2952,8 @@ impl WorldRecordPipeline {
                                     self.config.thermo.steps_per_temp,
                                     ai_uncertainty,
                                     self.telemetry.as_ref(),
+                                    self.config.thermo.force_start_temp,
+                                    self.config.thermo.force_full_strength_temp,
                                 ) {
                                     Ok(states) => {
                                         self.phase_gpu_status.phase2_gpu_used = true;
@@ -2923,6 +3011,8 @@ impl WorldRecordPipeline {
                                 self.config.thermo.steps_per_temp,
                                 ai_uncertainty,
                                 self.telemetry.as_ref(),
+                                self.config.thermo.force_start_temp,
+                                self.config.thermo.force_full_strength_temp,
                             ) {
                                 Ok(states) => {
                                     self.phase_gpu_status.phase2_gpu_used = true;
@@ -3020,6 +3110,36 @@ impl WorldRecordPipeline {
             println!("{{\"event\":\"phase_end\",\"phase\":\"2\",\"name\":\"thermodynamic\",\"time_s\":{:.3},\"colors\":{}}}",
                      phase2_elapsed.as_secs_f64(),
                      self.best_solution.chromatic_number);
+
+            // TWEAK 5: ADP telemetry-aware adjustments based on compaction guard events
+            if self.config.use_adp_learning {
+                // Count compaction guard triggers across all temperatures
+                let initial_chromatic = self.best_solution.chromatic_number;
+                let guard_count = equilibrium_states.iter().filter(|s| {
+                    // Heuristic: if chromatic is very low but conflicts are high, guard likely triggered
+                    s.chromatic_number < (initial_chromatic / 2) && s.conflicts > 1000
+                }).count();
+
+                if guard_count > 2 {
+                    println!("[TWEAK-5][ADP][TELEMETRY-DRIVEN] Detected {} guard triggers, adjusting parameters", guard_count);
+
+                    // Add more temperature steps to allow better equilibration
+                    let additional_steps = 2000 * guard_count;
+                    let old_temps = self.adp_thermo_num_temps;
+                    self.adp_thermo_num_temps = (self.adp_thermo_num_temps + 8).min(self.config.thermo.num_temps);
+
+                    println!("[TWEAK-5][ADP][TELEMETRY-DRIVEN] Increased temps from {} to {} (wanted {})",
+                             old_temps, self.adp_thermo_num_temps, old_temps + 8);
+                    println!("[TWEAK-5][ADP][TELEMETRY-DRIVEN] Would add {} steps/temp (logged for future config tuning)",
+                             additional_steps);
+
+                    // Increase exploration to escape phase-locking basins
+                    let old_epsilon = self.adp_epsilon;
+                    self.adp_epsilon = (self.adp_epsilon + 0.2).min(1.0);
+                    println!("[TWEAK-5][ADP][TELEMETRY-DRIVEN] Increased epsilon from {:.3} to {:.3}",
+                             old_epsilon, self.adp_epsilon);
+                }
+            }
 
             // Record telemetry: phase complete
             if let Some(ref telemetry) = self.telemetry {

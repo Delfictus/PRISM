@@ -41,6 +41,7 @@ extern "C" __global__ void initialize_oscillators_kernel(
 // Kernel 2: Compute coupling forces (SPARSE EDGE LIST VERSION)
 // Uses edge list representation for O(E) complexity instead of O(V²)
 // Task B1: Temperature-dependent coupling to prevent phase-locking
+// MOVE 5: Added uncertainty parameter for band-aware coupling redistribution
 extern "C" __global__ void compute_coupling_forces_kernel(
     const float* phases,           // Current phases (f32 as per Rust code)
     const unsigned int* edge_u,    // Edge source vertices
@@ -51,6 +52,7 @@ extern "C" __global__ void compute_coupling_forces_kernel(
     float coupling_strength,       // Base coupling strength
     float temperature,             // Current temperature (Task B1)
     float t_max,                   // Maximum temperature (Task B1)
+    const float* uncertainty,      // MOVE 5: AI uncertainty for band-aware coupling
     float* forces                  // Output: coupling forces
 ) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -61,9 +63,23 @@ extern "C" __global__ void compute_coupling_forces_kernel(
     // At high T (>30%): ZERO coupling → pure exploration
     // At low T (<30%): strong coupling → convergence
     float temp_factor = (t_max > 0.0f) ? (temperature / t_max) : 1.0f;
+
+    // MOVE 4: AGGRESSIVE band-aware coupling redistribution at high temps (T>3.0)
+    // Strong band (>66%): 15% coupling (0.15x gain)
+    // Weak band (<33%): 40% boost (1.40x gain)
+    // Neutral band: standard 1.0x
+    float coupling_gain = 1.0f;
+    if (temperature > 3.0f) {  // MOVE 4: Active at all T>3.0 (was T=[3.0, 8.0])
+        if (uncertainty && uncertainty[idx] > 0.66f) {
+            coupling_gain = 0.15f;  // MOVE 4: Strong band -> 15% coupling (was 50%)
+        } else if (uncertainty && uncertainty[idx] < 0.33f) {
+            coupling_gain = 1.40f;  // MOVE 4: Weak band -> 40% boost (was 20%)
+        }
+    }
+
     float modulated_coupling = (temp_factor < 0.3f)
-        ? coupling_strength * temp_factor  // Low T: enable coupling
-        : 0.0f;                            // High T: DISABLE coupling
+        ? coupling_strength * temp_factor * coupling_gain  // Low T: enable coupling with band gain
+        : 0.0f;                                             // High T: DISABLE coupling
 
     float force = 0.0;
 
@@ -124,6 +140,8 @@ extern "C" __global__ void evolve_oscillators_kernel(
 // This version adds repulsion forces for vertices with coloring conflicts
 // Task B2: Natural frequency heterogeneity
 // Task B3: Enhanced conflict-driven repulsion
+// TWEAK 1: Temperature-blended conflict force activation
+// MOVE 5: Guard boost multiplier for enhanced repulsion after collapse detection
 extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
     float* phases,               // Phases (updated in-place)
     float* velocities,           // Velocities (updated in-place)
@@ -138,7 +156,10 @@ extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
     float dt,
     float temperature,
     const float* natural_frequencies,  // Task B2: Per-vertex natural frequencies
-    float t_max                         // Task B2: Max temperature for noise scaling
+    float t_max,                        // Task B2: Max temperature for noise scaling
+    float force_start_temp,             // TWEAK 1: Temp at which forces start
+    float force_full_strength_temp,     // TWEAK 1: Temp at which forces reach full strength
+    float guard_boost_multiplier        // MOVE 5: Repulsion boost after guard fires (1.0 = normal, 1.5 = boosted)
 ) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= n_oscillators) return;
@@ -158,11 +179,25 @@ extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
     unsigned int seed = idx * 214013 + 2531011; // Simple LCG
     float noise = ((seed % 1000) / 500.0f - 1.0f) * noise_amplitude;
 
+    // TWEAK 1: Compute force blend factor based on temperature
+    // Linear ramp: 0.0 at force_start_temp → 1.0 at force_full_strength_temp
+    float force_blend_factor = 0.0f;
+    if (temperature <= force_start_temp) {
+        if (force_start_temp > force_full_strength_temp) {
+            force_blend_factor = 1.0f - (temperature - force_full_strength_temp) /
+                                         (force_start_temp - force_full_strength_temp);
+            force_blend_factor = fmaxf(0.0f, fminf(1.0f, force_blend_factor));
+        } else {
+            force_blend_factor = 1.0f; // Full strength if range is invalid
+        }
+    }
+
     // Task B3: Conflict-driven repulsion force (ENHANCED)
+    // TWEAK 1: Apply force_blend_factor to modulate conflict forces
     float conflict_force = 0.0f;
     int vertex_conflicts = conflicts[idx];
 
-    if (vertex_conflicts > 0) {
+    if (vertex_conflicts > 0 && force_blend_factor > 0.0f) {
         // Get uncertainty weight (higher uncertainty → stronger penalty)
         float uncertainty_weight = uncertainty ? uncertainty[idx] : 1.0f;
 
@@ -190,6 +225,21 @@ extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
                 conflict_force += sinf(phase_diff) * penalty_coefficient;
             }
         }
+
+        // MOVE 1: Band-aware force gains
+        // Strong band (uncertainty > 0.66): 40% boost
+        // Weak band (uncertainty < 0.33): 35% reduction
+        // Neutral band: no change
+        float band_gain = 1.0f;
+        if (uncertainty && uncertainty[idx] > 0.66f) {
+            band_gain = 1.4f;  // Strong band: 40% boost
+        } else if (uncertainty && uncertainty[idx] < 0.33f) {
+            band_gain = 0.65f;  // Weak band: 35% reduction
+        }
+
+        // TWEAK 1: Apply force blend factor and band gain to modulate conflict repulsion
+        // MOVE 5: Apply guard boost multiplier for enhanced repulsion after collapse
+        conflict_force *= force_blend_factor * band_gain * guard_boost_multiplier;
     }
 
     // Clamp conflict force to prevent numerical instability

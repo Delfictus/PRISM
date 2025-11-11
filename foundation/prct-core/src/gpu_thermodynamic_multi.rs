@@ -131,6 +131,8 @@ pub fn equilibrate_thermodynamic_multi_gpu(
                     steps_per_temp,
                     ai_unc.as_ref(),
                     None, // Multi-GPU does not pass telemetry to individual GPUs
+                    5.0,  // force_start_temp: default value
+                    1.0,  // force_full_strength_temp: default value
                 )?;
 
                 let elapsed = start_time.elapsed();
