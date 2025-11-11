@@ -46,14 +46,12 @@
 pub mod profile;
 pub mod command;
 pub mod config;
+pub mod controller;
 
 pub use profile::{ForceBand, ForceBandStats, ForceProfile};
 pub use command::{ForceCommand, CommandResult};
 pub use config::{FluxNetConfig, MemoryTier, ForceProfileConfig, RLConfig, PersistenceConfig};
-
-// TODO: Phase D - RL Controller
-// pub mod controller;
-// pub use controller::{RLController, RLState, RLAction};
+pub use controller::{RLController, RLState, QTable, Experience, ReplayBuffer};
 
 // TODO: Phase E - Telemetry Integration
 // pub mod telemetry_ext;

@@ -24,6 +24,7 @@ rayon = "1.10"  # Parallel CPU algorithms
 rand = "0.8"     # For simulated annealing
 rand_chacha = "0.3"  # For deterministic RNG
 num-complex = "0.4"  # For quantum adapter
+bincode = "1.3"  # For FluxNet Q-table serialization
 
 # Adapters - connect to infrastructure
 neuromorphic-engine = { path = "../neuromorphic", features = ["cuda"], optional = true }
