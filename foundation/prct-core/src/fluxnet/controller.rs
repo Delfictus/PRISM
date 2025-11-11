@@ -436,6 +436,11 @@ impl RLController {
     pub fn epsilon(&self) -> f32 {
         self.epsilon
     }
+
+    /// Get current replay buffer size
+    pub fn replay_buffer_size(&self) -> usize {
+        self.replay_buffer.len()
+    }
 }
 
 #[cfg(test)]
