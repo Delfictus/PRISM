@@ -320,6 +320,15 @@ pub fn equilibrate_thermodynamic_gpu(
         println!("[FLUXNET] No FluxNet config provided, running baseline thermodynamic");
     }
 
+    // Create identity force buffers for when FluxNet is disabled
+    // These are reused across all temperatures to avoid repeated allocation
+    let identity_f_strong = cuda_device
+        .htod_copy(vec![1.0f32; n])
+        .map_err(|e| PRCTError::GpuError(format!("Failed to allocate identity f_strong: {}", e)))?;
+    let identity_f_weak = cuda_device
+        .htod_copy(vec![1.0f32; n])
+        .map_err(|e| PRCTError::GpuError(format!("Failed to allocate identity f_weak: {}", e)))?;
+
     // Process each temperature
     for (temp_idx, &temp) in temperatures.iter().enumerate() {
         let temp_start = std::time::Instant::now();
@@ -490,28 +499,62 @@ pub fn equilibrate_thermodynamic_gpu(
                     })?;
             }
 
-            // Evolve oscillators
-            unsafe {
-                (*evolve_osc)
-                    .clone()
-                    .launch(
-                        LaunchConfig {
-                            grid_dim: (blocks as u32, 1, 1),
-                            block_dim: (threads as u32, 1, 1),
-                            shared_mem_bytes: 0,
-                        },
-                        (
-                            &d_phases,
-                            &d_velocities,
-                            &d_coupling_forces,
-                            n as i32,
-                            dt,
-                            temp as f32,
-                        ),
-                    )
-                    .map_err(|e| {
-                        PRCTError::GpuError(format!("Evolve kernel failed at step {}: {}", step, e))
-                    })?;
+            // Evolve oscillators with FluxNet force modulation if enabled
+            // FluxNet: Pass force buffers if available, otherwise pass zero-length dummy slices
+            // CUDA kernel checks for NULL pointer and uses multiplier=1.0 when NULL
+            if let Some((ref force_profile, ref _rl_controller)) = fluxnet_state {
+                // FluxNet enabled: use actual force buffers
+                unsafe {
+                    (*evolve_osc)
+                        .clone()
+                        .launch(
+                            LaunchConfig {
+                                grid_dim: (blocks as u32, 1, 1),
+                                block_dim: (threads as u32, 1, 1),
+                                shared_mem_bytes: 0,
+                            },
+                            (
+                                &d_phases,
+                                &d_velocities,
+                                &d_coupling_forces,
+                                n as i32,
+                                dt,
+                                temp as f32,
+                                &force_profile.device_f_strong,
+                                &force_profile.device_f_weak,
+                            ),
+                        )
+                        .map_err(|e| {
+                            PRCTError::GpuError(format!("Evolve kernel with FluxNet failed at step {}: {}", step, e))
+                        })?;
+                }
+            } else {
+                // FluxNet disabled: use pre-allocated identity multiplier buffers (all 1.0f)
+                // This ensures forces remain unchanged when FluxNet is not active
+                unsafe {
+                    (*evolve_osc)
+                        .clone()
+                        .launch(
+                            LaunchConfig {
+                                grid_dim: (blocks as u32, 1, 1),
+                                block_dim: (threads as u32, 1, 1),
+                                shared_mem_bytes: 0,
+                            },
+                            (
+                                &d_phases,
+                                &d_velocities,
+                                &d_coupling_forces,
+                                n as i32,
+                                dt,
+                                temp as f32,
+                                &identity_f_strong,
+                                &identity_f_weak,
+                            ),
+                        )
+                        .map_err(|e| {
+                            PRCTError::GpuError(format!("Evolve kernel failed at step {}: {}", step, e))
+                        })?;
+                }
             }
 
             // Periodic energy computation (every 100 steps)

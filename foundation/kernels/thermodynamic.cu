@@ -89,13 +89,16 @@ extern "C" __global__ void compute_coupling_forces_kernel(
 }
 
 // Kernel 3: Evolve oscillators (Langevin dynamics) - FLOAT VERSION with CONFLICT FORCES
+// FluxNet: Supports adaptive force profiles for RL-driven optimization
 extern "C" __global__ void evolve_oscillators_kernel(
     float* phases,               // Phases (updated in-place) - f32
     float* velocities,           // Velocities (updated in-place) - f32
     const float* forces,         // Coupling forces - f32
     int n_oscillators,
     float dt,                    // Time step
-    float temperature            // Temperature T
+    float temperature,           // Temperature T
+    const float* f_strong,       // FluxNet: Force multipliers (NULL if disabled)
+    const float* f_weak          // FluxNet: Force multipliers (NULL if disabled)
 ) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= n_oscillators) return;
@@ -103,6 +106,11 @@ extern "C" __global__ void evolve_oscillators_kernel(
     float phi = phases[idx];
     float v = velocities[idx];
     float force = forces[idx];
+
+    // FluxNet: Apply adaptive force multiplier
+    // When FluxNet disabled, multipliers are 1.0f (identity)
+    float force_multiplier = (f_strong != NULL) ? f_strong[idx] : 1.0f;
+    force *= force_multiplier;
 
     // Simple velocity update with damping
     float damping = 0.1f;
@@ -124,6 +132,7 @@ extern "C" __global__ void evolve_oscillators_kernel(
 // This version adds repulsion forces for vertices with coloring conflicts
 // Task B2: Natural frequency heterogeneity
 // Task B3: Enhanced conflict-driven repulsion
+// FluxNet: Adaptive force profiles for RL-driven optimization
 extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
     float* phases,               // Phases (updated in-place)
     float* velocities,           // Velocities (updated in-place)
@@ -138,7 +147,9 @@ extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
     float dt,
     float temperature,
     const float* natural_frequencies,  // Task B2: Per-vertex natural frequencies
-    float t_max                         // Task B2: Max temperature for noise scaling
+    float t_max,                        // Task B2: Max temperature for noise scaling
+    const float* f_strong,              // FluxNet: Force multipliers for strong coupling (NULL if disabled)
+    const float* f_weak                 // FluxNet: Force multipliers for weak coupling (NULL if disabled)
 ) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= n_oscillators) return;
@@ -194,6 +205,17 @@ extern "C" __global__ void evolve_oscillators_with_conflicts_kernel(
 
     // Clamp conflict force to prevent numerical instability
     conflict_force = fmaxf(-100.0f, fminf(100.0f, conflict_force));
+
+    // FluxNet: Apply adaptive force multipliers
+    // f_strong: amplifies forces for high-difficulty vertices (strong coupling)
+    // f_weak: dampens forces for low-difficulty vertices (weak coupling)
+    // When FluxNet disabled, multipliers are 1.0f (identity)
+    float force_multiplier = (f_strong != NULL) ? f_strong[idx] : 1.0f;
+
+    // Apply multiplier to coupling and conflict forces
+    // (Natural freq, noise, anti-sync remain unaffected for exploration)
+    coupling_force *= force_multiplier;
+    conflict_force *= force_multiplier;
 
     // CRITICAL FIX 2B: Anti-synchronization repulsion
     // Compute global mean phase (approximate using local sampling)
