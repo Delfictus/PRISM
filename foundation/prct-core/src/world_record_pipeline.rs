@@ -1048,7 +1048,7 @@ impl WorldRecordConfig {
 
         // Estimate VRAM for reservoir computing
         if self.use_reservoir_prediction && self.gpu.enable_reservoir_gpu {
-            let reservoir_size = 1000.min(graph.num_vertices * 2);
+            let reservoir_size = 2000.min(graph.num_vertices * 2);  // Increased from 1000 to 2000 for FluxNet enhancements
             let reservoir_mb = (reservoir_size * reservoir_size * 4) / (1024 * 1024);
 
             if reservoir_mb > VRAM_MB / 4 {
@@ -3211,6 +3211,7 @@ impl WorldRecordPipeline {
                                     self.telemetry.as_ref(),
                                     self.config.thermo.force_start_temp,
                                     self.config.thermo.force_full_strength_temp,
+                                    self.config.thermo.aggressive_midband,
                                 ) {
                                     Ok(mut states) => {
                                         self.phase_gpu_status.phase2_gpu_used = true;
@@ -3292,6 +3293,7 @@ impl WorldRecordPipeline {
                                 self.telemetry.as_ref(),
                                 self.config.thermo.force_start_temp,
                                 self.config.thermo.force_full_strength_temp,
+                                self.config.thermo.aggressive_midband,
                             ) {
                                 Ok(mut states) => {
                                     self.phase_gpu_status.phase2_gpu_used = true;
@@ -3779,6 +3781,82 @@ impl WorldRecordPipeline {
             }
         } else {
             println!("[PHASE 3] disabled by config");
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // PHASE 3.5: Extreme Memetic Burst (FluxNet Enhancement)
+        // ═══════════════════════════════════════════════════════════
+        let phase35_start = std::time::Instant::now();
+        println!("\n┌─────────────────────────────────────────────────────────┐");
+        println!("│ PHASE 3.5: Extreme Memetic Burst (FluxNet)             │");
+        println!("└─────────────────────────────────────────────────────────┘");
+        println!("{{\"event\":\"phase_start\",\"phase\":\"3.5\",\"name\":\"extreme_memetic_burst\"}}");
+
+        // Create aggressive burst configuration
+        let burst_config = MemeticConfig {
+            population_size: 32,
+            elite_size: 8,
+            generations: 200,
+            mutation_rate: 0.20,  // Aggressive mutation
+            tournament_size: 3,
+            local_search_depth: 5000,
+            use_tsp_guidance: true,
+            tsp_weight: 0.30,
+        };
+
+        println!(
+            "[PHASE 3.5] Launching extreme burst: pop={}, gens={}, mutation={:.2}, depth={}",
+            burst_config.population_size,
+            burst_config.generations,
+            burst_config.mutation_rate,
+            burst_config.local_search_depth
+        );
+
+        let mut burst_solver = MemeticColoringSolver::new(burst_config);
+        let burst_result = burst_solver.solve_with_restart(
+            graph,
+            vec![self.best_solution.clone()],  // Seed from best
+            3  // 3 restarts for robustness
+        )?;
+
+        if burst_result.conflicts == 0
+            && burst_result.chromatic_number < self.best_solution.chromatic_number
+        {
+            let delta = self.best_solution.chromatic_number - burst_result.chromatic_number;
+            println!(
+                "[PHASE 3.5] 🎯 Extreme burst breakthrough: {} → {} colors (Δ={})",
+                self.best_solution.chromatic_number, burst_result.chromatic_number, delta
+            );
+            self.best_solution = burst_result.clone();
+        }
+        self.history.push(burst_result.clone());
+
+        let phase35_elapsed = phase35_start.elapsed();
+        println!(
+            "{{\"event\":\"phase_end\",\"phase\":\"3.5\",\"name\":\"extreme_memetic_burst\",\"time_s\":{:.3},\"colors\":{}}}",
+            phase35_elapsed.as_secs_f64(),
+            self.best_solution.chromatic_number
+        );
+
+        if let Some(ref telemetry) = self.telemetry {
+            telemetry.record(
+                RunMetric::new(
+                    PhaseName::Memetic,
+                    "phase_3_5_extreme_burst",
+                    self.best_solution.chromatic_number,
+                    self.best_solution.conflicts,
+                    phase35_elapsed.as_secs_f64() * 1000.0,
+                    PhaseExecMode::cpu_disabled(),
+                )
+                .with_parameters(serde_json::json!({
+                    "phase": "3.5",
+                    "population_size": 32,
+                    "generations": 200,
+                    "mutation_rate": 0.20,
+                    "restarts": 3,
+                    "local_search_depth": 5000,
+                })),
+            );
         }
 
         // ═══════════════════════════════════════════════════════════

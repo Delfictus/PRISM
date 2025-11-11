@@ -46,7 +46,7 @@ impl GpuReservoirConflictPredictor {
 
         // Create GPU reservoir configuration
         let reservoir_config = ReservoirConfig {
-            size: 1000.min(n * 2),  // Adaptive reservoir size
+            size: 2000.min(n * 2),  // Increased from 1000 to 2000 for FluxNet enhancements
             input_size: n,
             spectral_radius: 0.95,
             connection_prob: 0.1,

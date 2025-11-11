@@ -51,6 +51,7 @@ pub fn equilibrate_thermodynamic_gpu(
     telemetry: Option<&Arc<crate::telemetry::TelemetryHandle>>,
     force_start_temp: f64,
     force_full_strength_temp: f64,
+    aggressive_midband: bool,
 ) -> Result<Vec<ColoringSolution>> {
     // Note: cudarc 0.9 doesn't support async stream execution, but we accept the parameter
     // for API consistency and future cudarc 0.17+ upgrade
@@ -156,17 +157,38 @@ pub fn equilibrate_thermodynamic_gpu(
             })?
         };
 
-    // Geometric temperature ladder
-    let temperatures: Vec<f64> = (0..num_temps)
+    // Geometric temperature ladder with optional midband density boost
+    let mut temperatures: Vec<f64> = (0..num_temps)
         .map(|i| {
             let ratio = t_min / t_max;
             t_max * ratio.powf(i as f64 / (num_temps - 1) as f64)
         })
         .collect();
 
+    // Part B: Aggressive midband density - insert 10 extra temps in T=7 → T=3 range
+    if aggressive_midband {
+        let mut midband_temps = Vec::new();
+        for i in 0..10 {
+            let ratio_f64: f64 = 3.0 / 7.0;
+            let t: f64 = 7.0 * ratio_f64.powf(i as f64 / 9.0);
+            midband_temps.push(t);
+        }
+        temperatures.extend(midband_temps);
+        temperatures.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+        println!(
+            "[THERMO-GPU][MIDBAND] Added 10 extra temps in T=7→3 range (total: {})",
+            temperatures.len()
+        );
+    }
+
     println!(
-        "[THERMO-GPU] Temperature ladder: {:?}",
+        "[THERMO-GPU] Temperature ladder: {:?}...",
         &temperatures[..temperatures.len().min(5)]
+    );
+    println!(
+        "[THERMO-GPU] Temperature count: {} (aggressive_midband={})",
+        temperatures.len(),
+        aggressive_midband
     );
 
     // Convert graph edges to device format (u32, u32, f32)
@@ -445,11 +467,46 @@ pub fn equilibrate_thermodynamic_gpu(
             .htod_copy_into(color_phases, &mut d_phases)
             .map_err(|e| PRCTError::GpuError(format!("Failed to init phases: {}", e)))?;
 
-        // Evolution loop
+        // Evolution loop with dynamic steps for midband
         let dt = 0.01f32;
-        let coupling_strength = 1.0f32 / (n as f32).sqrt();
 
-        for step in 0..steps_per_temp {
+        // Part B: Per-band coupling gains (3.0 ≤ T ≤ 8.0 midband)
+        let coupling_base = 1.0f32 / (n as f32).sqrt();
+        let coupling_gain = if temp >= 3.0 && temp <= 8.0 && aggressive_midband {
+            // Midband: apply differential coupling to force heterogeneity
+            // Strong vertices: 0.15x (reduced coupling to prevent phase-lock)
+            // Neutral vertices: 0.25x
+            // Weak vertices: 0.40x (increased coupling to drive mixing)
+            // Note: The actual per-vertex gains are applied in the CUDA kernel via vertex_weights
+            // This is a global scaling factor
+            0.25f32 // Average gain for midband
+        } else {
+            1.0f32
+        };
+        let coupling_strength = coupling_base * coupling_gain;
+
+        if temp >= 3.0 && temp <= 8.0 && aggressive_midband {
+            println!(
+                "[THERMO-GPU][MIDBAND] Using coupling_gain={:.2} for T={:.3}",
+                coupling_gain, temp
+            );
+        }
+
+        // Part B: 20k steps for midband temps (T=3 to T=7)
+        let dynamic_steps = if temp >= 3.0 && temp <= 7.0 && aggressive_midband {
+            steps_per_temp * 4 // 5k * 4 = 20k steps
+        } else {
+            steps_per_temp
+        };
+
+        if temp >= 3.0 && temp <= 7.0 && aggressive_midband {
+            println!(
+                "[THERMO-GPU][MIDBAND] Using {}x steps ({}) for T={:.3}",
+                4, dynamic_steps, temp
+            );
+        }
+
+        for step in 0..dynamic_steps {
             // Compute coupling forces (Task B1: temperature-dependent coupling)
             // MOVE 5: Pass uncertainty for band-aware coupling redistribution
             unsafe {
@@ -984,8 +1041,10 @@ pub fn equilibrate_thermodynamic_gpu(
             params.insert("force_blend_factor".to_string(), json!(force_blend_factor));
             params.insert("force_start_temp".to_string(), json!(force_start_temp));
             params.insert("force_full_strength_temp".to_string(), json!(force_full_strength_temp));
-            params.insert("coupling_strong_gain".to_string(), json!(if temp > 3.0 { 0.15 } else { 1.0 }));
-            params.insert("coupling_weak_gain".to_string(), json!(if temp > 3.0 { 1.40 } else { 1.0 }));
+            params.insert("coupling_gain".to_string(), json!(coupling_gain));
+            params.insert("coupling_strength".to_string(), json!(coupling_strength));
+            params.insert("aggressive_midband".to_string(), json!(aggressive_midband));
+            params.insert("dynamic_steps".to_string(), json!(dynamic_steps));
 
             // Shake metrics
             params.insert("shake_invoked".to_string(), json!(shake_invoked));
