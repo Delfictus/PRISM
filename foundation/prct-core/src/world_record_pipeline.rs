@@ -2654,6 +2654,42 @@ impl WorldRecordPipeline {
                 self.last_fluxnet_action = Some(action);
             }
 
+            // Capture FluxNet telemetry data (Phase 0)
+            #[cfg(feature = "cuda")]
+            let fluxnet_telemetry = if let Some(ref rl) = self.fluxnet_rl {
+                if self.config.fluxnet.enabled {
+                    let indexer_stats = rl.adaptive_indexer_stats();
+                    let priority_stats = rl.replay_buffer_stats();
+                    Some(json!({
+                        "enabled": true,
+                        "action_taken": self.last_fluxnet_action.as_ref().map(|a| format!("{:?}", a)),
+                        "state_index_hashed": self.last_fluxnet_state.as_ref().map(|s| s.to_index(rl.table_size())),
+                        "adaptive_indexer": {
+                            "total_samples": indexer_stats.total_samples,
+                            "ready": indexer_stats.adaptive_ready,
+                            "chromatic_hist_size": indexer_stats.chromatic_hist_size,
+                            "conflicts_hist_size": indexer_stats.conflicts_hist_size,
+                        },
+                        "replay_buffer": {
+                            "size": rl.replay_buffer_size(),
+                            "mean_priority": priority_stats.mean_priority,
+                            "max_priority": priority_stats.max_priority,
+                        },
+                        "q_table": {
+                            "visited_states": rl.num_visited_states(),
+                            "table_size": rl.table_size(),
+                        },
+                        "epsilon": rl.epsilon(),
+                    }))
+                } else {
+                    Some(json!({"enabled": false}))
+                }
+            } else {
+                None
+            };
+            #[cfg(not(feature = "cuda"))]
+            let fluxnet_telemetry: Option<serde_json::Value> = None;
+
             // Record telemetry: phase complete
             if let Some(ref telemetry) = self.telemetry {
                 let gpu_mode = if self.phase_gpu_status.phase0_gpu_used {
@@ -2719,6 +2755,17 @@ impl WorldRecordPipeline {
                     }
                 };
 
+                let mut params = json!({
+                    "phase": "0B",
+                    "gpu_used": self.phase_gpu_status.phase0_gpu_used,
+                    "difficulty_zones": difficulty_stats,
+                });
+
+                // Add FluxNet telemetry if available
+                if let Some(fluxnet_data) = fluxnet_telemetry {
+                    params["fluxnet"] = fluxnet_data;
+                }
+
                 telemetry.record(
                     RunMetric::new(
                         PhaseName::Reservoir,
@@ -2728,11 +2775,7 @@ impl WorldRecordPipeline {
                         phase_elapsed.as_secs_f64() * 1000.0,
                         gpu_mode,
                     )
-                    .with_parameters(json!({
-                        "phase": "0B",
-                        "gpu_used": self.phase_gpu_status.phase0_gpu_used,
-                        "difficulty_zones": difficulty_stats,
-                    })),
+                    .with_parameters(params),
                 );
             }
 
@@ -3059,6 +3102,42 @@ impl WorldRecordPipeline {
             self.last_fluxnet_action = Some(action);
         }
 
+        // Capture FluxNet telemetry data (Phase 1)
+        #[cfg(feature = "cuda")]
+        let fluxnet_telemetry_p1 = if let Some(ref rl) = self.fluxnet_rl {
+            if self.config.fluxnet.enabled {
+                let indexer_stats = rl.adaptive_indexer_stats();
+                let priority_stats = rl.replay_buffer_stats();
+                Some(json!({
+                    "enabled": true,
+                    "action_taken": self.last_fluxnet_action.as_ref().map(|a| format!("{:?}", a)),
+                    "state_index_hashed": self.last_fluxnet_state.as_ref().map(|s| s.to_index(rl.table_size())),
+                    "adaptive_indexer": {
+                        "total_samples": indexer_stats.total_samples,
+                        "ready": indexer_stats.adaptive_ready,
+                        "chromatic_hist_size": indexer_stats.chromatic_hist_size,
+                        "conflicts_hist_size": indexer_stats.conflicts_hist_size,
+                    },
+                    "replay_buffer": {
+                        "size": rl.replay_buffer_size(),
+                        "mean_priority": priority_stats.mean_priority,
+                        "max_priority": priority_stats.max_priority,
+                    },
+                    "q_table": {
+                        "visited_states": rl.num_visited_states(),
+                        "table_size": rl.table_size(),
+                    },
+                    "epsilon": rl.epsilon(),
+                }))
+            } else {
+                Some(json!({"enabled": false}))
+            }
+        } else {
+            None
+        };
+        #[cfg(not(feature = "cuda"))]
+        let fluxnet_telemetry_p1: Option<serde_json::Value> = None;
+
         // Record telemetry: phase complete
         if let Some(ref telemetry) = self.telemetry {
             let gpu_mode = if self.phase_gpu_status.phase1_gpu_used {
@@ -3092,6 +3171,19 @@ impl WorldRecordPipeline {
                 })
             };
 
+            // Build telemetry parameters with FluxNet data
+            let mut p1_params = json!({
+                "phase": "1",
+                "te_gpu_used": self.phase_gpu_status.phase1_gpu_used,
+                "ai_gpu_used": self.phase_gpu_status.phase1_ai_gpu_used,
+                "active_inference_enabled": self.config.use_active_inference,
+                "ai_stats": ai_stats,
+            });
+
+            if let Some(fluxnet_data) = fluxnet_telemetry_p1 {
+                p1_params["fluxnet"] = fluxnet_data;
+            }
+
             telemetry.record(
                 RunMetric::new(
                     PhaseName::TransferEntropy,
@@ -3101,13 +3193,7 @@ impl WorldRecordPipeline {
                     phase1_elapsed.as_secs_f64() * 1000.0,
                     gpu_mode,
                 )
-                .with_parameters(json!({
-                    "phase": "1",
-                    "te_gpu_used": self.phase_gpu_status.phase1_gpu_used,
-                    "ai_gpu_used": self.phase_gpu_status.phase1_ai_gpu_used,
-                    "active_inference_enabled": self.config.use_active_inference,
-                    "ai_stats": ai_stats,
-                })),
+                .with_parameters(p1_params),
             );
         }
 
@@ -3568,6 +3654,42 @@ impl WorldRecordPipeline {
                 }
             }
 
+            // Capture FluxNet telemetry data (Phase 2)
+            #[cfg(feature = "cuda")]
+            let fluxnet_telemetry_p2 = if let Some(ref rl) = self.fluxnet_rl {
+                if self.config.fluxnet.enabled {
+                    let indexer_stats = rl.adaptive_indexer_stats();
+                    let priority_stats = rl.replay_buffer_stats();
+                    Some(json!({
+                        "enabled": true,
+                        "action_taken": self.last_fluxnet_action.as_ref().map(|a| format!("{:?}", a)),
+                        "state_index_hashed": self.last_fluxnet_state.as_ref().map(|s| s.to_index(rl.table_size())),
+                        "adaptive_indexer": {
+                            "total_samples": indexer_stats.total_samples,
+                            "ready": indexer_stats.adaptive_ready,
+                            "chromatic_hist_size": indexer_stats.chromatic_hist_size,
+                            "conflicts_hist_size": indexer_stats.conflicts_hist_size,
+                        },
+                        "replay_buffer": {
+                            "size": rl.replay_buffer_size(),
+                            "mean_priority": priority_stats.mean_priority,
+                            "max_priority": priority_stats.max_priority,
+                        },
+                        "q_table": {
+                            "visited_states": rl.num_visited_states(),
+                            "table_size": rl.table_size(),
+                        },
+                        "epsilon": rl.epsilon(),
+                    }))
+                } else {
+                    Some(json!({"enabled": false}))
+                }
+            } else {
+                None
+            };
+            #[cfg(not(feature = "cuda"))]
+            let fluxnet_telemetry_p2: Option<serde_json::Value> = None;
+
             // Record telemetry: phase complete
             if let Some(ref telemetry) = self.telemetry {
                 let gpu_mode = if self.phase_gpu_status.phase2_gpu_used {
@@ -3578,6 +3700,17 @@ impl WorldRecordPipeline {
                     PhaseExecMode::cpu_disabled()
                 };
 
+                // Build telemetry parameters with FluxNet data
+                let mut p2_params = json!({
+                    "phase": "2",
+                    "gpu_used": self.phase_gpu_status.phase2_gpu_used,
+                    "num_states_explored": equilibrium_states.len(),
+                });
+
+                if let Some(fluxnet_data) = fluxnet_telemetry_p2 {
+                    p2_params["fluxnet"] = fluxnet_data;
+                }
+
                 telemetry.record(
                     RunMetric::new(
                         PhaseName::Thermodynamic,
@@ -3587,11 +3720,7 @@ impl WorldRecordPipeline {
                         phase2_elapsed.as_secs_f64() * 1000.0,
                         gpu_mode,
                     )
-                    .with_parameters(json!({
-                        "phase": "2",
-                        "gpu_used": self.phase_gpu_status.phase2_gpu_used,
-                        "num_states_explored": equilibrium_states.len(),
-                    })),
+                    .with_parameters(p2_params),
                 );
             }
         } else {
@@ -3818,6 +3947,42 @@ impl WorldRecordPipeline {
                 self.last_fluxnet_action = Some(action);
             }
 
+            // Capture FluxNet telemetry data (Phase 3)
+            #[cfg(feature = "cuda")]
+            let fluxnet_telemetry_p3 = if let Some(ref rl) = self.fluxnet_rl {
+                if self.config.fluxnet.enabled {
+                    let indexer_stats = rl.adaptive_indexer_stats();
+                    let priority_stats = rl.replay_buffer_stats();
+                    Some(json!({
+                        "enabled": true,
+                        "action_taken": self.last_fluxnet_action.as_ref().map(|a| format!("{:?}", a)),
+                        "state_index_hashed": self.last_fluxnet_state.as_ref().map(|s| s.to_index(rl.table_size())),
+                        "adaptive_indexer": {
+                            "total_samples": indexer_stats.total_samples,
+                            "ready": indexer_stats.adaptive_ready,
+                            "chromatic_hist_size": indexer_stats.chromatic_hist_size,
+                            "conflicts_hist_size": indexer_stats.conflicts_hist_size,
+                        },
+                        "replay_buffer": {
+                            "size": rl.replay_buffer_size(),
+                            "mean_priority": priority_stats.mean_priority,
+                            "max_priority": priority_stats.max_priority,
+                        },
+                        "q_table": {
+                            "visited_states": rl.num_visited_states(),
+                            "table_size": rl.table_size(),
+                        },
+                        "epsilon": rl.epsilon(),
+                    }))
+                } else {
+                    Some(json!({"enabled": false}))
+                }
+            } else {
+                None
+            };
+            #[cfg(not(feature = "cuda"))]
+            let fluxnet_telemetry_p3: Option<serde_json::Value> = None;
+
             // Record telemetry: phase complete
             if let Some(ref telemetry) = self.telemetry {
                 let gpu_mode = if self.phase_gpu_status.phase3_gpu_used {
@@ -3828,6 +3993,16 @@ impl WorldRecordPipeline {
                     PhaseExecMode::cpu_disabled()
                 };
 
+                // Build telemetry parameters with FluxNet data
+                let mut p3_params = json!({
+                    "phase": "3",
+                    "gpu_used": self.phase_gpu_status.phase3_gpu_used,
+                });
+
+                if let Some(fluxnet_data) = fluxnet_telemetry_p3 {
+                    p3_params["fluxnet"] = fluxnet_data;
+                }
+
                 telemetry.record(
                     RunMetric::new(
                         PhaseName::Quantum,
@@ -3837,10 +4012,7 @@ impl WorldRecordPipeline {
                         phase3_elapsed.as_secs_f64() * 1000.0,
                         gpu_mode,
                     )
-                    .with_parameters(json!({
-                        "phase": "3",
-                        "gpu_used": self.phase_gpu_status.phase3_gpu_used,
-                    })),
+                    .with_parameters(p3_params),
                 );
             }
         } else {
@@ -3902,7 +4074,57 @@ impl WorldRecordPipeline {
             self.best_solution.chromatic_number
         );
 
+        // Capture FluxNet telemetry data (Phase 3.5)
+        #[cfg(feature = "cuda")]
+        let fluxnet_telemetry_p35 = if let Some(ref rl) = self.fluxnet_rl {
+            if self.config.fluxnet.enabled {
+                let indexer_stats = rl.adaptive_indexer_stats();
+                let priority_stats = rl.replay_buffer_stats();
+                Some(json!({
+                    "enabled": true,
+                    "action_taken": self.last_fluxnet_action.as_ref().map(|a| format!("{:?}", a)),
+                    "state_index_hashed": self.last_fluxnet_state.as_ref().map(|s| s.to_index(rl.table_size())),
+                    "adaptive_indexer": {
+                        "total_samples": indexer_stats.total_samples,
+                        "ready": indexer_stats.adaptive_ready,
+                        "chromatic_hist_size": indexer_stats.chromatic_hist_size,
+                        "conflicts_hist_size": indexer_stats.conflicts_hist_size,
+                    },
+                    "replay_buffer": {
+                        "size": rl.replay_buffer_size(),
+                        "mean_priority": priority_stats.mean_priority,
+                        "max_priority": priority_stats.max_priority,
+                    },
+                    "q_table": {
+                        "visited_states": rl.num_visited_states(),
+                        "table_size": rl.table_size(),
+                    },
+                    "epsilon": rl.epsilon(),
+                }))
+            } else {
+                Some(json!({"enabled": false}))
+            }
+        } else {
+            None
+        };
+        #[cfg(not(feature = "cuda"))]
+        let fluxnet_telemetry_p35: Option<serde_json::Value> = None;
+
         if let Some(ref telemetry) = self.telemetry {
+            // Build telemetry parameters with FluxNet data
+            let mut p35_params = serde_json::json!({
+                "phase": "3.5",
+                "population_size": 32,
+                "generations": 200,
+                "mutation_rate": 0.20,
+                "restarts": 3,
+                "local_search_depth": 5000,
+            });
+
+            if let Some(fluxnet_data) = fluxnet_telemetry_p35 {
+                p35_params["fluxnet"] = fluxnet_data;
+            }
+
             telemetry.record(
                 RunMetric::new(
                     PhaseName::Memetic,
@@ -3912,14 +4134,7 @@ impl WorldRecordPipeline {
                     phase35_elapsed.as_secs_f64() * 1000.0,
                     PhaseExecMode::cpu_disabled(),
                 )
-                .with_parameters(serde_json::json!({
-                    "phase": "3.5",
-                    "population_size": 32,
-                    "generations": 200,
-                    "mutation_rate": 0.20,
-                    "restarts": 3,
-                    "local_search_depth": 5000,
-                })),
+                .with_parameters(p35_params),
             );
         }
 
