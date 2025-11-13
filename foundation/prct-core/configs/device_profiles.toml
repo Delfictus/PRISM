@@ -1,0 +1,100 @@
+# PRISM Device Profiles
+#
+# Device selection profiles for single RTX 5070 workstations and RunPod multi-GPU instances.
+# Selected via PRISM_DEVICE_PROFILE environment variable or --device-profile CLI flag.
+#
+# Example usage:
+#   PRISM_DEVICE_PROFILE=rtx5070 cargo run --release --features cuda ...
+#   PRISM_DEVICE_PROFILE=runpod_b200 cargo run --release --features cuda ...
+
+[device_profiles.rtx5070]
+# Single RTX 5070 workstation profile
+# - Local development and single-GPU production
+# - Conservative replica count to avoid memory pressure
+# - Sequential stream mode for determinism
+mode = "local"
+replicas = 1
+device_filter = ["cuda:0"]
+sync_interval_ms = 0  # No sync needed for single replica
+allow_remote = false
+enable_peer_access = false
+strategy = "single_device"
+
+[device_profiles.rtx5070_aggressive]
+# Aggressive RTX 5070 profile with multiple replicas on same GPU
+# - Useful for embarrassingly parallel phases (multistart)
+# - Higher memory pressure but better throughput
+mode = "local"
+replicas = 4
+device_filter = ["cuda:0"]
+sync_interval_ms = 100
+allow_remote = false
+enable_peer_access = false
+strategy = "single_device_multi_replica"
+
+[device_profiles.runpod_b200]
+# RunPod 8x B200 GPU cluster profile
+# - Automatic detection of all available GPUs
+# - Embarrassingly parallel replica distribution
+# - Snapshot sharing every 100ms for global best tracking
+mode = "cluster"
+replicas = "auto"  # One replica per GPU detected
+device_filter = ["cuda:*"]  # All CUDA devices
+sync_interval_ms = 100
+allow_remote = true  # Future: enable gRPC for multi-node
+enable_peer_access = true  # Enable NVLink P2P if available
+strategy = "distributed_replicas"
+
+[device_profiles.runpod_b200_fixed]
+# RunPod with fixed number of GPUs (user override)
+# - Useful when CUDA_VISIBLE_DEVICES restricts visible GPUs
+# - Explicit device list for controlled deployment
+mode = "cluster"
+replicas = 8
+device_filter = ["cuda:0", "cuda:1", "cuda:2", "cuda:3", "cuda:4", "cuda:5", "cuda:6", "cuda:7"]
+sync_interval_ms = 100
+allow_remote = true
+enable_peer_access = true
+strategy = "distributed_replicas"
+
+[device_profiles.runpod_b200_4gpu]
+# RunPod 4x B200 profile for cost efficiency
+mode = "cluster"
+replicas = 4
+device_filter = ["cuda:0", "cuda:1", "cuda:2", "cuda:3"]
+sync_interval_ms = 100
+allow_remote = true
+enable_peer_access = true
+strategy = "distributed_replicas"
+
+[device_profiles.runpod_b200_2gpu]
+# RunPod 2x B200 profile for testing/development
+mode = "cluster"
+replicas = 2
+device_filter = ["cuda:0", "cuda:1"]
+sync_interval_ms = 100
+allow_remote = true
+enable_peer_access = true
+strategy = "distributed_replicas"
+
+[device_profiles.debug]
+# Debug profile with single GPU, verbose logging
+mode = "local"
+replicas = 1
+device_filter = ["cuda:0"]
+sync_interval_ms = 0
+allow_remote = false
+enable_peer_access = false
+strategy = "single_device"
+verbose = true
+
+[device_profiles.benchmark]
+# Benchmark profile to measure single vs multi-GPU scaling
+# Uses 8 replicas on first GPU only for comparison
+mode = "local"
+replicas = 8
+device_filter = ["cuda:0"]
+sync_interval_ms = 50
+allow_remote = false
+enable_peer_access = false
+strategy = "single_device_multi_replica"
