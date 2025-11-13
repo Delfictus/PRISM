@@ -115,7 +115,10 @@ COPY --from=builder /build/foundation/prct-core/configs/*.toml /app/configs/
 COPY --from=builder /build/benchmarks/dimacs/*.col /app/benchmarks/dimacs/
 
 # Create directories for outputs
-RUN mkdir -p /app/results /app/fluxnet_cache /app/logs /app/bin
+RUN mkdir -p /app/results /app/fluxnet_cache /app/logs /app/bin /app/target/ptx
+
+# Create symlink so PTX kernels are found at target/ptx/ (where app expects them)
+RUN ln -s /app/ptx/*.ptx /app/target/ptx/
 
 # Copy entrypoint script
 COPY --from=builder /build/docker/entrypoint.sh /app/entrypoint.sh
