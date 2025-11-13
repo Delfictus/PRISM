@@ -2995,8 +2995,55 @@ impl WorldRecordPipeline {
                 println!("[FLUXNET][PHASE1] Reward: {:.2}", reward);
             }
 
-            // Choose next action
-            let action = rl.choose_action(&curr_state, crate::telemetry::PhaseName::TransferEntropy);
+            // Choose next action with nested rollout (sample 3 candidates, pick best Q-value)
+            let state_idx = curr_state.to_index(rl.table_size());
+            let phase = crate::telemetry::PhaseName::TransferEntropy;
+            let valid_actions = crate::fluxnet::FluxNetAction::actions_for_phase(phase);
+
+            // Candidate 1: Epsilon-greedy (from choose_action)
+            let candidate1 = rl.choose_action(&curr_state, phase);
+
+            // Candidate 2: Random valid action
+            use rand::seq::SliceRandom;
+            let mut rng = rand::thread_rng();
+            let candidate2 = if !valid_actions.is_empty() {
+                valid_actions.choose(&mut rng).cloned().unwrap_or(crate::fluxnet::FluxNetAction::NoOp)
+            } else {
+                crate::fluxnet::FluxNetAction::NoOp
+            };
+
+            // Candidate 3: Greedy (best Q-value)
+            let candidate3 = if !valid_actions.is_empty() {
+                valid_actions
+                    .iter()
+                    .max_by(|a, b| {
+                        let qa = rl.get_q_value(state_idx, a.to_index());
+                        let qb = rl.get_q_value(state_idx, b.to_index());
+                        qa.partial_cmp(&qb).unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .cloned()
+                    .unwrap_or(crate::fluxnet::FluxNetAction::NoOp)
+            } else {
+                crate::fluxnet::FluxNetAction::NoOp
+            };
+
+            // Pick candidate with best Q-value
+            let q1 = rl.get_q_value(state_idx, candidate1.to_index());
+            let q2 = rl.get_q_value(state_idx, candidate2.to_index());
+            let q3 = rl.get_q_value(state_idx, candidate3.to_index());
+
+            let (action, q_selected) = if q1 >= q2 && q1 >= q3 {
+                (candidate1, q1)
+            } else if q2 >= q3 {
+                (candidate2, q2)
+            } else {
+                (candidate3, q3)
+            };
+
+            println!(
+                "[FLUXNET][PHASE1][NESTED-ROLLOUT] Selected {:?} (Q={:.3}) from candidates [Q1={:.3}, Q2={:.3}, Q3={:.3}]",
+                action, q_selected, q1, q2, q3
+            );
 
             match action.apply(&mut self.config) {
                 Ok(desc) => println!("[FLUXNET][PHASE1] RL Action: {:?} -> {}", action, desc),

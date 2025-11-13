@@ -484,6 +484,16 @@ impl MultiPhaseRLController {
         self.qtable.num_visited()
     }
 
+    /// Get Q-table size (for state indexing)
+    pub fn table_size(&self) -> usize {
+        self.table_size
+    }
+
+    /// Get Q-value for state-action pair
+    pub fn get_q_value(&self, state_idx: usize, action_idx: usize) -> f64 {
+        self.qtable.get(state_idx, action_idx)
+    }
+
     /// Get average reward for a phase (last 100 episodes)
     pub fn avg_reward(&self, phase: PhaseName) -> Option<f64> {
         self.phase_rewards.get(&phase).and_then(|rewards| {

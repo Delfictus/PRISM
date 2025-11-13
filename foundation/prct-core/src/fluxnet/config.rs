@@ -412,7 +412,7 @@ mod tests {
         assert!(config.enabled);
         assert_eq!(config.memory_tier, MemoryTier::Compact);
         assert_eq!(config.rl.get_replay_capacity(config.memory_tier), 1024);
-        assert_eq!(config.rl.get_qtable_states(config.memory_tier), 256);
+        assert_eq!(config.rl.get_qtable_states(config.memory_tier), 4096);
     }
 
     #[test]

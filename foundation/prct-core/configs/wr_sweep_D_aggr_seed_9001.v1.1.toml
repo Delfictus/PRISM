@@ -20,7 +20,8 @@ strategy = "greedy"  # Options: greedy, spectral, community, randomized
 
 [gpu]
 device_id = 0
-streams = 1
+streams = 4
+stream_mode = "parallel"
 batch_size = 1024
 enable_reservoir_gpu = true
 enable_te_gpu = true
@@ -94,7 +95,7 @@ tsp_weight = 0.0
 [thermo]
 replicas = 48
 num_temps = 58  # Part B: Was 48, +10 for midband density
-steps_per_temp = 20000  # Part B: Was 5000, increased for midband (T=3-7)
+steps_per_temp = 40000  # TELEMETRY RECOMMENDATION: 40k base → 160k midband (was 20k)
 swaps_per_temp = 100
 temperature_max = 10.0
 temperature_min = 0.001

@@ -472,17 +472,18 @@ pub fn equilibrate_thermodynamic_gpu(
 
         // Part B: Per-band coupling gains (3.0 ≤ T ≤ 8.0 midband)
         let coupling_base = 1.0f32 / (n as f32).sqrt();
-        let coupling_gain = if temp >= 3.0 && temp <= 8.0 && aggressive_midband {
-            // Midband: apply differential coupling to force heterogeneity
-            // Strong vertices: 0.15x (reduced coupling to prevent phase-lock)
-            // Neutral vertices: 0.25x
-            // Weak vertices: 0.40x (increased coupling to drive mixing)
-            // Note: The actual per-vertex gains are applied in the CUDA kernel via vertex_weights
-            // This is a global scaling factor
-            0.25f32 // Average gain for midband
-        } else {
-            1.0f32
-        };
+        let (coupling_gain_strong, coupling_gain_neutral, coupling_gain_weak, coupling_gain) =
+            if temp >= 3.0 && temp <= 8.0 && aggressive_midband {
+                // Midband: apply differential coupling to force heterogeneity
+                // Strong vertices: 0.15x (reduced coupling to prevent phase-lock)
+                // Neutral vertices: 0.25x
+                // Weak vertices: 0.40x (increased coupling to drive mixing)
+                // Note: The actual per-vertex gains are applied in the CUDA kernel via vertex_weights
+                // This is a global scaling factor
+                (0.15f32, 0.25f32, 0.40f32, 0.25f32) // Average gain for midband
+            } else {
+                (1.0f32, 1.0f32, 1.0f32, 1.0f32)
+            };
         let coupling_strength = coupling_base * coupling_gain;
 
         if temp >= 3.0 && temp <= 8.0 && aggressive_midband {
@@ -492,9 +493,10 @@ pub fn equilibrate_thermodynamic_gpu(
             );
         }
 
-        // Part B: 20k steps for midband temps (T=3 to T=7)
+        // Part B: Aggressive midband steps - 4x multiplier for midband temps (T=3 to T=7)
+        // With telemetry-driven config: 40k base → 160k midband
         let dynamic_steps = if temp >= 3.0 && temp <= 7.0 && aggressive_midband {
-            steps_per_temp * 4 // 5k * 4 = 20k steps
+            steps_per_temp * 4
         } else {
             steps_per_temp
         };
@@ -1042,6 +1044,9 @@ pub fn equilibrate_thermodynamic_gpu(
             params.insert("force_start_temp".to_string(), json!(force_start_temp));
             params.insert("force_full_strength_temp".to_string(), json!(force_full_strength_temp));
             params.insert("coupling_gain".to_string(), json!(coupling_gain));
+            params.insert("coupling_gain_strong".to_string(), json!(coupling_gain_strong));
+            params.insert("coupling_gain_neutral".to_string(), json!(coupling_gain_neutral));
+            params.insert("coupling_gain_weak".to_string(), json!(coupling_gain_weak));
             params.insert("coupling_strength".to_string(), json!(coupling_strength));
             params.insert("aggressive_midband".to_string(), json!(aggressive_midband));
             params.insert("dynamic_steps".to_string(), json!(dynamic_steps));
