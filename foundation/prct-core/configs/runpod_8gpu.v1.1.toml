@@ -157,7 +157,7 @@ gamma = 0.97
 # ═══════════════════════════════════════════════════════════════════════════════
 [fluxnet]
 enabled = true
-memory_tier = "Extended"  # Extended tier for massive VRAM
+memory_tier = "extended"  # extended tier for massive VRAM
 verbose = true
 
 # RL Hyperparameters - Extended configuration

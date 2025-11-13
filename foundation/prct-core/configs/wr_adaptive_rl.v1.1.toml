@@ -112,7 +112,7 @@ gamma = 0.95
 # ═══════════════════════════════════════════════════════════
 [fluxnet]
 enabled = true
-memory_tier = "Compact"  # Compact (8GB) or Extended (16GB+)
+memory_tier = "compact"  # compact (8GB) or extended (16GB+)
 verbose = true
 
 # RL Hyperparameters with Adaptive Indexing
