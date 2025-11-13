@@ -3,12 +3,13 @@
 ## Build Status: COMPLETE ✅
 
 **Date**: 2025-11-13
-**Version**: v1.1.0-multi-gpu
+**Version**: v1.1.1-multi-gpu-fix
 **Image**: `delfictus/prism-ai-world-record:latest`
-**Digest**: `sha256:7cde4e059108df2737357ffa5940a58da8e95c81ec08835022b14e2848883561`
+**Digest**: `sha256:43446316b2fa2347deaea7d57672fe035fd7ab3e32c0b10c4d6be5df523fda9e`
 **Size**: 2.32 GB
 **Build Time**: ~25 minutes (cached dependencies)
 **Features**: FluxNet RL, Multi-GPU (1-8×), Q-table persistence, Phase 2 hardening
+**Fix**: Verified entrypoint script creation and execution permissions
 
 ---
 

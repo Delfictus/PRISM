@@ -232,6 +232,13 @@ ENTRY
 
 RUN chmod +x /workspace/prism/entrypoint.sh
 
+# Verify all scripts are created and executable
+RUN echo "=== Verifying scripts ===" && \
+    ls -la /workspace/prism/*.sh && \
+    echo "=== Entrypoint content (first 10 lines) ===" && \
+    head -10 /workspace/prism/entrypoint.sh && \
+    echo "=== Verification complete ==="
+
 # Expose ports for monitoring/telemetry (optional)
 EXPOSE 8080 8081
 
