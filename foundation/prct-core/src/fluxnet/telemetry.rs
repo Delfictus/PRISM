@@ -4,7 +4,8 @@
 //! force band statistics, and Q-learning updates during Phase 2 execution.
 
 use serde::{Deserialize, Serialize};
-use crate::fluxnet::{ForceCommand, RLState};
+use crate::fluxnet::{FluxNetAction, UnifiedRLState};
+use crate::telemetry::PhaseName;
 
 /// FluxNet-specific telemetry data
 ///
@@ -109,14 +110,14 @@ impl ForceBandTelemetry {
 /// RL decision and action telemetry
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RLDecisionTelemetry {
-    /// Temperature index when decision was made
-    pub temp_index: usize,
+    /// Phase when decision was made
+    pub phase: String,
 
     /// RL state observation (discretized)
     pub state: RLStateTelemetry,
 
     /// Action taken by RL controller
-    pub action: ForceCommand,
+    pub action: FluxNetAction,
 
     /// Q-value for selected action (before update)
     pub q_value: f32,
@@ -126,25 +127,35 @@ pub struct RLDecisionTelemetry {
 
     /// Whether action was exploratory (random) or exploitative (greedy)
     pub was_exploration: bool,
+
+    /// State index (hashed)
+    pub state_index_hashed: usize,
+
+    /// State index (adaptive) - None if adaptive indexing not ready
+    pub state_index_adaptive: Option<usize>,
 }
 
 impl RLDecisionTelemetry {
     /// Create from RL controller state and action
     pub fn new(
-        temp_index: usize,
-        state: &RLState,
-        action: ForceCommand,
+        phase: PhaseName,
+        state: &UnifiedRLState,
+        action: FluxNetAction,
         q_value: f32,
         epsilon: f32,
         was_exploration: bool,
+        table_size: usize,
+        state_index_adaptive: Option<usize>,
     ) -> Self {
         Self {
-            temp_index,
-            state: RLStateTelemetry::from_rl_state(state),
+            phase: format!("{:?}", phase),
+            state: RLStateTelemetry::from_unified_state(state),
             action,
             q_value,
             epsilon,
             was_exploration,
+            state_index_hashed: state.to_index(table_size),
+            state_index_adaptive,
         }
     }
 }
@@ -152,27 +163,55 @@ impl RLDecisionTelemetry {
 /// RL state observation for telemetry
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RLStateTelemetry {
-    /// Conflict count
-    pub conflicts: usize,
+    /// Phase name
+    pub phase: String,
 
-    /// Chromatic number
-    pub chromatic_number: usize,
+    /// Chromatic bin (0-255)
+    pub chromatic_bin: u8,
 
-    /// Compaction ratio [0.0, 1.0]
-    pub compaction_ratio: f32,
+    /// Conflicts bin (0-255)
+    pub conflicts_bin: u8,
 
-    /// Discretized state index
-    pub state_index: usize,
+    /// Iteration bin (0-255)
+    pub iteration_bin: u8,
+
+    /// GPU utilization bin (0-255)
+    pub gpu_util_bin: u8,
+
+    /// Phase 0 difficulty/quality score
+    pub phase0_difficulty_quality: u8,
+
+    /// Phase 1 TE centrality
+    pub phase1_te_centrality: u8,
+
+    /// Phase 1 AI uncertainty
+    pub phase1_ai_uncertainty: u8,
+
+    /// Phase 2 temperature band
+    pub phase2_temp_band: u8,
+
+    /// Phase 2 escape rate
+    pub phase2_escape_rate: u8,
+
+    /// Phase 3 QUBO quality
+    pub phase3_qubo_quality: u8,
 }
 
 impl RLStateTelemetry {
-    /// Create from RLState
-    pub fn from_rl_state(state: &RLState) -> Self {
+    /// Create from UnifiedRLState
+    pub fn from_unified_state(state: &UnifiedRLState) -> Self {
         Self {
-            conflicts: state.conflicts,
-            chromatic_number: state.chromatic_number,
-            compaction_ratio: state.compaction_ratio,
-            state_index: state.to_index(),
+            phase: format!("{:?}", state.phase()),
+            chromatic_bin: state.chromatic_bin,
+            conflicts_bin: state.conflicts_bin,
+            iteration_bin: state.iteration_bin,
+            gpu_util_bin: state.gpu_util_bin,
+            phase0_difficulty_quality: state.phase0_difficulty_quality,
+            phase1_te_centrality: state.phase1_te_centrality,
+            phase1_ai_uncertainty: state.phase1_ai_uncertainty,
+            phase2_temp_band: state.phase2_temp_band,
+            phase2_escape_rate: state.phase2_escape_rate,
+            phase3_qubo_quality: state.phase3_qubo_quality,
         }
     }
 }
@@ -300,19 +339,28 @@ mod tests {
         };
 
         let rl_state = RLStateTelemetry {
-            conflicts: 10,
-            chromatic_number: 95,
-            compaction_ratio: 0.75,
-            state_index: 42,
+            phase: "Reservoir".to_string(),
+            chromatic_bin: 100,
+            conflicts_bin: 50,
+            iteration_bin: 128,
+            gpu_util_bin: 200,
+            phase0_difficulty_quality: 5,
+            phase1_te_centrality: 10,
+            phase1_ai_uncertainty: 3,
+            phase2_temp_band: 8,
+            phase2_escape_rate: 12,
+            phase3_qubo_quality: 7,
         };
 
         let rl_decision = RLDecisionTelemetry {
-            temp_index: 5,
+            phase: "Reservoir".to_string(),
             state: rl_state,
-            action: ForceCommand::BoostStrong(1.2),
+            action: FluxNetAction::NoOp,
             q_value: 0.8,
             epsilon: 0.1,
             was_exploration: false,
+            state_index_hashed: 42,
+            state_index_adaptive: Some(137),
         };
 
         let config = FluxNetConfigSnapshot {

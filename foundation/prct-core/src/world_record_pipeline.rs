@@ -1926,12 +1926,17 @@ impl WorldRecordPipeline {
 
                 if pretrained_path.exists() {
                     if let Some(ref mut rl) = fluxnet_rl {
-                        match rl.load_qtable(&pretrained_path) {
+                        match rl.load_with_indexer(&pretrained_path) {
                             Ok(_) => {
                                 let num_states = rl.num_visited_states();
+                                let adaptive_ready = rl.is_adaptive_ready();
                                 println!(
                                     "[FLUXNET] Loaded pretrained Q-table: {} state-action pairs from {:?}",
                                     num_states, pretrained_path
+                                );
+                                println!(
+                                    "[FLUXNET] Adaptive indexer: {}",
+                                    if adaptive_ready { "Ready" } else { "Learning" }
                                 );
                             }
                             Err(e) => {
@@ -3270,12 +3275,18 @@ impl WorldRecordPipeline {
                                                 let save_interval = self.config.fluxnet.persistence.save_interval_temps;
                                                 // Save checkpoint after Phase 2 thermodynamic completion
                                                 let checkpoint_path = cache_dir.join("qtable_checkpoint_phase2.bin");
-                                                match rl.save_qtable(&checkpoint_path) {
+                                                match rl.save_with_indexer(&checkpoint_path) {
                                                     Ok(_) => {
                                                         let num_states = rl.num_visited_states();
+                                                        let indexer_stats = rl.adaptive_indexer_stats();
                                                         println!(
                                                             "[FLUXNET] Saved Phase 2 checkpoint: {} state-action pairs to {:?}",
                                                             num_states, checkpoint_path
+                                                        );
+                                                        println!(
+                                                            "[FLUXNET] Adaptive indexer: {} samples, {}",
+                                                            indexer_stats.total_samples,
+                                                            if indexer_stats.adaptive_ready { "Ready" } else { "Learning" }
                                                         );
                                                     }
                                                     Err(e) => {
@@ -3350,12 +3361,18 @@ impl WorldRecordPipeline {
                                     if let (Some(ref cache_dir), Some(ref rl)) = (&self.fluxnet_cache_dir, &self.fluxnet_rl) {
                                         if self.config.fluxnet.enabled && self.config.fluxnet.persistence.save_interval_temps > 0 {
                                             let checkpoint_path = cache_dir.join("qtable_checkpoint_phase2.bin");
-                                            match rl.save_qtable(&checkpoint_path) {
+                                            match rl.save_with_indexer(&checkpoint_path) {
                                                 Ok(_) => {
                                                     let num_states = rl.num_visited_states();
+                                                    let indexer_stats = rl.adaptive_indexer_stats();
                                                     println!(
                                                         "[FLUXNET] Saved Phase 2 checkpoint: {} state-action pairs to {:?}",
                                                         num_states, checkpoint_path
+                                                    );
+                                                    println!(
+                                                        "[FLUXNET] Adaptive indexer: {} samples, {}",
+                                                        indexer_stats.total_samples,
+                                                        if indexer_stats.adaptive_ready { "Ready" } else { "Learning" }
                                                     );
                                                 }
                                                 Err(e) => {
@@ -4343,12 +4360,25 @@ impl WorldRecordPipeline {
         if let (Some(ref cache_dir), Some(ref rl)) = (&self.fluxnet_cache_dir, &self.fluxnet_rl) {
             if self.config.fluxnet.persistence.save_final {
                 let final_path = cache_dir.join("qtable_final.bin");
-                match rl.save_qtable(&final_path) {
+                match rl.save_with_indexer(&final_path) {
                     Ok(_) => {
                         let num_states = rl.num_visited_states();
+                        let indexer_stats = rl.adaptive_indexer_stats();
+                        let priority_stats = rl.replay_buffer_stats();
                         println!(
                             "[FLUXNET] Saved final Q-table: {} state-action pairs to {:?}",
                             num_states, final_path
+                        );
+                        println!(
+                            "[FLUXNET] Adaptive indexer: {} samples, {} ({})",
+                            indexer_stats.total_samples,
+                            if indexer_stats.adaptive_ready { "Ready" } else { "Learning" },
+                            final_path.with_file_name("adaptive_indexer_final.bin").display()
+                        );
+                        println!(
+                            "[FLUXNET] Replay buffer: {} experiences, avg priority: {:.2}",
+                            rl.replay_buffer_size(),
+                            priority_stats.mean_priority
                         );
                     }
                     Err(e) => {

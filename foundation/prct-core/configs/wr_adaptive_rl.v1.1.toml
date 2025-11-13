@@ -1,0 +1,159 @@
+# World Record Config with Adaptive RL (FluxNet)
+# Enhanced with percentile-based state indexing and prioritized experience replay
+# Based on wr_sweep_D_seed_42 (achieved 83 colors)
+# NEW: 16K Q-table, adaptive indexing, priority replay
+
+profile = "wr_adaptive_rl"
+version = "1.1.0"
+target_chromatic = 83
+deterministic = false
+max_runtime_hours = 48.0  # Extended for deep learning
+
+[cpu]
+threads = 24
+pin_pool = false
+work_steal = true
+parallel_io = true
+
+[initial_coloring]
+strategy = "greedy"
+
+[gpu]
+device_id = 0
+streams = 1
+batch_size = 1024
+enable_reservoir_gpu = true
+enable_te_gpu = true
+enable_statmech_gpu = true
+enable_quantum_gpu = true
+enable_pimc_gpu = true
+enable_thermo_gpu = true
+enable_tda_gpu = true
+
+[orchestrator]
+use_reservoir_prediction = true
+use_active_inference = true
+use_gpu_active_inference = true
+use_transfer_entropy = true
+use_geodesic_features = true
+use_thermodynamic_equilibration = true
+use_pimc = true
+use_quantum_classical_hybrid = true
+use_gnn_screening = true
+use_adp_learning = true
+use_tda = true
+use_multiscale_analysis = true
+use_ensemble_consensus = true
+restarts = 10
+seed = 42
+early_stop_no_improve_iters = 5
+checkpoint_minutes = 15
+adp_dsatur_depth = 50000
+adp_quantum_iterations = 30
+adp_thermo_num_temps = 48
+
+[neuromorphic]
+enabled = true
+reservoir_size = 1000
+spectral_radius = 0.9
+leak_rate = 0.3
+input_scaling = 0.5
+
+[dsatur]
+geodesic_weight = 0.30
+reservoir_weight = 0.30
+ai_weight = 0.40
+tie_break = "quantum_then_thermo"
+
+[quantum]
+iterations = 7
+target_chromatic = 83
+depth = 7
+attempts = 384
+beta = 0.9
+temperature = 1.0
+
+[memetic]
+population_size = 256
+elite_size = 8
+generations = 800
+mutation_rate = 0.05
+tournament_size = 3
+local_search_depth = 5000
+use_tsp_guidance = true
+tsp_weight = 0.20
+
+[thermo]
+replicas = 48
+num_temps = 48
+exchange_interval = 20
+t_min = 0.01
+t_max = 10.0
+batch_size = 1000
+damping = 0.02
+schedule = "geometric"
+
+[pimc]
+replicas = 48
+beads = 48
+beta = 1.0
+tau = 0.1
+steps = 20000
+
+[adp]
+epsilon = 0.3
+epsilon_decay = 0.995
+epsilon_min = 0.05
+alpha = 0.1
+gamma = 0.95
+
+# ═══════════════════════════════════════════════════════════
+# FluxNet Adaptive RL Configuration (NEW!)
+# ═══════════════════════════════════════════════════════════
+[fluxnet]
+enabled = true
+memory_tier = "Compact"  # Compact (8GB) or Extended (16GB+)
+verbose = true
+
+# RL Hyperparameters with Adaptive Indexing
+[fluxnet.rl]
+# State space: 16K states (expanded from 8K for adaptive indexing)
+qtable_states = 16384
+
+# Replay buffer: 2048 experiences
+replay_capacity = 2048
+
+# Q-learning parameters
+learning_rate = 0.001      # Lower for stability with large table
+discount_factor = 0.95
+epsilon_start = 1.0
+epsilon_decay = 0.995
+epsilon_min = 0.01
+
+# Adaptive indexing (percentile-based state quantization)
+use_adaptive_index = true  # Enable adaptive percentile indexing
+
+# Prioritized experience replay
+priority_alpha = 0.6       # Priority exponent (0.6 = moderate prioritization)
+priority_beta = 0.4        # Importance sampling correction (0.4 = moderate correction)
+priority_eps = 0.01        # Numerical stability epsilon
+high_reward_cutoff = 10.0  # 2x priority boost for |reward| > 10.0
+
+# Optional: batch replay for efficiency
+batch_size = 32            # Sample 32 experiences per update
+
+# Persistence Configuration
+[fluxnet.persistence]
+cache_dir = "target/fluxnet_cache"  # Where to save Q-tables and indexers
+save_interval_temps = 10            # Save checkpoint every 10 temperature steps
+save_final = true                   # Save when run completes
+load_pretrained = true              # Load existing Q-table if available
+# pretrained_path = "path/to/pretrained_qtable.bin"  # Optional: specific Q-table
+
+# Force Profile (adaptive thermodynamic forces)
+[fluxnet.force_profile]
+strong_multiplier = 1.5    # Boost difficult vertices
+weak_multiplier = 0.7      # Gentle forces for easy vertices
+neutral_multiplier = 1.0   # Standard forces
+difficulty_threshold = 0.6 # Percentile cutoff for "difficult"
+easy_threshold = 0.3       # Percentile cutoff for "easy"

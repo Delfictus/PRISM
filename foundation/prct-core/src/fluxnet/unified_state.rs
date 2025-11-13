@@ -301,6 +301,72 @@ impl UnifiedRLState {
         (hash as usize) % table_size
     }
 
+    /// Convert state to compact index using adaptive percentile-based quantization
+    ///
+    /// Instead of linear hashing, maps each feature to its empirical percentile
+    /// (learned from past observations), quantizes to 4-bit buckets (0-15),
+    /// packs into a 64-bit key, and hashes to the target table size.
+    ///
+    /// This approach improves Q-table distribution when state features have
+    /// skewed distributions (e.g., chromatic clustered near target, conflicts
+    /// log-distributed).
+    ///
+    /// # Arguments
+    /// - `table_size`: Size of Q-table state space (typically 16384)
+    /// - `indexer`: Adaptive indexer with learned histograms
+    ///
+    /// # Returns
+    /// State index in range [0, table_size)
+    ///
+    /// # Fallback
+    /// If indexer is not ready (< 100 samples), falls back to to_index()
+    pub fn to_index_adaptive(
+        &self,
+        table_size: usize,
+        indexer: &crate::fluxnet::AdaptiveStateIndexer,
+    ) -> usize {
+        use crate::fluxnet::AdaptiveStateIndexer;
+
+        // Fallback to hashed indexing if not enough data yet
+        if !indexer.is_ready() {
+            return self.to_index(table_size);
+        }
+
+        // Quantize each feature to 4-bit bucket using percentile breakpoints
+        let chromatic_bucket = indexer.quantize_chromatic(self.chromatic_bin);
+        let conflicts_bucket = indexer.quantize_conflicts(self.conflicts_bin);
+        let iteration_bucket = indexer.quantize_iteration(self.iteration_bin);
+        let gpu_util_bucket = indexer.quantize_gpu_util(self.gpu_util_bin);
+
+        // Phase-specific metrics (6 features, each 4-bit)
+        let phase_buckets = [
+            indexer.quantize_phase_metric(0, self.phase0_difficulty_quality),
+            indexer.quantize_phase_metric(1, self.phase1_te_centrality),
+            indexer.quantize_phase_metric(2, self.phase1_ai_uncertainty),
+            indexer.quantize_phase_metric(3, self.phase2_temp_band),
+            indexer.quantize_phase_metric(4, self.phase2_escape_rate),
+            indexer.quantize_phase_metric(5, self.phase3_qubo_quality),
+        ];
+
+        // Pack into 64-bit key:
+        // [chromatic:4][conflicts:4][iteration:4][gpu_util:4]
+        // [phase0:4][phase1a:4][phase1b:4][phase2a:4][phase2b:4][phase3:4]
+        // Total: 10 × 4 bits = 40 bits (fits in u64)
+        let key: u64 = ((chromatic_bucket as u64) << 36)
+            | ((conflicts_bucket as u64) << 32)
+            | ((iteration_bucket as u64) << 28)
+            | ((gpu_util_bucket as u64) << 24)
+            | ((phase_buckets[0] as u64) << 20)
+            | ((phase_buckets[1] as u64) << 16)
+            | ((phase_buckets[2] as u64) << 12)
+            | ((phase_buckets[3] as u64) << 8)
+            | ((phase_buckets[4] as u64) << 4)
+            | (phase_buckets[5] as u64);
+
+        // Hash to table size (16K = 16384)
+        (key as usize) % table_size
+    }
+
     /// Get current phase
     pub fn phase(&self) -> PhaseName {
         self.current_phase

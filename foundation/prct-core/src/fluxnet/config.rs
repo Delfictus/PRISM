@@ -173,6 +173,29 @@ pub struct RLConfig {
     /// Reward shaping: weight for compaction ratio improvement
     #[serde(default = "default_reward_compaction_weight")]
     pub reward_compaction_weight: f32,
+
+    /// Use adaptive percentile-based indexing (vs linear hashing)
+    /// Requires 16K Q-table (qtable_states=16384)
+    #[serde(default = "default_use_adaptive_index")]
+    pub use_adaptive_index: bool,
+
+    /// Prioritized replay: priority exponent (alpha)
+    /// Higher = more aggressive prioritization
+    #[serde(default = "default_priority_alpha")]
+    pub priority_alpha: f32,
+
+    /// Prioritized replay: importance sampling correction (beta)
+    /// Increases from beta to 1.0 over training
+    #[serde(default = "default_priority_beta")]
+    pub priority_beta: f32,
+
+    /// Prioritized replay: small epsilon for numerical stability
+    #[serde(default = "default_priority_eps")]
+    pub priority_eps: f32,
+
+    /// High reward threshold for priority boost
+    #[serde(default = "default_high_reward_cutoff")]
+    pub high_reward_cutoff: f32,
 }
 
 fn default_learning_rate() -> f32 { 0.1 }
@@ -183,6 +206,11 @@ fn default_epsilon_min() -> f32 { 0.05 }
 fn default_reward_conflict_weight() -> f32 { 1.0 }
 fn default_reward_color_weight() -> f32 { 0.5 }
 fn default_reward_compaction_weight() -> f32 { 0.3 }
+fn default_use_adaptive_index() -> bool { true }
+fn default_priority_alpha() -> f32 { 0.6 }
+fn default_priority_beta() -> f32 { 0.4 }
+fn default_priority_eps() -> f32 { 0.01 }
+fn default_high_reward_cutoff() -> f32 { 10.0 }
 
 impl Default for RLConfig {
     fn default() -> Self {
@@ -198,6 +226,11 @@ impl Default for RLConfig {
             reward_conflict_weight: default_reward_conflict_weight(),
             reward_color_weight: default_reward_color_weight(),
             reward_compaction_weight: default_reward_compaction_weight(),
+            use_adaptive_index: default_use_adaptive_index(),
+            priority_alpha: default_priority_alpha(),
+            priority_beta: default_priority_beta(),
+            priority_eps: default_priority_eps(),
+            high_reward_cutoff: default_high_reward_cutoff(),
         }
     }
 }
@@ -209,8 +242,15 @@ impl RLConfig {
     }
 
     /// Get Q-table states, using override or memory tier default
+    /// When use_adaptive_index=true, defaults to 16384 for better distribution
     pub fn get_qtable_states(&self, memory_tier: MemoryTier) -> usize {
-        self.qtable_states.unwrap_or_else(|| memory_tier.qtable_states())
+        self.qtable_states.unwrap_or_else(|| {
+            if self.use_adaptive_index {
+                16384 // 16K states for adaptive percentile-based indexing
+            } else {
+                memory_tier.qtable_states() // 4K (compact) or 1K (extended) for hash-based
+            }
+        })
     }
 
     /// Get batch size, using override or memory tier default

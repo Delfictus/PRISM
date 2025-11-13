@@ -538,33 +538,34 @@ pub fn equilibrate_thermodynamic_gpu(
             // Evolve oscillators with FluxNet force modulation if enabled
             // FluxNet: Pass force buffers if available, otherwise pass zero-length dummy slices
             // CUDA kernel checks for NULL pointer and uses multiplier=1.0 when NULL
-            if let Some((ref force_profile, ref _rl_controller)) = fluxnet_state {
-                // FluxNet enabled: use actual force buffers
-                unsafe {
-                    (*evolve_osc)
-                        .clone()
-                        .launch(
-                            LaunchConfig {
-                                grid_dim: (blocks as u32, 1, 1),
-                                block_dim: (threads as u32, 1, 1),
-                                shared_mem_bytes: 0,
-                            },
-                            (
-                                &d_phases,
-                                &d_velocities,
-                                &d_coupling_forces,
-                                n as i32,
-                                dt,
-                                temp as f32,
-                                &force_profile.device_f_strong,
-                                &force_profile.device_f_weak,
-                            ),
-                        )
-                        .map_err(|e| {
-                            PRCTError::GpuError(format!("Evolve kernel with FluxNet failed at step {}: {}", step, e))
-                        })?;
-                }
-            } else {
+            // NOTE: FluxNet is currently disabled (fluxnet_state commented out)
+            // if let Some((ref force_profile, ref _rl_controller)) = fluxnet_state {
+            //     // FluxNet enabled: use actual force buffers
+            //     unsafe {
+            //         (*evolve_osc)
+            //             .clone()
+            //             .launch(
+            //                 LaunchConfig {
+            //                     grid_dim: (blocks as u32, 1, 1),
+            //                     block_dim: (threads as u32, 1, 1),
+            //                     shared_mem_bytes: 0,
+            //                 },
+            //                 (
+            //                     &d_phases,
+            //                     &d_velocities,
+            //                     &d_coupling_forces,
+            //                     n as i32,
+            //                     dt,
+            //                     temp as f32,
+            //                     &force_profile.device_f_strong,
+            //                     &force_profile.device_f_weak,
+            //                 ),
+            //             )
+            //             .map_err(|e| {
+            //                 PRCTError::GpuError(format!("Evolve kernel with FluxNet failed at step {}: {}", step, e))
+            //             })?;
+            //     }
+            // } else {
                 // FluxNet disabled: use pre-allocated identity multiplier buffers (all 1.0f)
                 // This ensures forces remain unchanged when FluxNet is not active
                 unsafe {
@@ -591,7 +592,7 @@ pub fn equilibrate_thermodynamic_gpu(
                             PRCTError::GpuError(format!("Evolve kernel failed at step {}: {}", step, e))
                         })?;
                 }
-            }
+            // }
 
             // Periodic energy computation (every 100 steps)
             if step % 100 == 0 {

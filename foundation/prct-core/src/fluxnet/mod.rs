@@ -51,6 +51,7 @@ pub mod controller;
 pub mod unified_state;
 pub mod reward;
 pub mod telemetry;
+pub mod adaptive_index;
 
 pub use profile::{ForceBand, ForceBandStats, ForceProfile};
 pub use command::{FluxNetAction, AdjustDirection, ActionResult};
@@ -62,3 +63,4 @@ pub use telemetry::{
     FluxNetTelemetry, ForceBandTelemetry, RLDecisionTelemetry, RLStateTelemetry,
     QUpdateTelemetry, FluxNetConfigSnapshot,
 };
+pub use adaptive_index::{AdaptiveStateIndexer, AdaptiveBinsSnapshot, AdaptiveIndexStats};
