@@ -265,9 +265,9 @@ pub fn equilibrate_thermodynamic_gpu(
     let initial_chromatic = initial_solution.chromatic_number;
     let initial_conflicts = initial_solution.conflicts;
 
-    // MOVE 3: Dynamic slack tracking with aggressive initial slack
+    // MOVE 3: Dynamic slack tracking with MORE aggressive initial slack (FIX 4)
     let mut consecutive_guards = 0;
-    let mut current_slack = 60; // MOVE 3: Start with aggressive slack=60
+    let mut current_slack = 90; // FIX 4: Increased from 60 to 90 for wider palette (185+90=275)
     let mut stable_temps = 0;   // MOVE 3: Track stable temperatures for slack decay
 
     // MOVE 5: Guard boost tracking - 1.5x repulsion for 2 temps after guard fires
@@ -282,6 +282,13 @@ pub fn equilibrate_thermodynamic_gpu(
 
     // TWEAK 6: Track best snapshot across all temperatures
     let mut best_snapshot: Option<(usize, ColoringSolution, f64)> = None; // (temp_idx, solution, quality_score)
+
+    // FIX 3: Track last conflict-free snapshot for rollback + reheat
+    let mut last_good_snapshot: Option<(usize, ColoringSolution, Vec<f32>)> = None; // (temp_idx, solution, phases)
+    let mut collapse_streak = 0; // Count consecutive collapses
+
+    // FIX 5: Early-abort tracking
+    let mut high_conflict_streak = 0; // Count consecutive temps with conflicts > 20k
 
     // Task B2: Generate natural frequency heterogeneity
     // CRITICAL FIX: Widened range [0.9, 1.1] → [0.5, 1.5] (5x spread)
@@ -486,13 +493,38 @@ pub fn equilibrate_thermodynamic_gpu(
             );
         }
 
-        // Part B: Aggressive midband steps - 4x multiplier for midband temps (T=3 to T=7)
-        // With telemetry-driven config: 40k base → 160k midband
-        let dynamic_steps = if temp >= 3.0 && temp <= 7.0 && aggressive_midband {
-            steps_per_temp * 4
+        // FIX 1: Adaptive burn-in depth - more steps when conflicts > 500
+        // Increase to 10-12k base when high conflicts persist
+        let adaptive_base_steps = if temp_idx > 0 {
+            let prev_conflicts = equilibrium_states.last().map(|s: &ColoringSolution| s.conflicts).unwrap_or(0);
+            if prev_conflicts > 1000 {
+                // Very high conflicts persisting - bump to 12k
+                println!("[THERMO-GPU][FIX-1] Prev conflicts {} > 1000, bumping to 12k steps", prev_conflicts);
+                steps_per_temp.max(12000)
+            } else if prev_conflicts > 500 {
+                println!("[THERMO-GPU][FIX-1] Prev conflicts {} > 500, bumping to 10k steps", prev_conflicts);
+                steps_per_temp.max(10000)
+            } else {
+                steps_per_temp
+            }
         } else {
             steps_per_temp
         };
+
+        // Part B: Aggressive midband steps - 4x multiplier for midband temps (T=3 to T=7)
+        // With telemetry-driven config: 40k base → 160k midband
+        let dynamic_steps = if temp >= 3.0 && temp <= 7.0 && aggressive_midband {
+            adaptive_base_steps * 4
+        } else {
+            adaptive_base_steps
+        };
+
+        if adaptive_base_steps > steps_per_temp {
+            println!(
+                "[THERMO-GPU][FIX-1][BURN-IN] Conflicts > 500: bumping steps {} → {}",
+                steps_per_temp, adaptive_base_steps
+            );
+        }
 
         if temp >= 3.0 && temp <= 7.0 && aggressive_midband {
             println!(
@@ -676,6 +708,20 @@ pub fn equilibrate_thermodynamic_gpu(
         let compaction_ratio = actual_chromatic as f64 / color_range as f64;
         let unique_buckets = color_map.len(); // Number of distinct phase buckets used
 
+        // FIX 4: Adaptive palette expansion when compaction_ratio < 0.15
+        if compaction_ratio < 0.15 && current_slack < 120 {
+            let old_slack = current_slack;
+            current_slack = 120; // Expand to maximum
+            println!(
+                "[THERMO-GPU][FIX-4][PALETTE-EXPAND] Compaction ratio {:.3} < 0.15: expanding slack {} → {}",
+                compaction_ratio, old_slack, current_slack
+            );
+            println!(
+                "[THERMO-GPU][FIX-4][PALETTE-EXPAND] New color_range will be {} (from {})",
+                initial_chromatic + current_slack, color_range
+            );
+        }
+
         println!(
             "[THERMO-GPU][COMPACTION] {} phase buckets -> {} actual colors (ratio: {:.3})",
             color_range,
@@ -691,12 +737,64 @@ pub fn equilibrate_thermodynamic_gpu(
             }
         }
 
+        // FIX 5: Early-abort hook - detect dead zones with high conflicts
+        if conflicts_temp > 20000 {
+            high_conflict_streak += 1;
+            println!(
+                "[THERMO-GPU][FIX-5][EARLY-ABORT] High conflict streak: {} (conflicts: {})",
+                high_conflict_streak, conflicts_temp
+            );
+
+            if high_conflict_streak >= 3 {
+                println!(
+                    "[THERMO-GPU][FIX-5][EARLY-ABORT] ⚠️ ABORTING: 3 consecutive temps with conflicts > 20k"
+                );
+                println!(
+                    "[THERMO-GPU][FIX-5][EARLY-ABORT] Dead zone detected - returning best snapshot"
+                );
+
+                // Return best snapshot found so far
+                if let Some((best_temp_idx, ref best_sol, _)) = best_snapshot {
+                    println!(
+                        "[THERMO-GPU][FIX-5][EARLY-ABORT] Best result: temp {} with {} colors, {} conflicts",
+                        best_temp_idx, best_sol.chromatic_number, best_sol.conflicts
+                    );
+                    equilibrium_states.push(best_sol.clone());
+                }
+
+                // Early exit from temperature loop
+                break;
+            }
+        } else {
+            high_conflict_streak = 0; // Reset on good temp
+        }
+
         // Task B5: De-sync burst detection
         let bucket_collapse_risk = if unique_buckets < (color_range / 2) {
             "high"
         } else {
             "low"
         };
+
+        // FIX 3: Save last good snapshot (low conflicts) for potential rollback
+        if conflicts_temp < 2000 && compaction_ratio > 0.3 {
+            // Good state - save for potential rollback
+            let snapshot_phases = cuda_device
+                .dtoh_sync_copy(&d_phases)
+                .map_err(|e| PRCTError::GpuError(format!("Failed to save phases: {}", e)))?;
+
+            last_good_snapshot = Some((
+                temp_idx,
+                ColoringSolution {
+                    colors: colors.clone(),
+                    chromatic_number: actual_chromatic,
+                    conflicts: conflicts_temp,
+                    quality_score: 1.0 / (conflicts_temp + 1) as f64,
+                    computation_time_ms: 0.0,
+                },
+                snapshot_phases
+            ));
+        }
 
         // Task B6: Compaction guard - prevent catastrophic chromatic collapse
         let collapse_threshold = (initial_chromatic as f64 * 0.5) as usize; // 50% of initial
@@ -706,15 +804,58 @@ pub fn equilibrate_thermodynamic_gpu(
         let mut post_shake_conflicts_count = 0;
         let mut slack_expanded = false;
 
-        // MOVE 3: Immediate slack expansion on guard (already at max=60, maintain it)
+        // FIX 3: Track collapse streak for rollback + reheat
         if compaction_guard_triggered {
+            collapse_streak += 1;
             consecutive_guards += 1;
             temps_since_guard = 0; // MOVE 5: Reset guard boost counter
 
+            println!(
+                "[THERMO-GPU][FIX-3] Collapse detected (streak: {})",
+                collapse_streak
+            );
+
+            // FIX 3: Rollback + reheat on 2 consecutive collapses
+            if collapse_streak >= 2 && last_good_snapshot.is_some() {
+                let (good_temp_idx, ref good_sol, ref good_phases) = last_good_snapshot.as_ref().unwrap();
+                println!(
+                    "[THERMO-GPU][FIX-3][ROLLBACK] ⚠️ 2 consecutive collapses detected!"
+                );
+                println!(
+                    "[THERMO-GPU][FIX-3][ROLLBACK] Restoring last conflict-free snapshot from temp {} ({} colors, {} conflicts)",
+                    good_temp_idx, good_sol.chromatic_number, good_sol.conflicts
+                );
+
+                // Restore good solution
+                colors = good_sol.colors.clone();
+
+                // Restore phases
+                cuda_device
+                    .htod_copy_into(good_phases.clone(), &mut d_phases)
+                    .map_err(|e| PRCTError::GpuError(format!("Failed to restore phases: {}", e)))?;
+
+                // Expand slack aggressively for reheat
+                current_slack = 90; // Max slack
+                slack_expanded = true;
+
+                // Set reheat flag (we'll handle this by continuing with expanded slack)
+                println!(
+                    "[THERMO-GPU][FIX-3][REHEAT] Reheating with expanded slack={} to escape dead zone",
+                    current_slack
+                );
+
+                // Reset collapse streak after successful rollback
+                collapse_streak = 0;
+
+                // Skip the rest of this temperature - move to next
+                println!("[THERMO-GPU][FIX-3][ROLLBACK] Skipping remaining temps in dead zone");
+                continue; // Skip to next temperature
+            }
+
             if consecutive_guards == 1 {
-                // MOVE 3: Already at max slack=60, ensure it stays there
+                // MOVE 3: Ensure we maintain aggressive slack
                 let old_slack = current_slack;
-                current_slack = 60; // Maintain aggressive slack
+                current_slack = current_slack.max(90); // FIX 4: Raised from 60 to 90
                 slack_expanded = true;
                 println!(
                     "[THERMO-GPU][MOVE-3][SLACK-EXPAND] Maintaining aggressive slack={} on first guard (was {})",
@@ -757,6 +898,7 @@ pub fn equilibrate_thermodynamic_gpu(
             }
         } else {
             consecutive_guards = 0; // Reset on success
+            collapse_streak = 0; // FIX 3: Reset collapse streak on successful temp
             temps_since_guard += 1; // MOVE 5: Increment temps since last guard
         }
 
@@ -951,8 +1093,8 @@ pub fn equilibrate_thermodynamic_gpu(
         // Record detailed telemetry for this temperature
         let temp_elapsed = temp_start.elapsed();
 
-        // TWEAK 1: Calculate force blend factor for telemetry
-        let force_blend_factor = if temp <= force_start_temp {
+        // FIX 2: Calculate force blend factor with conflict-based clamping
+        let force_blend_factor_raw = if temp <= force_start_temp {
             if force_start_temp > force_full_strength_temp {
                 let blend = 1.0 - (temp - force_full_strength_temp) /
                                   (force_start_temp - force_full_strength_temp);
@@ -962,6 +1104,21 @@ pub fn equilibrate_thermodynamic_gpu(
             }
         } else {
             0.0
+        };
+
+        // FIX 2: Clamp force_blend_factor to ≤0.4 when conflicts > 5000
+        // This prevents aggressive compaction while conflicts remain unresolved
+        let force_blend_factor = if conflicts > 5000 {
+            let clamped = force_blend_factor_raw.min(0.4);
+            if force_blend_factor_raw > clamped {
+                println!(
+                    "[THERMO-GPU][FIX-2][COMPACTION-DELAY] Conflicts {} > 5000: clamping force_blend from {:.3} to {:.3}",
+                    conflicts, force_blend_factor_raw, clamped
+                );
+            }
+            clamped
+        } else {
+            force_blend_factor_raw
         };
 
         if let Some(ref telemetry) = telemetry {

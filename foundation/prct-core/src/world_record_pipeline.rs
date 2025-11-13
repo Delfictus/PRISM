@@ -267,7 +267,7 @@ fn default_steps_per_temp() -> usize {
 }
 
 fn default_force_start_temp() -> f64 {
-    5.0
+    9.0  // FIX 2: Raised from 5.0 to 9.0 to delay compaction until conflicts resolve
 }
 
 fn default_force_full_strength_temp() -> f64 {
@@ -289,11 +289,11 @@ impl Default for ThermoConfig {
             num_temps: default_replicas(), // VRAM guard: 56 for 8GB
             exchange_interval: 50,
             t_min: 0.01,
-            t_max: 10.0,
+            t_max: 15.0,  // FIX 1: Raised from 10.0 to 15.0 for better high-temp exploration
             steps_per_temp: 5000,
             replicas_max_safe: 56,
             num_temps_max_safe: 56,
-            force_start_temp: 5.0,
+            force_start_temp: 9.0,  // FIX 2: Raised from 5.0 to 9.0
             force_full_strength_temp: 1.0,
             force_strong: 1.5,
             force_weak: 0.6,
