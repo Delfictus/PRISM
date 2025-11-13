@@ -240,6 +240,18 @@ pub struct ThermoConfig {
     /// TWEAK 1: Temperature at which conflict forces reach full strength (default: 1.0)
     #[serde(default = "default_force_full_strength_temp")]
     pub force_full_strength_temp: f64,
+
+    /// FluxNet strong force multiplier (for high-conflict vertices)
+    #[serde(default = "default_force_strong")]
+    pub force_strong: f64,
+
+    /// FluxNet weak force multiplier (for low-conflict vertices)
+    #[serde(default = "default_force_weak")]
+    pub force_weak: f64,
+
+    /// Part B: Aggressive midband (+10 temps in T=7→3 range)
+    #[serde(default)]
+    pub aggressive_midband: bool,
 }
 
 fn default_t_min() -> f64 {
@@ -255,11 +267,19 @@ fn default_steps_per_temp() -> usize {
 }
 
 fn default_force_start_temp() -> f64 {
-    5.0
+    9.0  // FIX 2: Raised from 5.0 to 9.0 to delay compaction until conflicts resolve
 }
 
 fn default_force_full_strength_temp() -> f64 {
     1.0
+}
+
+fn default_force_strong() -> f64 {
+    1.5
+}
+
+fn default_force_weak() -> f64 {
+    0.6
 }
 
 impl Default for ThermoConfig {
@@ -269,12 +289,15 @@ impl Default for ThermoConfig {
             num_temps: default_replicas(), // VRAM guard: 56 for 8GB
             exchange_interval: 50,
             t_min: 0.01,
-            t_max: 10.0,
+            t_max: 15.0,  // FIX 1: Raised from 10.0 to 15.0 for better high-temp exploration
             steps_per_temp: 5000,
             replicas_max_safe: 56,
             num_temps_max_safe: 56,
-            force_start_temp: 5.0,
+            force_start_temp: 9.0,  // FIX 2: Raised from 5.0 to 9.0
             force_full_strength_temp: 1.0,
+            force_strong: 1.5,
+            force_weak: 0.6,
+            aggressive_midband: false,
         }
     }
 }
@@ -308,6 +331,18 @@ pub struct QuantumConfig {
     /// GPU QUBO final temperature (default: 0.01)
     #[serde(default = "default_qubo_t_final")]
     pub qubo_t_final: f64,
+
+    /// FluxNet: Number of quantum solver iterations
+    #[serde(default = "default_quantum_num_iterations")]
+    pub num_iterations: usize,
+
+    /// FluxNet: Quantum beta (coherence strength)
+    #[serde(default = "default_quantum_beta")]
+    pub beta: f64,
+
+    /// FluxNet: Quantum temperature (decoherence)
+    #[serde(default = "default_quantum_temperature")]
+    pub temperature: f64,
 }
 
 fn default_quantum_retries() -> usize {
@@ -330,6 +365,18 @@ fn default_qubo_t_final() -> f64 {
     0.01
 }
 
+fn default_quantum_num_iterations() -> usize {
+    50
+}
+
+fn default_quantum_beta() -> f64 {
+    0.92
+}
+
+fn default_quantum_temperature() -> f64 {
+    0.8
+}
+
 impl Default for QuantumConfig {
     fn default() -> Self {
         Self {
@@ -341,6 +388,9 @@ impl Default for QuantumConfig {
             qubo_batch_size: 256,
             qubo_t_initial: 1.0,
             qubo_t_final: 0.01,
+            num_iterations: 50,
+            beta: 0.92,
+            temperature: 0.8,
         }
     }
 }
@@ -391,6 +441,9 @@ pub struct GeodesicConfig {
     pub centrality_weight: f64,
     #[serde(default = "default_eccentricity_weight")]
     pub eccentricity_weight: f64,
+    /// FluxNet: Weight for geodesic features in ordering
+    #[serde(default = "default_geodesic_weight")]
+    pub weight: f64,
 }
 
 fn default_centrality_weight() -> f64 {
@@ -409,6 +462,7 @@ impl Default for GeodesicConfig {
             weight_attr: None,
             centrality_weight: 0.5,
             eccentricity_weight: 0.5,
+            weight: 0.35,
         }
     }
 }
@@ -523,16 +577,43 @@ pub struct NeuromorphicConfig {
     /// Phase threshold for difficulty zone clustering (radians)
     #[serde(default = "default_phase_threshold")]
     pub phase_threshold: f64,
+
+    /// Reservoir spectral radius (echo state property)
+    #[serde(default = "default_spectral_radius")]
+    pub spectral_radius: f64,
+
+    /// Reservoir leak rate (memory decay)
+    #[serde(default = "default_leak_rate")]
+    pub leak_rate: f64,
+
+    /// Reservoir input scaling (input influence)
+    #[serde(default = "default_input_scaling")]
+    pub input_scaling: f64,
 }
 
 fn default_phase_threshold() -> f64 {
     0.5
 }
 
+fn default_spectral_radius() -> f64 {
+    0.90
+}
+
+fn default_leak_rate() -> f64 {
+    0.30
+}
+
+fn default_input_scaling() -> f64 {
+    0.50
+}
+
 impl Default for NeuromorphicConfig {
     fn default() -> Self {
         Self {
             phase_threshold: 0.5,
+            spectral_radius: 0.90,
+            leak_rate: 0.30,
+            input_scaling: 0.50,
         }
     }
 }
@@ -744,6 +825,10 @@ pub struct WorldRecordConfig {
     /// Initial coloring configuration
     #[serde(default)]
     pub initial_coloring: InitialColoringConfig,
+
+    /// FluxNet RL configuration
+    #[serde(default)]
+    pub fluxnet: crate::fluxnet::FluxNetConfig,
 }
 
 impl Default for WorldRecordConfig {
@@ -782,6 +867,7 @@ impl Default for WorldRecordConfig {
             transfer_entropy: TransferEntropyConfig::default(),
             neuromorphic: NeuromorphicConfig::default(),
             initial_coloring: InitialColoringConfig::default(),
+            fluxnet: crate::fluxnet::FluxNetConfig::default(),
         }
     }
 }
@@ -962,7 +1048,7 @@ impl WorldRecordConfig {
 
         // Estimate VRAM for reservoir computing
         if self.use_reservoir_prediction && self.gpu.enable_reservoir_gpu {
-            let reservoir_size = 1000.min(graph.num_vertices * 2);
+            let reservoir_size = 2000.min(graph.num_vertices * 2);  // Increased from 1000 to 2000 for FluxNet enhancements
             let reservoir_mb = (reservoir_size * reservoir_size * 4) / (1024 * 1024);
 
             if reservoir_mb > VRAM_MB / 4 {
@@ -1725,6 +1811,22 @@ pub struct WorldRecordPipeline {
     /// Stagnation tracking for adaptive loopback
     stagnation_count: usize,
     last_improvement_iteration: usize,
+
+    /// FluxNet multi-phase RL controller
+    #[cfg(feature = "cuda")]
+    fluxnet_rl: Option<crate::fluxnet::MultiPhaseRLController>,
+
+    /// Last RL state for reward computation
+    #[cfg(feature = "cuda")]
+    last_fluxnet_state: Option<crate::fluxnet::UnifiedRLState>,
+
+    /// Last RL action taken
+    #[cfg(feature = "cuda")]
+    last_fluxnet_action: Option<crate::fluxnet::FluxNetAction>,
+
+    /// FluxNet Q-table cache directory for persistence
+    #[cfg(feature = "cuda")]
+    fluxnet_cache_dir: Option<std::path::PathBuf>,
 }
 
 impl WorldRecordPipeline {
@@ -1785,6 +1887,73 @@ impl WorldRecordPipeline {
             None
         };
 
+        // Initialize FluxNet RL controller
+        let mut fluxnet_rl = if config.fluxnet.enabled {
+            let replay_buffer_size = config.fluxnet.rl.replay_capacity
+                .unwrap_or_else(|| config.fluxnet.memory_tier.replay_capacity());
+            let table_size = config.fluxnet.rl.qtable_states
+                .unwrap_or_else(|| config.fluxnet.memory_tier.qtable_states());
+
+            println!(
+                "[PIPELINE][INIT] FluxNet RL enabled: table_size={}, replay_buffer={}, epsilon={:.3}",
+                table_size, replay_buffer_size, config.fluxnet.rl.epsilon_start
+            );
+
+            Some(crate::fluxnet::MultiPhaseRLController::new(
+                config.fluxnet.rl.clone(),
+                table_size,
+                replay_buffer_size,
+                config.target_chromatic,
+                config.fluxnet.verbose,
+            ))
+        } else {
+            None
+        };
+
+        // Initialize FluxNet cache directory and load pretrained Q-table
+        let fluxnet_cache_dir = if config.fluxnet.enabled {
+            let cache_dir = config.fluxnet.persistence.cache_dir.clone();
+            std::fs::create_dir_all(&cache_dir)
+                .map_err(|e| PRCTError::ConfigError(format!("Failed to create FluxNet cache dir: {}", e)))?;
+
+            // Load pretrained Q-table if configured
+            if config.fluxnet.persistence.load_pretrained {
+                let pretrained_path = if let Some(ref custom_path) = config.fluxnet.persistence.pretrained_path {
+                    custom_path.clone()
+                } else {
+                    cache_dir.join("qtable_pretrained.bin")
+                };
+
+                if pretrained_path.exists() {
+                    if let Some(ref mut rl) = fluxnet_rl {
+                        match rl.load_with_indexer(&pretrained_path) {
+                            Ok(_) => {
+                                let num_states = rl.num_visited_states();
+                                let adaptive_ready = rl.is_adaptive_ready();
+                                println!(
+                                    "[FLUXNET] Loaded pretrained Q-table: {} state-action pairs from {:?}",
+                                    num_states, pretrained_path
+                                );
+                                println!(
+                                    "[FLUXNET] Adaptive indexer: {}",
+                                    if adaptive_ready { "Ready" } else { "Learning" }
+                                );
+                            }
+                            Err(e) => {
+                                println!("[FLUXNET] Failed to load pretrained Q-table: {}", e);
+                            }
+                        }
+                    }
+                } else {
+                    println!("[FLUXNET] No pretrained Q-table found at {:?}", pretrained_path);
+                }
+            }
+
+            Some(cache_dir)
+        } else {
+            None
+        };
+
         Ok(Self {
             config: config.clone(),
             best_solution: ColoringSolution {
@@ -1816,6 +1985,10 @@ impl WorldRecordPipeline {
             adp_thermo_num_temps: config.orchestrator.adp_thermo_num_temps,
             stagnation_count: 0,
             last_improvement_iteration: 0,
+            fluxnet_rl,
+            last_fluxnet_state: None,
+            last_fluxnet_action: None,
+            fluxnet_cache_dir,
         })
     }
 
@@ -2454,6 +2627,69 @@ impl WorldRecordPipeline {
             println!("{{\"event\":\"phase_end\",\"phase\":\"0B\",\"name\":\"reservoir\",\"time_s\":{:.3}}}",
                      phase_elapsed.as_secs_f64());
 
+            // FluxNet RL: Phase 0 adaptation
+            #[cfg(feature = "cuda")]
+            if let Some(ref mut rl) = self.fluxnet_rl {
+                let difficulty_zones_len = self.conflict_predictor_gpu.as_ref()
+                    .map(|p| p.difficulty_zones.len())
+                    .unwrap_or(0);
+
+                let curr_state = crate::fluxnet::UnifiedRLState::from_phase0(
+                    &self.best_solution,
+                    &vec![vec![]; difficulty_zones_len], // Placeholder zones
+                    self.config.target_chromatic,
+                    0,
+                    self.config.orchestrator.restarts,
+                    0.0,
+                );
+
+                let action = rl.choose_action(&curr_state, crate::telemetry::PhaseName::Reservoir);
+
+                match action.apply(&mut self.config) {
+                    Ok(desc) => println!("[FLUXNET][PHASE0] RL Action: {:?} -> {}", action, desc),
+                    Err(e) => println!("[FLUXNET][PHASE0] Action failed: {}", e),
+                }
+
+                self.last_fluxnet_state = Some(curr_state);
+                self.last_fluxnet_action = Some(action);
+            }
+
+            // Capture FluxNet telemetry data (Phase 0)
+            #[cfg(feature = "cuda")]
+            let fluxnet_telemetry = if let Some(ref rl) = self.fluxnet_rl {
+                if self.config.fluxnet.enabled {
+                    let indexer_stats = rl.adaptive_indexer_stats();
+                    let priority_stats = rl.replay_buffer_stats();
+                    Some(json!({
+                        "enabled": true,
+                        "action_taken": self.last_fluxnet_action.as_ref().map(|a| format!("{:?}", a)),
+                        "state_index_hashed": self.last_fluxnet_state.as_ref().map(|s| s.to_index(rl.table_size())),
+                        "adaptive_indexer": {
+                            "total_samples": indexer_stats.total_samples,
+                            "ready": indexer_stats.adaptive_ready,
+                            "chromatic_hist_size": indexer_stats.chromatic_hist_size,
+                            "conflicts_hist_size": indexer_stats.conflicts_hist_size,
+                        },
+                        "replay_buffer": {
+                            "size": rl.replay_buffer_size(),
+                            "mean_priority": priority_stats.mean_priority,
+                            "max_priority": priority_stats.max_priority,
+                        },
+                        "q_table": {
+                            "visited_states": rl.num_visited_states(),
+                            "table_size": rl.table_size(),
+                        },
+                        "epsilon": rl.epsilon(),
+                    }))
+                } else {
+                    Some(json!({"enabled": false}))
+                }
+            } else {
+                None
+            };
+            #[cfg(not(feature = "cuda"))]
+            let fluxnet_telemetry: Option<serde_json::Value> = None;
+
             // Record telemetry: phase complete
             if let Some(ref telemetry) = self.telemetry {
                 let gpu_mode = if self.phase_gpu_status.phase0_gpu_used {
@@ -2519,6 +2755,17 @@ impl WorldRecordPipeline {
                     }
                 };
 
+                let mut params = json!({
+                    "phase": "0B",
+                    "gpu_used": self.phase_gpu_status.phase0_gpu_used,
+                    "difficulty_zones": difficulty_stats,
+                });
+
+                // Add FluxNet telemetry if available
+                if let Some(fluxnet_data) = fluxnet_telemetry {
+                    params["fluxnet"] = fluxnet_data;
+                }
+
                 telemetry.record(
                     RunMetric::new(
                         PhaseName::Reservoir,
@@ -2528,11 +2775,7 @@ impl WorldRecordPipeline {
                         phase_elapsed.as_secs_f64() * 1000.0,
                         gpu_mode,
                     )
-                    .with_parameters(json!({
-                        "phase": "0B",
-                        "gpu_used": self.phase_gpu_status.phase0_gpu_used,
-                        "difficulty_zones": difficulty_stats,
-                    })),
+                    .with_parameters(params),
                 );
             }
 
@@ -2750,6 +2993,151 @@ impl WorldRecordPipeline {
                  phase1_elapsed.as_secs_f64(),
                  te_solution.chromatic_number);
 
+        // FluxNet RL: Phase 1 adaptation
+        #[cfg(feature = "cuda")]
+        if let Some(ref mut rl) = self.fluxnet_rl {
+            let te_hub_concentration = 0.5; // Placeholder metric
+            let ai_uncertainty = self.active_inference_policy.as_ref()
+                .map(|p| p.uncertainty.iter().sum::<f64>() / p.uncertainty.len() as f64)
+                .unwrap_or(0.0) as f32;
+
+            let curr_state = crate::fluxnet::UnifiedRLState::from_phase1(
+                &te_solution,
+                te_hub_concentration,
+                ai_uncertainty,
+                self.config.target_chromatic,
+                0,
+                self.config.orchestrator.restarts,
+                0.0,
+            );
+
+            // Update Q-table if we have previous transition
+            if let (Some(prev_state), Some(prev_action)) =
+                (self.last_fluxnet_state.take(), self.last_fluxnet_action.take())
+            {
+                let prev_chromatic = self.history.iter().rev().nth(1)
+                    .map(|s| s.chromatic_number)
+                    .unwrap_or(self.config.target_chromatic + 50);
+                let prev_conflicts = self.history.iter().rev().nth(1)
+                    .map(|s| s.conflicts)
+                    .unwrap_or(0);
+
+                let reward = crate::fluxnet::compute_reward(
+                    crate::telemetry::PhaseName::TransferEntropy,
+                    prev_chromatic,
+                    te_solution.chromatic_number,
+                    prev_conflicts,
+                    te_solution.conflicts,
+                    phase1_elapsed.as_secs_f64() * 1000.0,
+                    0.0,
+                );
+
+                rl.update(
+                    prev_state,
+                    prev_action,
+                    reward,
+                    curr_state.clone(),
+                    false,
+                );
+
+                println!("[FLUXNET][PHASE1] Reward: {:.2}", reward);
+            }
+
+            // Choose next action with nested rollout (sample 3 candidates, pick best Q-value)
+            let state_idx = curr_state.to_index(rl.table_size());
+            let phase = crate::telemetry::PhaseName::TransferEntropy;
+            let valid_actions = crate::fluxnet::FluxNetAction::actions_for_phase(phase);
+
+            // Candidate 1: Epsilon-greedy (from choose_action)
+            let candidate1 = rl.choose_action(&curr_state, phase);
+
+            // Candidate 2: Random valid action
+            use rand::seq::SliceRandom;
+            let mut rng = rand::thread_rng();
+            let candidate2 = if !valid_actions.is_empty() {
+                valid_actions.choose(&mut rng).cloned().unwrap_or(crate::fluxnet::FluxNetAction::NoOp)
+            } else {
+                crate::fluxnet::FluxNetAction::NoOp
+            };
+
+            // Candidate 3: Greedy (best Q-value)
+            let candidate3 = if !valid_actions.is_empty() {
+                valid_actions
+                    .iter()
+                    .max_by(|a, b| {
+                        let qa = rl.get_q_value(state_idx, a.to_index());
+                        let qb = rl.get_q_value(state_idx, b.to_index());
+                        qa.partial_cmp(&qb).unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .cloned()
+                    .unwrap_or(crate::fluxnet::FluxNetAction::NoOp)
+            } else {
+                crate::fluxnet::FluxNetAction::NoOp
+            };
+
+            // Pick candidate with best Q-value
+            let q1 = rl.get_q_value(state_idx, candidate1.to_index());
+            let q2 = rl.get_q_value(state_idx, candidate2.to_index());
+            let q3 = rl.get_q_value(state_idx, candidate3.to_index());
+
+            let (action, q_selected) = if q1 >= q2 && q1 >= q3 {
+                (candidate1, q1)
+            } else if q2 >= q3 {
+                (candidate2, q2)
+            } else {
+                (candidate3, q3)
+            };
+
+            println!(
+                "[FLUXNET][PHASE1][NESTED-ROLLOUT] Selected {:?} (Q={:.3}) from candidates [Q1={:.3}, Q2={:.3}, Q3={:.3}]",
+                action, q_selected, q1, q2, q3
+            );
+
+            match action.apply(&mut self.config) {
+                Ok(desc) => println!("[FLUXNET][PHASE1] RL Action: {:?} -> {}", action, desc),
+                Err(e) => println!("[FLUXNET][PHASE1] Action failed: {}", e),
+            }
+
+            self.last_fluxnet_state = Some(curr_state);
+            self.last_fluxnet_action = Some(action);
+        }
+
+        // Capture FluxNet telemetry data (Phase 1)
+        #[cfg(feature = "cuda")]
+        let fluxnet_telemetry_p1 = if let Some(ref rl) = self.fluxnet_rl {
+            if self.config.fluxnet.enabled {
+                let indexer_stats = rl.adaptive_indexer_stats();
+                let priority_stats = rl.replay_buffer_stats();
+                Some(json!({
+                    "enabled": true,
+                    "action_taken": self.last_fluxnet_action.as_ref().map(|a| format!("{:?}", a)),
+                    "state_index_hashed": self.last_fluxnet_state.as_ref().map(|s| s.to_index(rl.table_size())),
+                    "adaptive_indexer": {
+                        "total_samples": indexer_stats.total_samples,
+                        "ready": indexer_stats.adaptive_ready,
+                        "chromatic_hist_size": indexer_stats.chromatic_hist_size,
+                        "conflicts_hist_size": indexer_stats.conflicts_hist_size,
+                    },
+                    "replay_buffer": {
+                        "size": rl.replay_buffer_size(),
+                        "mean_priority": priority_stats.mean_priority,
+                        "max_priority": priority_stats.max_priority,
+                    },
+                    "q_table": {
+                        "visited_states": rl.num_visited_states(),
+                        "table_size": rl.table_size(),
+                    },
+                    "epsilon": rl.epsilon(),
+                }))
+            } else {
+                Some(json!({"enabled": false}))
+            }
+        } else {
+            None
+        };
+        #[cfg(not(feature = "cuda"))]
+        let fluxnet_telemetry_p1: Option<serde_json::Value> = None;
+
         // Record telemetry: phase complete
         if let Some(ref telemetry) = self.telemetry {
             let gpu_mode = if self.phase_gpu_status.phase1_gpu_used {
@@ -2783,6 +3171,19 @@ impl WorldRecordPipeline {
                 })
             };
 
+            // Build telemetry parameters with FluxNet data
+            let mut p1_params = json!({
+                "phase": "1",
+                "te_gpu_used": self.phase_gpu_status.phase1_gpu_used,
+                "ai_gpu_used": self.phase_gpu_status.phase1_ai_gpu_used,
+                "active_inference_enabled": self.config.use_active_inference,
+                "ai_stats": ai_stats,
+            });
+
+            if let Some(fluxnet_data) = fluxnet_telemetry_p1 {
+                p1_params["fluxnet"] = fluxnet_data;
+            }
+
             telemetry.record(
                 RunMetric::new(
                     PhaseName::TransferEntropy,
@@ -2792,13 +3193,7 @@ impl WorldRecordPipeline {
                     phase1_elapsed.as_secs_f64() * 1000.0,
                     gpu_mode,
                 )
-                .with_parameters(json!({
-                    "phase": "1",
-                    "te_gpu_used": self.phase_gpu_status.phase1_gpu_used,
-                    "ai_gpu_used": self.phase_gpu_status.phase1_ai_gpu_used,
-                    "active_inference_enabled": self.config.use_active_inference,
-                    "ai_stats": ai_stats,
-                })),
+                .with_parameters(p1_params),
             );
         }
 
@@ -2954,10 +3349,39 @@ impl WorldRecordPipeline {
                                     self.telemetry.as_ref(),
                                     self.config.thermo.force_start_temp,
                                     self.config.thermo.force_full_strength_temp,
+                                    self.config.thermo.aggressive_midband,
                                 ) {
-                                    Ok(states) => {
+                                    Ok(mut states) => {
                                         self.phase_gpu_status.phase2_gpu_used = true;
                                         println!("[PHASE 2][GPU] ✅ Thermodynamic kernels executed successfully");
+
+                                        // Part A: FluxNet Q-table checkpoint saving (after GPU thermodynamic completes)
+                                        if let (Some(ref cache_dir), Some(ref rl)) = (&self.fluxnet_cache_dir, &self.fluxnet_rl) {
+                                            if self.config.fluxnet.enabled && self.config.fluxnet.persistence.save_interval_temps > 0 {
+                                                let save_interval = self.config.fluxnet.persistence.save_interval_temps;
+                                                // Save checkpoint after Phase 2 thermodynamic completion
+                                                let checkpoint_path = cache_dir.join("qtable_checkpoint_phase2.bin");
+                                                match rl.save_with_indexer(&checkpoint_path) {
+                                                    Ok(_) => {
+                                                        let num_states = rl.num_visited_states();
+                                                        let indexer_stats = rl.adaptive_indexer_stats();
+                                                        println!(
+                                                            "[FLUXNET] Saved Phase 2 checkpoint: {} state-action pairs to {:?}",
+                                                            num_states, checkpoint_path
+                                                        );
+                                                        println!(
+                                                            "[FLUXNET] Adaptive indexer: {} samples, {}",
+                                                            indexer_stats.total_samples,
+                                                            if indexer_stats.adaptive_ready { "Ready" } else { "Learning" }
+                                                        );
+                                                    }
+                                                    Err(e) => {
+                                                        println!("[FLUXNET] Phase 2 checkpoint save failed: {}", e);
+                                                    }
+                                                }
+                                            }
+                                        }
+
                                         states
                                     }
                                     Err(e) => {
@@ -3013,10 +3437,37 @@ impl WorldRecordPipeline {
                                 self.telemetry.as_ref(),
                                 self.config.thermo.force_start_temp,
                                 self.config.thermo.force_full_strength_temp,
+                                self.config.thermo.aggressive_midband,
                             ) {
-                                Ok(states) => {
+                                Ok(mut states) => {
                                     self.phase_gpu_status.phase2_gpu_used = true;
                                     println!("[PHASE 2][GPU] ✅ Thermodynamic kernels executed successfully");
+
+                                    // Part A: FluxNet Q-table checkpoint saving (after GPU thermodynamic completes)
+                                    if let (Some(ref cache_dir), Some(ref rl)) = (&self.fluxnet_cache_dir, &self.fluxnet_rl) {
+                                        if self.config.fluxnet.enabled && self.config.fluxnet.persistence.save_interval_temps > 0 {
+                                            let checkpoint_path = cache_dir.join("qtable_checkpoint_phase2.bin");
+                                            match rl.save_with_indexer(&checkpoint_path) {
+                                                Ok(_) => {
+                                                    let num_states = rl.num_visited_states();
+                                                    let indexer_stats = rl.adaptive_indexer_stats();
+                                                    println!(
+                                                        "[FLUXNET] Saved Phase 2 checkpoint: {} state-action pairs to {:?}",
+                                                        num_states, checkpoint_path
+                                                    );
+                                                    println!(
+                                                        "[FLUXNET] Adaptive indexer: {} samples, {}",
+                                                        indexer_stats.total_samples,
+                                                        if indexer_stats.adaptive_ready { "Ready" } else { "Learning" }
+                                                    );
+                                                }
+                                                Err(e) => {
+                                                    println!("[FLUXNET] Phase 2 checkpoint save failed: {}", e);
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     states
                                 }
                                 Err(e) => {
@@ -3111,6 +3562,68 @@ impl WorldRecordPipeline {
                      phase2_elapsed.as_secs_f64(),
                      self.best_solution.chromatic_number);
 
+            // FluxNet RL: Phase 2 adaptation
+            #[cfg(feature = "cuda")]
+            if let Some(ref mut rl) = self.fluxnet_rl {
+                let conflicts_before = self.history.iter().rev().nth(1)
+                    .map(|s| s.conflicts)
+                    .unwrap_or(0);
+
+                let curr_state = crate::fluxnet::UnifiedRLState::from_phase2(
+                    &self.best_solution,
+                    self.adp_thermo_num_temps / 2, // Mid-range temperature band
+                    self.adp_thermo_num_temps,
+                    conflicts_before,
+                    self.config.target_chromatic,
+                    0,
+                    self.config.orchestrator.restarts,
+                    0.0,
+                );
+
+                // Update Q-table if we have previous transition
+                if let (Some(prev_state), Some(prev_action)) =
+                    (self.last_fluxnet_state.take(), self.last_fluxnet_action.take())
+                {
+                    let prev_chromatic = self.history.iter().rev().nth(1)
+                        .map(|s| s.chromatic_number)
+                        .unwrap_or(self.config.target_chromatic + 50);
+                    let prev_conflicts = self.history.iter().rev().nth(1)
+                        .map(|s| s.conflicts)
+                        .unwrap_or(0);
+
+                    let reward = crate::fluxnet::compute_reward(
+                        crate::telemetry::PhaseName::Thermodynamic,
+                        prev_chromatic,
+                        self.best_solution.chromatic_number,
+                        prev_conflicts,
+                        self.best_solution.conflicts,
+                        phase2_elapsed.as_secs_f64() * 1000.0,
+                        0.0,
+                    );
+
+                    rl.update(
+                        prev_state,
+                        prev_action,
+                        reward,
+                        curr_state.clone(),
+                        false,
+                    );
+
+                    println!("[FLUXNET][PHASE2] Reward: {:.2}", reward);
+                }
+
+                // Choose next action
+                let action = rl.choose_action(&curr_state, crate::telemetry::PhaseName::Thermodynamic);
+
+                match action.apply(&mut self.config) {
+                    Ok(desc) => println!("[FLUXNET][PHASE2] RL Action: {:?} -> {}", action, desc),
+                    Err(e) => println!("[FLUXNET][PHASE2] Action failed: {}", e),
+                }
+
+                self.last_fluxnet_state = Some(curr_state);
+                self.last_fluxnet_action = Some(action);
+            }
+
             // TWEAK 5: ADP telemetry-aware adjustments based on compaction guard events
             if self.config.use_adp_learning {
                 // Count compaction guard triggers across all temperatures
@@ -3141,6 +3654,42 @@ impl WorldRecordPipeline {
                 }
             }
 
+            // Capture FluxNet telemetry data (Phase 2)
+            #[cfg(feature = "cuda")]
+            let fluxnet_telemetry_p2 = if let Some(ref rl) = self.fluxnet_rl {
+                if self.config.fluxnet.enabled {
+                    let indexer_stats = rl.adaptive_indexer_stats();
+                    let priority_stats = rl.replay_buffer_stats();
+                    Some(json!({
+                        "enabled": true,
+                        "action_taken": self.last_fluxnet_action.as_ref().map(|a| format!("{:?}", a)),
+                        "state_index_hashed": self.last_fluxnet_state.as_ref().map(|s| s.to_index(rl.table_size())),
+                        "adaptive_indexer": {
+                            "total_samples": indexer_stats.total_samples,
+                            "ready": indexer_stats.adaptive_ready,
+                            "chromatic_hist_size": indexer_stats.chromatic_hist_size,
+                            "conflicts_hist_size": indexer_stats.conflicts_hist_size,
+                        },
+                        "replay_buffer": {
+                            "size": rl.replay_buffer_size(),
+                            "mean_priority": priority_stats.mean_priority,
+                            "max_priority": priority_stats.max_priority,
+                        },
+                        "q_table": {
+                            "visited_states": rl.num_visited_states(),
+                            "table_size": rl.table_size(),
+                        },
+                        "epsilon": rl.epsilon(),
+                    }))
+                } else {
+                    Some(json!({"enabled": false}))
+                }
+            } else {
+                None
+            };
+            #[cfg(not(feature = "cuda"))]
+            let fluxnet_telemetry_p2: Option<serde_json::Value> = None;
+
             // Record telemetry: phase complete
             if let Some(ref telemetry) = self.telemetry {
                 let gpu_mode = if self.phase_gpu_status.phase2_gpu_used {
@@ -3151,6 +3700,17 @@ impl WorldRecordPipeline {
                     PhaseExecMode::cpu_disabled()
                 };
 
+                // Build telemetry parameters with FluxNet data
+                let mut p2_params = json!({
+                    "phase": "2",
+                    "gpu_used": self.phase_gpu_status.phase2_gpu_used,
+                    "num_states_explored": equilibrium_states.len(),
+                });
+
+                if let Some(fluxnet_data) = fluxnet_telemetry_p2 {
+                    p2_params["fluxnet"] = fluxnet_data;
+                }
+
                 telemetry.record(
                     RunMetric::new(
                         PhaseName::Thermodynamic,
@@ -3160,11 +3720,7 @@ impl WorldRecordPipeline {
                         phase2_elapsed.as_secs_f64() * 1000.0,
                         gpu_mode,
                     )
-                    .with_parameters(json!({
-                        "phase": "2",
-                        "gpu_used": self.phase_gpu_status.phase2_gpu_used,
-                        "num_states_explored": equilibrium_states.len(),
-                    })),
+                    .with_parameters(p2_params),
                 );
             }
         } else {
@@ -3329,6 +3885,104 @@ impl WorldRecordPipeline {
                      phase3_elapsed.as_secs_f64(),
                      self.best_solution.chromatic_number);
 
+            // FluxNet RL: Phase 3 adaptation
+            #[cfg(feature = "cuda")]
+            if let Some(ref mut rl) = self.fluxnet_rl {
+                let qubo_energy = 0.0; // Placeholder - would need to extract from quantum solver
+                let qubo_energy_min = -1000.0;
+                let qubo_energy_max = 1000.0;
+
+                let curr_state = crate::fluxnet::UnifiedRLState::from_phase3(
+                    &self.best_solution,
+                    qubo_energy,
+                    qubo_energy_min,
+                    qubo_energy_max,
+                    self.config.target_chromatic,
+                    0,
+                    self.config.orchestrator.restarts,
+                    0.0,
+                );
+
+                // Update Q-table if we have previous transition
+                if let (Some(prev_state), Some(prev_action)) =
+                    (self.last_fluxnet_state.take(), self.last_fluxnet_action.take())
+                {
+                    let prev_chromatic = self.history.iter().rev().nth(1)
+                        .map(|s| s.chromatic_number)
+                        .unwrap_or(self.config.target_chromatic + 50);
+                    let prev_conflicts = self.history.iter().rev().nth(1)
+                        .map(|s| s.conflicts)
+                        .unwrap_or(0);
+
+                    let reward = crate::fluxnet::compute_reward(
+                        crate::telemetry::PhaseName::Quantum,
+                        prev_chromatic,
+                        self.best_solution.chromatic_number,
+                        prev_conflicts,
+                        self.best_solution.conflicts,
+                        phase3_elapsed.as_secs_f64() * 1000.0,
+                        0.0,
+                    );
+
+                    rl.update(
+                        prev_state,
+                        prev_action,
+                        reward,
+                        curr_state.clone(),
+                        false,
+                    );
+
+                    println!("[FLUXNET][PHASE3] Reward: {:.2}", reward);
+                }
+
+                // Choose next action
+                let action = rl.choose_action(&curr_state, crate::telemetry::PhaseName::Quantum);
+
+                match action.apply(&mut self.config) {
+                    Ok(desc) => println!("[FLUXNET][PHASE3] RL Action: {:?} -> {}", action, desc),
+                    Err(e) => println!("[FLUXNET][PHASE3] Action failed: {}", e),
+                }
+
+                self.last_fluxnet_state = Some(curr_state);
+                self.last_fluxnet_action = Some(action);
+            }
+
+            // Capture FluxNet telemetry data (Phase 3)
+            #[cfg(feature = "cuda")]
+            let fluxnet_telemetry_p3 = if let Some(ref rl) = self.fluxnet_rl {
+                if self.config.fluxnet.enabled {
+                    let indexer_stats = rl.adaptive_indexer_stats();
+                    let priority_stats = rl.replay_buffer_stats();
+                    Some(json!({
+                        "enabled": true,
+                        "action_taken": self.last_fluxnet_action.as_ref().map(|a| format!("{:?}", a)),
+                        "state_index_hashed": self.last_fluxnet_state.as_ref().map(|s| s.to_index(rl.table_size())),
+                        "adaptive_indexer": {
+                            "total_samples": indexer_stats.total_samples,
+                            "ready": indexer_stats.adaptive_ready,
+                            "chromatic_hist_size": indexer_stats.chromatic_hist_size,
+                            "conflicts_hist_size": indexer_stats.conflicts_hist_size,
+                        },
+                        "replay_buffer": {
+                            "size": rl.replay_buffer_size(),
+                            "mean_priority": priority_stats.mean_priority,
+                            "max_priority": priority_stats.max_priority,
+                        },
+                        "q_table": {
+                            "visited_states": rl.num_visited_states(),
+                            "table_size": rl.table_size(),
+                        },
+                        "epsilon": rl.epsilon(),
+                    }))
+                } else {
+                    Some(json!({"enabled": false}))
+                }
+            } else {
+                None
+            };
+            #[cfg(not(feature = "cuda"))]
+            let fluxnet_telemetry_p3: Option<serde_json::Value> = None;
+
             // Record telemetry: phase complete
             if let Some(ref telemetry) = self.telemetry {
                 let gpu_mode = if self.phase_gpu_status.phase3_gpu_used {
@@ -3339,6 +3993,16 @@ impl WorldRecordPipeline {
                     PhaseExecMode::cpu_disabled()
                 };
 
+                // Build telemetry parameters with FluxNet data
+                let mut p3_params = json!({
+                    "phase": "3",
+                    "gpu_used": self.phase_gpu_status.phase3_gpu_used,
+                });
+
+                if let Some(fluxnet_data) = fluxnet_telemetry_p3 {
+                    p3_params["fluxnet"] = fluxnet_data;
+                }
+
                 telemetry.record(
                     RunMetric::new(
                         PhaseName::Quantum,
@@ -3348,14 +4012,130 @@ impl WorldRecordPipeline {
                         phase3_elapsed.as_secs_f64() * 1000.0,
                         gpu_mode,
                     )
-                    .with_parameters(json!({
-                        "phase": "3",
-                        "gpu_used": self.phase_gpu_status.phase3_gpu_used,
-                    })),
+                    .with_parameters(p3_params),
                 );
             }
         } else {
             println!("[PHASE 3] disabled by config");
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // PHASE 3.5: Extreme Memetic Burst (FluxNet Enhancement)
+        // ═══════════════════════════════════════════════════════════
+        let phase35_start = std::time::Instant::now();
+        println!("\n┌─────────────────────────────────────────────────────────┐");
+        println!("│ PHASE 3.5: Extreme Memetic Burst (FluxNet)             │");
+        println!("└─────────────────────────────────────────────────────────┘");
+        println!("{{\"event\":\"phase_start\",\"phase\":\"3.5\",\"name\":\"extreme_memetic_burst\"}}");
+
+        // Create aggressive burst configuration
+        let burst_config = MemeticConfig {
+            population_size: 32,
+            elite_size: 8,
+            generations: 200,
+            mutation_rate: 0.20,  // Aggressive mutation
+            tournament_size: 3,
+            local_search_depth: 5000,
+            use_tsp_guidance: true,
+            tsp_weight: 0.30,
+        };
+
+        println!(
+            "[PHASE 3.5] Launching extreme burst: pop={}, gens={}, mutation={:.2}, depth={}",
+            burst_config.population_size,
+            burst_config.generations,
+            burst_config.mutation_rate,
+            burst_config.local_search_depth
+        );
+
+        let mut burst_solver = MemeticColoringSolver::new(burst_config);
+        let burst_result = burst_solver.solve_with_restart(
+            graph,
+            vec![self.best_solution.clone()],  // Seed from best
+            3  // 3 restarts for robustness
+        )?;
+
+        if burst_result.conflicts == 0
+            && burst_result.chromatic_number < self.best_solution.chromatic_number
+        {
+            let delta = self.best_solution.chromatic_number - burst_result.chromatic_number;
+            println!(
+                "[PHASE 3.5] 🎯 Extreme burst breakthrough: {} → {} colors (Δ={})",
+                self.best_solution.chromatic_number, burst_result.chromatic_number, delta
+            );
+            self.best_solution = burst_result.clone();
+        }
+        self.history.push(burst_result.clone());
+
+        let phase35_elapsed = phase35_start.elapsed();
+        println!(
+            "{{\"event\":\"phase_end\",\"phase\":\"3.5\",\"name\":\"extreme_memetic_burst\",\"time_s\":{:.3},\"colors\":{}}}",
+            phase35_elapsed.as_secs_f64(),
+            self.best_solution.chromatic_number
+        );
+
+        // Capture FluxNet telemetry data (Phase 3.5)
+        #[cfg(feature = "cuda")]
+        let fluxnet_telemetry_p35 = if let Some(ref rl) = self.fluxnet_rl {
+            if self.config.fluxnet.enabled {
+                let indexer_stats = rl.adaptive_indexer_stats();
+                let priority_stats = rl.replay_buffer_stats();
+                Some(json!({
+                    "enabled": true,
+                    "action_taken": self.last_fluxnet_action.as_ref().map(|a| format!("{:?}", a)),
+                    "state_index_hashed": self.last_fluxnet_state.as_ref().map(|s| s.to_index(rl.table_size())),
+                    "adaptive_indexer": {
+                        "total_samples": indexer_stats.total_samples,
+                        "ready": indexer_stats.adaptive_ready,
+                        "chromatic_hist_size": indexer_stats.chromatic_hist_size,
+                        "conflicts_hist_size": indexer_stats.conflicts_hist_size,
+                    },
+                    "replay_buffer": {
+                        "size": rl.replay_buffer_size(),
+                        "mean_priority": priority_stats.mean_priority,
+                        "max_priority": priority_stats.max_priority,
+                    },
+                    "q_table": {
+                        "visited_states": rl.num_visited_states(),
+                        "table_size": rl.table_size(),
+                    },
+                    "epsilon": rl.epsilon(),
+                }))
+            } else {
+                Some(json!({"enabled": false}))
+            }
+        } else {
+            None
+        };
+        #[cfg(not(feature = "cuda"))]
+        let fluxnet_telemetry_p35: Option<serde_json::Value> = None;
+
+        if let Some(ref telemetry) = self.telemetry {
+            // Build telemetry parameters with FluxNet data
+            let mut p35_params = serde_json::json!({
+                "phase": "3.5",
+                "population_size": 32,
+                "generations": 200,
+                "mutation_rate": 0.20,
+                "restarts": 3,
+                "local_search_depth": 5000,
+            });
+
+            if let Some(fluxnet_data) = fluxnet_telemetry_p35 {
+                p35_params["fluxnet"] = fluxnet_data;
+            }
+
+            telemetry.record(
+                RunMetric::new(
+                    PhaseName::Memetic,
+                    "phase_3_5_extreme_burst",
+                    self.best_solution.chromatic_number,
+                    self.best_solution.conflicts,
+                    phase35_elapsed.as_secs_f64() * 1000.0,
+                    PhaseExecMode::cpu_disabled(),
+                )
+                .with_parameters(p35_params),
+            );
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -3789,6 +4569,39 @@ impl WorldRecordPipeline {
 
         // Persist GPU usage tracking
         self.save_phase_gpu_status()?;
+
+        // Save final FluxNet Q-table (Part A: FluxNet Persistence)
+        #[cfg(feature = "cuda")]
+        if let (Some(ref cache_dir), Some(ref rl)) = (&self.fluxnet_cache_dir, &self.fluxnet_rl) {
+            if self.config.fluxnet.persistence.save_final {
+                let final_path = cache_dir.join("qtable_final.bin");
+                match rl.save_with_indexer(&final_path) {
+                    Ok(_) => {
+                        let num_states = rl.num_visited_states();
+                        let indexer_stats = rl.adaptive_indexer_stats();
+                        let priority_stats = rl.replay_buffer_stats();
+                        println!(
+                            "[FLUXNET] Saved final Q-table: {} state-action pairs to {:?}",
+                            num_states, final_path
+                        );
+                        println!(
+                            "[FLUXNET] Adaptive indexer: {} samples, {} ({})",
+                            indexer_stats.total_samples,
+                            if indexer_stats.adaptive_ready { "Ready" } else { "Learning" },
+                            final_path.with_file_name("adaptive_indexer_final.bin").display()
+                        );
+                        println!(
+                            "[FLUXNET] Replay buffer: {} experiences, avg priority: {:.2}",
+                            rl.replay_buffer_size(),
+                            priority_stats.mean_priority
+                        );
+                    }
+                    Err(e) => {
+                        println!("[FLUXNET] Final save failed: {}", e);
+                    }
+                }
+            }
+        }
 
         Ok(self.best_solution.clone())
     }

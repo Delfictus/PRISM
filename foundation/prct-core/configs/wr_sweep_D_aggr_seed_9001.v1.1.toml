@@ -20,7 +20,8 @@ strategy = "greedy"  # Options: greedy, spectral, community, randomized
 
 [gpu]
 device_id = 0
-streams = 1
+streams = 4
+stream_mode = "parallel"
 batch_size = 1024
 enable_reservoir_gpu = true
 enable_te_gpu = true
@@ -59,7 +60,7 @@ adp_thermo_num_temps = 48
 
 [neuromorphic]
 enabled = true
-reservoir_size = 1000
+reservoir_size = 2000  # FluxNet enhancement: increased from 1000 to 2000
 spectral_radius = 0.9
 leak_rate = 0.3
 input_scaling = 0.5
@@ -93,12 +94,18 @@ tsp_weight = 0.0
 
 [thermo]
 replicas = 48
-num_temps = 48
+num_temps = 58  # Part B: Was 48, +10 for midband density
+steps_per_temp = 40000  # TELEMETRY RECOMMENDATION: 40k base → 160k midband (was 20k)
 swaps_per_temp = 100
 temperature_max = 10.0
 temperature_min = 0.001
+t_min = 0.001
+t_max = 10.0
 damping = 0.02
 schedule = "geometric"
+force_start_temp = 9.0  # Part B: Was 12.0, force ramp starts earlier
+force_full_strength_temp = 3.0  # Part B: Was 5.0, full strength reached earlier
+aggressive_midband = true  # Part B: Enable +10 temps in T=7→3 range
 
 [pimc]
 replicas = 48
@@ -108,7 +115,41 @@ tau = 0.01
 lambda = 1.0
 
 [adp]
-learning_rate = 0.1
-discount_factor = 0.95
-exploration_rate = 0.2
+epsilon = 1.0           # Initial exploration rate (starts high)
+epsilon_decay = 0.995   # Exploration decay rate per episode
+epsilon_min = 0.03      # Minimum exploration rate
+alpha = 0.1             # Learning rate
+gamma = 0.95            # Discount factor
 replay_buffer_size = 1000
+
+[fluxnet]
+enabled = true
+memory_tier = "extended"
+verbose = true
+
+[fluxnet.force_profile]
+f_strong_initial = 1.8
+f_neutral_initial = 1.0
+f_weak_initial = 0.5
+update_interval_temps = 4
+
+[fluxnet.rl]
+learning_rate = 0.1  # alpha
+discount_factor = 0.95  # gamma
+epsilon_start = 1.0
+epsilon_min = 0.01  # minimum exploration
+epsilon_decay = 0.995
+replay_capacity = 10000
+batch_size = 64
+
+[fluxnet.persistence]
+cache_dir = "target/fluxnet_cache"
+load_pretrained = true
+save_interval_temps = 4  # Save checkpoint every 4 temps
+save_final = true
+
+[fluxnet.phase_control]
+control_phase0 = true
+control_phase1 = true
+control_phase2 = true
+control_phase3 = true

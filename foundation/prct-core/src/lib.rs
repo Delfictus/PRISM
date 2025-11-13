@@ -148,7 +148,8 @@ pub mod fluxnet;
 #[cfg(feature = "cuda")]
 pub use fluxnet::{
     ForceBand, ForceBandStats, ForceProfile,
-    ForceCommand, CommandResult,
+    FluxNetAction, AdjustDirection, ActionResult,
     FluxNetConfig, MemoryTier, ForceProfileConfig, RLConfig, PersistenceConfig,
-    RLController, RLState, QTable, Experience, ReplayBuffer,
+    MultiPhaseRLController, UnifiedRLState, QTable, Experience, ReplayBuffer,
+    compute_reward,
 };

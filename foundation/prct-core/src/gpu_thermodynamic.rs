@@ -30,8 +30,7 @@ use std::sync::Arc;
 /// * `num_temps` - Number of temperature replicas
 /// * `steps_per_temp` - Evolution steps at each temperature
 /// * `ai_uncertainty` - Active Inference uncertainty scores for vertex prioritization (Phase 1 output)
-/// * `fluxnet_config` - Optional FluxNet RL configuration for adaptive force profiles
-/// * `difficulty_scores` - Optional reservoir difficulty scores for ForceProfile initialization (Phase 0 output)
+/// * `telemetry` - Telemetry handle for metric collection
 /// * `force_start_temp` - TWEAK 1: Temperature at which conflict forces start activating
 /// * `force_full_strength_temp` - TWEAK 1: Temperature at which conflict forces reach full strength
 ///
@@ -50,13 +49,9 @@ pub fn equilibrate_thermodynamic_gpu(
     steps_per_temp: usize,
     ai_uncertainty: Option<&Vec<f64>>,
     telemetry: Option<&Arc<crate::telemetry::TelemetryHandle>>,
-<<<<<<< HEAD
-    fluxnet_config: Option<&crate::fluxnet::FluxNetConfig>,
-    difficulty_scores: Option<&Vec<f32>>,
-=======
     force_start_temp: f64,
     force_full_strength_temp: f64,
->>>>>>> main
+    aggressive_midband: bool,
 ) -> Result<Vec<ColoringSolution>> {
     // Note: cudarc 0.9 doesn't support async stream execution, but we accept the parameter
     // for API consistency and future cudarc 0.17+ upgrade
@@ -162,17 +157,38 @@ pub fn equilibrate_thermodynamic_gpu(
             })?
         };
 
-    // Geometric temperature ladder
-    let temperatures: Vec<f64> = (0..num_temps)
+    // Geometric temperature ladder with optional midband density boost
+    let mut temperatures: Vec<f64> = (0..num_temps)
         .map(|i| {
             let ratio = t_min / t_max;
             t_max * ratio.powf(i as f64 / (num_temps - 1) as f64)
         })
         .collect();
 
+    // Part B: Aggressive midband density - insert 10 extra temps in T=7 → T=3 range
+    if aggressive_midband {
+        let mut midband_temps = Vec::new();
+        for i in 0..10 {
+            let ratio_f64: f64 = 3.0 / 7.0;
+            let t: f64 = 7.0 * ratio_f64.powf(i as f64 / 9.0);
+            midband_temps.push(t);
+        }
+        temperatures.extend(midband_temps);
+        temperatures.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+        println!(
+            "[THERMO-GPU][MIDBAND] Added 10 extra temps in T=7→3 range (total: {})",
+            temperatures.len()
+        );
+    }
+
     println!(
-        "[THERMO-GPU] Temperature ladder: {:?}",
+        "[THERMO-GPU] Temperature ladder: {:?}...",
         &temperatures[..temperatures.len().min(5)]
+    );
+    println!(
+        "[THERMO-GPU] Temperature count: {} (aggressive_midband={})",
+        temperatures.len(),
+        aggressive_midband
     );
 
     // Convert graph edges to device format (u32, u32, f32)
@@ -249,9 +265,9 @@ pub fn equilibrate_thermodynamic_gpu(
     let initial_chromatic = initial_solution.chromatic_number;
     let initial_conflicts = initial_solution.conflicts;
 
-    // MOVE 3: Dynamic slack tracking with aggressive initial slack
+    // MOVE 3: Dynamic slack tracking with MORE aggressive initial slack (FIX 4)
     let mut consecutive_guards = 0;
-    let mut current_slack = 60; // MOVE 3: Start with aggressive slack=60
+    let mut current_slack = 90; // FIX 4: Increased from 60 to 90 for wider palette (185+90=275)
     let mut stable_temps = 0;   // MOVE 3: Track stable temperatures for slack decay
 
     // MOVE 5: Guard boost tracking - 1.5x repulsion for 2 temps after guard fires
@@ -266,6 +282,13 @@ pub fn equilibrate_thermodynamic_gpu(
 
     // TWEAK 6: Track best snapshot across all temperatures
     let mut best_snapshot: Option<(usize, ColoringSolution, f64)> = None; // (temp_idx, solution, quality_score)
+
+    // FIX 3: Track last conflict-free snapshot for rollback + reheat
+    let mut last_good_snapshot: Option<(usize, ColoringSolution, Vec<f32>)> = None; // (temp_idx, solution, phases)
+    let mut collapse_streak = 0; // Count consecutive collapses
+
+    // FIX 5: Early-abort tracking
+    let mut high_conflict_streak = 0; // Count consecutive temps with conflicts > 20k
 
     // Task B2: Generate natural frequency heterogeneity
     // CRITICAL FIX: Widened range [0.9, 1.1] → [0.5, 1.5] (5x spread)
@@ -284,10 +307,16 @@ pub fn equilibrate_thermodynamic_gpu(
         n
     );
 
-    // FluxNet RL: Initialize ForceProfile and RLController if enabled
-    let mut fluxnet_state: Option<(crate::fluxnet::ForceProfile, crate::fluxnet::RLController)> = None;
+    // NOTE: Old Phase 2-only FluxNet RL code commented out during multi-phase RL refactor
+    // FluxNet RL is now handled at pipeline level via MultiPhaseRLController
+    // let mut fluxnet_state: Option<(crate::fluxnet::ForceProfile, crate::fluxnet::RLController)> = None;
 
-    if let Some(config) = fluxnet_config {
+    // TODO: Re-enable FluxNet integration after multi-phase RL is fully wired
+    // The entire FluxNet initialization block is disabled
+    /*
+    if false { // Disabled: fluxnet_config parameter removed
+        let fluxnet_config: Option<()> = None; // Placeholder to satisfy old code
+        if let Some(config) = fluxnet_config {
         if config.enabled {
             println!("[FLUXNET] Initializing FluxNet RL controller");
             println!("[FLUXNET] Memory tier: {:?}", config.memory_tier);
@@ -320,13 +349,12 @@ pub fn equilibrate_thermodynamic_gpu(
             let max_chromatic = n; // Assume max colors ~ num_vertices
             let compact = config.memory_tier == crate::fluxnet::MemoryTier::Compact;
 
-            let mut rl_controller = crate::fluxnet::RLController::new(
+            let mut rl_controller = crate::fluxnet::MultiPhaseRLController::new(
                 config.rl.clone(),
                 num_states,
                 replay_capacity,
-                max_conflicts,
                 max_chromatic,
-                compact,
+                false, // verbose
             );
 
             // Load pre-trained Q-table if available
@@ -355,13 +383,22 @@ pub fn equilibrate_thermodynamic_gpu(
             println!("[FLUXNET]   Weak band: {:.1}%", stats.weak_fraction * 100.0);
             println!("[FLUXNET]   Mean force: {:.3}", stats.mean_force);
 
-            fluxnet_state = Some((force_profile, rl_controller));
+            // fluxnet_state = Some((force_profile, rl_controller));
         } else {
             println!("[FLUXNET] FluxNet disabled in config");
         }
-    } else {
-        println!("[FLUXNET] No FluxNet config provided, running baseline thermodynamic");
-    }
+        } // End of if let Some(config)
+    } // End of if false (disabled FluxNet block)
+    */
+
+    // Create identity force buffers for when FluxNet is disabled
+    // These are reused across all temperatures to avoid repeated allocation
+    let identity_f_strong = cuda_device
+        .htod_copy(vec![1.0f32; n])
+        .map_err(|e| PRCTError::GpuError(format!("Failed to allocate identity f_strong: {}", e)))?;
+    let identity_f_weak = cuda_device
+        .htod_copy(vec![1.0f32; n])
+        .map_err(|e| PRCTError::GpuError(format!("Failed to allocate identity f_weak: {}", e)))?;
 
     // Process each temperature
     for (temp_idx, &temp) in temperatures.iter().enumerate() {
@@ -374,81 +411,8 @@ pub fn equilibrate_thermodynamic_gpu(
             temp
         );
 
-        // FluxNet RL: Per-temperature decision-making
-        // Store telemetry before this temperature for reward computation
-        let telemetry_before = if let Some((ref force_profile, ref rl_controller)) = fluxnet_state {
-            if temp_idx > 0 {
-                // Get telemetry from previous temperature solution
-                let prev_solution = equilibrium_states.last().unwrap();
-                let prev_chromatic = prev_solution.chromatic_number;
-                let prev_conflicts = prev_solution.conflicts;
-
-                // Compute compaction_ratio placeholder (will be refined with actual telemetry)
-                let prev_compaction = 0.75f32; // Default placeholder
-
-                Some((prev_chromatic, prev_conflicts, prev_compaction))
-            } else {
-                // First temperature: use initial solution
-                Some((initial_chromatic, initial_conflicts, 0.5f32))
-            }
-        } else {
-            None
-        };
-
-        // FluxNet RL: Select and apply force command at start of temperature
-        let mut fluxnet_command: Option<crate::fluxnet::ForceCommand> = None;
-        let mut rl_state_before: Option<crate::fluxnet::RLState> = None;
-
-        if let Some((ref mut force_profile, ref mut rl_controller)) = fluxnet_state {
-            if let Some((chromatic_before, conflicts_before, compaction_before)) = telemetry_before {
-                // Create RL state from previous telemetry
-                let state = crate::fluxnet::RLState::from_telemetry(
-                    conflicts_before,
-                    chromatic_before,
-                    compaction_before,
-                    n, // max_conflicts
-                    n, // max_chromatic
-                );
-
-                // Store state for Q-table update at end of temperature
-                rl_state_before = Some(state.clone());
-
-                // Select action via epsilon-greedy
-                let command = rl_controller.select_action(&state);
-
-                println!(
-                    "[FLUXNET][T={}] State: conflicts={}, chromatic={}, compaction={:.2}",
-                    temp_idx, conflicts_before, chromatic_before, compaction_before
-                );
-                println!(
-                    "[FLUXNET][T={}] Action: {} (ε={:.3})",
-                    temp_idx,
-                    command.description(),
-                    rl_controller.epsilon()
-                );
-
-                // Apply command to force profile
-                match force_profile.apply_force_command(&command) {
-                    Ok(result) => {
-                        println!(
-                            "[FLUXNET][T={}] Applied {}: mean_force {:.3} → {:.3}",
-                            temp_idx,
-                            command.telemetry_code(),
-                            result.stats_before.mean_force,
-                            result.stats_after.mean_force
-                        );
-                        fluxnet_command = Some(command);
-                    }
-                    Err(e) => {
-                        eprintln!("[FLUXNET][T={}] Error applying command: {}", temp_idx, e);
-                    }
-                }
-
-                // Force buffers are already synced to GPU in apply_force_command()
-                // NOTE: Passing force buffers to kernel requires CUDA kernel modification (Phase C.2)
-                // For now, forces are prepared on GPU but not yet used by kernel
-            }
-        }
+        // NOTE: Old FluxNet RL per-temperature decision-making disabled (multi-phase refactor)
+        // Functionality moved to pipeline-level multi-phase RL in world_record_pipeline.rs
 
         // Initialize oscillator phases on GPU
         let d_phases = cuda_device
@@ -503,11 +467,73 @@ pub fn equilibrate_thermodynamic_gpu(
             .htod_copy_into(color_phases, &mut d_phases)
             .map_err(|e| PRCTError::GpuError(format!("Failed to init phases: {}", e)))?;
 
-        // Evolution loop
+        // Evolution loop with dynamic steps for midband
         let dt = 0.01f32;
-        let coupling_strength = 1.0f32 / (n as f32).sqrt();
 
-        for step in 0..steps_per_temp {
+        // Part B: Per-band coupling gains (3.0 ≤ T ≤ 8.0 midband)
+        let coupling_base = 1.0f32 / (n as f32).sqrt();
+        let (coupling_gain_strong, coupling_gain_neutral, coupling_gain_weak, coupling_gain) =
+            if temp >= 3.0 && temp <= 8.0 && aggressive_midband {
+                // Midband: apply differential coupling to force heterogeneity
+                // Strong vertices: 0.15x (reduced coupling to prevent phase-lock)
+                // Neutral vertices: 0.25x
+                // Weak vertices: 0.40x (increased coupling to drive mixing)
+                // Note: The actual per-vertex gains are applied in the CUDA kernel via vertex_weights
+                // This is a global scaling factor
+                (0.15f32, 0.25f32, 0.40f32, 0.25f32) // Average gain for midband
+            } else {
+                (1.0f32, 1.0f32, 1.0f32, 1.0f32)
+            };
+        let coupling_strength = coupling_base * coupling_gain;
+
+        if temp >= 3.0 && temp <= 8.0 && aggressive_midband {
+            println!(
+                "[THERMO-GPU][MIDBAND] Using coupling_gain={:.2} for T={:.3}",
+                coupling_gain, temp
+            );
+        }
+
+        // FIX 1: Adaptive burn-in depth - more steps when conflicts > 500
+        // Increase to 10-12k base when high conflicts persist
+        let adaptive_base_steps = if temp_idx > 0 {
+            let prev_conflicts = equilibrium_states.last().map(|s: &ColoringSolution| s.conflicts).unwrap_or(0);
+            if prev_conflicts > 1000 {
+                // Very high conflicts persisting - bump to 12k
+                println!("[THERMO-GPU][FIX-1] Prev conflicts {} > 1000, bumping to 12k steps", prev_conflicts);
+                steps_per_temp.max(12000)
+            } else if prev_conflicts > 500 {
+                println!("[THERMO-GPU][FIX-1] Prev conflicts {} > 500, bumping to 10k steps", prev_conflicts);
+                steps_per_temp.max(10000)
+            } else {
+                steps_per_temp
+            }
+        } else {
+            steps_per_temp
+        };
+
+        // Part B: Aggressive midband steps - 4x multiplier for midband temps (T=3 to T=7)
+        // With telemetry-driven config: 40k base → 160k midband
+        let dynamic_steps = if temp >= 3.0 && temp <= 7.0 && aggressive_midband {
+            adaptive_base_steps * 4
+        } else {
+            adaptive_base_steps
+        };
+
+        if adaptive_base_steps > steps_per_temp {
+            println!(
+                "[THERMO-GPU][FIX-1][BURN-IN] Conflicts > 500: bumping steps {} → {}",
+                steps_per_temp, adaptive_base_steps
+            );
+        }
+
+        if temp >= 3.0 && temp <= 7.0 && aggressive_midband {
+            println!(
+                "[THERMO-GPU][MIDBAND] Using {}x steps ({}) for T={:.3}",
+                4, dynamic_steps, temp
+            );
+        }
+
+        for step in 0..dynamic_steps {
             // Compute coupling forces (Task B1: temperature-dependent coupling)
             // MOVE 5: Pass uncertainty for band-aware coupling redistribution
             unsafe {
@@ -541,29 +567,64 @@ pub fn equilibrate_thermodynamic_gpu(
                     })?;
             }
 
-            // Evolve oscillators
-            unsafe {
-                (*evolve_osc)
-                    .clone()
-                    .launch(
-                        LaunchConfig {
-                            grid_dim: (blocks as u32, 1, 1),
-                            block_dim: (threads as u32, 1, 1),
-                            shared_mem_bytes: 0,
-                        },
-                        (
-                            &d_phases,
-                            &d_velocities,
-                            &d_coupling_forces,
-                            n as i32,
-                            dt,
-                            temp as f32,
-                        ),
-                    )
-                    .map_err(|e| {
-                        PRCTError::GpuError(format!("Evolve kernel failed at step {}: {}", step, e))
-                    })?;
-            }
+            // Evolve oscillators with FluxNet force modulation if enabled
+            // FluxNet: Pass force buffers if available, otherwise pass zero-length dummy slices
+            // CUDA kernel checks for NULL pointer and uses multiplier=1.0 when NULL
+            // NOTE: FluxNet is currently disabled (fluxnet_state commented out)
+            // if let Some((ref force_profile, ref _rl_controller)) = fluxnet_state {
+            //     // FluxNet enabled: use actual force buffers
+            //     unsafe {
+            //         (*evolve_osc)
+            //             .clone()
+            //             .launch(
+            //                 LaunchConfig {
+            //                     grid_dim: (blocks as u32, 1, 1),
+            //                     block_dim: (threads as u32, 1, 1),
+            //                     shared_mem_bytes: 0,
+            //                 },
+            //                 (
+            //                     &d_phases,
+            //                     &d_velocities,
+            //                     &d_coupling_forces,
+            //                     n as i32,
+            //                     dt,
+            //                     temp as f32,
+            //                     &force_profile.device_f_strong,
+            //                     &force_profile.device_f_weak,
+            //                 ),
+            //             )
+            //             .map_err(|e| {
+            //                 PRCTError::GpuError(format!("Evolve kernel with FluxNet failed at step {}: {}", step, e))
+            //             })?;
+            //     }
+            // } else {
+                // FluxNet disabled: use pre-allocated identity multiplier buffers (all 1.0f)
+                // This ensures forces remain unchanged when FluxNet is not active
+                unsafe {
+                    (*evolve_osc)
+                        .clone()
+                        .launch(
+                            LaunchConfig {
+                                grid_dim: (blocks as u32, 1, 1),
+                                block_dim: (threads as u32, 1, 1),
+                                shared_mem_bytes: 0,
+                            },
+                            (
+                                &d_phases,
+                                &d_velocities,
+                                &d_coupling_forces,
+                                n as i32,
+                                dt,
+                                temp as f32,
+                                &identity_f_strong,
+                                &identity_f_weak,
+                            ),
+                        )
+                        .map_err(|e| {
+                            PRCTError::GpuError(format!("Evolve kernel failed at step {}: {}", step, e))
+                        })?;
+                }
+            // }
 
             // Periodic energy computation (every 100 steps)
             if step % 100 == 0 {
@@ -647,6 +708,20 @@ pub fn equilibrate_thermodynamic_gpu(
         let compaction_ratio = actual_chromatic as f64 / color_range as f64;
         let unique_buckets = color_map.len(); // Number of distinct phase buckets used
 
+        // FIX 4: Adaptive palette expansion when compaction_ratio < 0.15
+        if compaction_ratio < 0.15 && current_slack < 120 {
+            let old_slack = current_slack;
+            current_slack = 120; // Expand to maximum
+            println!(
+                "[THERMO-GPU][FIX-4][PALETTE-EXPAND] Compaction ratio {:.3} < 0.15: expanding slack {} → {}",
+                compaction_ratio, old_slack, current_slack
+            );
+            println!(
+                "[THERMO-GPU][FIX-4][PALETTE-EXPAND] New color_range will be {} (from {})",
+                initial_chromatic + current_slack, color_range
+            );
+        }
+
         println!(
             "[THERMO-GPU][COMPACTION] {} phase buckets -> {} actual colors (ratio: {:.3})",
             color_range,
@@ -662,12 +737,64 @@ pub fn equilibrate_thermodynamic_gpu(
             }
         }
 
+        // FIX 5: Early-abort hook - detect dead zones with high conflicts
+        if conflicts_temp > 20000 {
+            high_conflict_streak += 1;
+            println!(
+                "[THERMO-GPU][FIX-5][EARLY-ABORT] High conflict streak: {} (conflicts: {})",
+                high_conflict_streak, conflicts_temp
+            );
+
+            if high_conflict_streak >= 3 {
+                println!(
+                    "[THERMO-GPU][FIX-5][EARLY-ABORT] ⚠️ ABORTING: 3 consecutive temps with conflicts > 20k"
+                );
+                println!(
+                    "[THERMO-GPU][FIX-5][EARLY-ABORT] Dead zone detected - returning best snapshot"
+                );
+
+                // Return best snapshot found so far
+                if let Some((best_temp_idx, ref best_sol, _)) = best_snapshot {
+                    println!(
+                        "[THERMO-GPU][FIX-5][EARLY-ABORT] Best result: temp {} with {} colors, {} conflicts",
+                        best_temp_idx, best_sol.chromatic_number, best_sol.conflicts
+                    );
+                    equilibrium_states.push(best_sol.clone());
+                }
+
+                // Early exit from temperature loop
+                break;
+            }
+        } else {
+            high_conflict_streak = 0; // Reset on good temp
+        }
+
         // Task B5: De-sync burst detection
         let bucket_collapse_risk = if unique_buckets < (color_range / 2) {
             "high"
         } else {
             "low"
         };
+
+        // FIX 3: Save last good snapshot (low conflicts) for potential rollback
+        if conflicts_temp < 2000 && compaction_ratio > 0.3 {
+            // Good state - save for potential rollback
+            let snapshot_phases = cuda_device
+                .dtoh_sync_copy(&d_phases)
+                .map_err(|e| PRCTError::GpuError(format!("Failed to save phases: {}", e)))?;
+
+            last_good_snapshot = Some((
+                temp_idx,
+                ColoringSolution {
+                    colors: colors.clone(),
+                    chromatic_number: actual_chromatic,
+                    conflicts: conflicts_temp,
+                    quality_score: 1.0 / (conflicts_temp + 1) as f64,
+                    computation_time_ms: 0.0,
+                },
+                snapshot_phases
+            ));
+        }
 
         // Task B6: Compaction guard - prevent catastrophic chromatic collapse
         let collapse_threshold = (initial_chromatic as f64 * 0.5) as usize; // 50% of initial
@@ -677,15 +804,58 @@ pub fn equilibrate_thermodynamic_gpu(
         let mut post_shake_conflicts_count = 0;
         let mut slack_expanded = false;
 
-        // MOVE 3: Immediate slack expansion on guard (already at max=60, maintain it)
+        // FIX 3: Track collapse streak for rollback + reheat
         if compaction_guard_triggered {
+            collapse_streak += 1;
             consecutive_guards += 1;
             temps_since_guard = 0; // MOVE 5: Reset guard boost counter
 
+            println!(
+                "[THERMO-GPU][FIX-3] Collapse detected (streak: {})",
+                collapse_streak
+            );
+
+            // FIX 3: Rollback + reheat on 2 consecutive collapses
+            if collapse_streak >= 2 && last_good_snapshot.is_some() {
+                let (good_temp_idx, ref good_sol, ref good_phases) = last_good_snapshot.as_ref().unwrap();
+                println!(
+                    "[THERMO-GPU][FIX-3][ROLLBACK] ⚠️ 2 consecutive collapses detected!"
+                );
+                println!(
+                    "[THERMO-GPU][FIX-3][ROLLBACK] Restoring last conflict-free snapshot from temp {} ({} colors, {} conflicts)",
+                    good_temp_idx, good_sol.chromatic_number, good_sol.conflicts
+                );
+
+                // Restore good solution
+                colors = good_sol.colors.clone();
+
+                // Restore phases
+                cuda_device
+                    .htod_copy_into(good_phases.clone(), &mut d_phases)
+                    .map_err(|e| PRCTError::GpuError(format!("Failed to restore phases: {}", e)))?;
+
+                // Expand slack aggressively for reheat
+                current_slack = 90; // Max slack
+                slack_expanded = true;
+
+                // Set reheat flag (we'll handle this by continuing with expanded slack)
+                println!(
+                    "[THERMO-GPU][FIX-3][REHEAT] Reheating with expanded slack={} to escape dead zone",
+                    current_slack
+                );
+
+                // Reset collapse streak after successful rollback
+                collapse_streak = 0;
+
+                // Skip the rest of this temperature - move to next
+                println!("[THERMO-GPU][FIX-3][ROLLBACK] Skipping remaining temps in dead zone");
+                continue; // Skip to next temperature
+            }
+
             if consecutive_guards == 1 {
-                // MOVE 3: Already at max slack=60, ensure it stays there
+                // MOVE 3: Ensure we maintain aggressive slack
                 let old_slack = current_slack;
-                current_slack = 60; // Maintain aggressive slack
+                current_slack = current_slack.max(90); // FIX 4: Raised from 60 to 90
                 slack_expanded = true;
                 println!(
                     "[THERMO-GPU][MOVE-3][SLACK-EXPAND] Maintaining aggressive slack={} on first guard (was {})",
@@ -728,6 +898,7 @@ pub fn equilibrate_thermodynamic_gpu(
             }
         } else {
             consecutive_guards = 0; // Reset on success
+            collapse_streak = 0; // FIX 3: Reset collapse streak on successful temp
             temps_since_guard += 1; // MOVE 5: Increment temps since last guard
         }
 
@@ -922,8 +1093,8 @@ pub fn equilibrate_thermodynamic_gpu(
         // Record detailed telemetry for this temperature
         let temp_elapsed = temp_start.elapsed();
 
-        // TWEAK 1: Calculate force blend factor for telemetry
-        let force_blend_factor = if temp <= force_start_temp {
+        // FIX 2: Calculate force blend factor with conflict-based clamping
+        let force_blend_factor_raw = if temp <= force_start_temp {
             if force_start_temp > force_full_strength_temp {
                 let blend = 1.0 - (temp - force_full_strength_temp) /
                                   (force_start_temp - force_full_strength_temp);
@@ -933,6 +1104,21 @@ pub fn equilibrate_thermodynamic_gpu(
             }
         } else {
             0.0
+        };
+
+        // FIX 2: Clamp force_blend_factor to ≤0.4 when conflicts > 5000
+        // This prevents aggressive compaction while conflicts remain unresolved
+        let force_blend_factor = if conflicts > 5000 {
+            let clamped = force_blend_factor_raw.min(0.4);
+            if force_blend_factor_raw > clamped {
+                println!(
+                    "[THERMO-GPU][FIX-2][COMPACTION-DELAY] Conflicts {} > 5000: clamping force_blend from {:.3} to {:.3}",
+                    conflicts, force_blend_factor_raw, clamped
+                );
+            }
+            clamped
+        } else {
+            force_blend_factor_raw
         };
 
         if let Some(ref telemetry) = telemetry {
@@ -1042,8 +1228,13 @@ pub fn equilibrate_thermodynamic_gpu(
             params.insert("force_blend_factor".to_string(), json!(force_blend_factor));
             params.insert("force_start_temp".to_string(), json!(force_start_temp));
             params.insert("force_full_strength_temp".to_string(), json!(force_full_strength_temp));
-            params.insert("coupling_strong_gain".to_string(), json!(if temp > 3.0 { 0.15 } else { 1.0 }));
-            params.insert("coupling_weak_gain".to_string(), json!(if temp > 3.0 { 1.40 } else { 1.0 }));
+            params.insert("coupling_gain".to_string(), json!(coupling_gain));
+            params.insert("coupling_gain_strong".to_string(), json!(coupling_gain_strong));
+            params.insert("coupling_gain_neutral".to_string(), json!(coupling_gain_neutral));
+            params.insert("coupling_gain_weak".to_string(), json!(coupling_gain_weak));
+            params.insert("coupling_strength".to_string(), json!(coupling_strength));
+            params.insert("aggressive_midband".to_string(), json!(aggressive_midband));
+            params.insert("dynamic_steps".to_string(), json!(dynamic_steps));
 
             // Shake metrics
             params.insert("shake_invoked".to_string(), json!(shake_invoked));
@@ -1083,61 +1274,8 @@ pub fn equilibrate_thermodynamic_gpu(
             );
         }
 
-        // FluxNet RL: Compute reward and update Q-table after temperature completes
-        if let Some((ref mut _force_profile, ref mut rl_controller)) = fluxnet_state {
-            if let (Some(cmd), Some(state_before), Some((chromatic_before, conflicts_before, compaction_before)))
-                = (fluxnet_command, rl_state_before, telemetry_before) {
-
-                // Compute reward from telemetry delta
-                let reward = rl_controller.compute_reward(
-                    conflicts_before,
-                    conflicts,
-                    chromatic_before,
-                    chromatic_number,
-                    compaction_before,
-                    compaction_ratio,
-                );
-
-                // Create next state from current telemetry
-                let next_state = crate::fluxnet::RLState::from_telemetry(
-                    conflicts,
-                    chromatic_number,
-                    compaction_ratio,
-                    n, // max_conflicts
-                    n, // max_chromatic
-                );
-
-                // Determine if this is a terminal state (last temperature)
-                let is_terminal = temp_idx == num_temps - 1;
-
-                // Update Q-table with experience
-                rl_controller.update(state_before, cmd, reward, next_state, is_terminal);
-
-                println!(
-                    "[FLUXNET][T={}] Reward: {:.3}, Q-table updated (ε={:.3})",
-                    temp_idx, reward, rl_controller.epsilon()
-                );
-
-                // Save Q-table at intervals if configured
-                if let Some(config) = fluxnet_config {
-                    if config.persistence.save_interval_temps > 0
-                        && temp_idx % config.persistence.save_interval_temps == 0
-                        && temp_idx > 0 {
-
-                        let save_path = format!(
-                            "{}/qtable_checkpoint_temp{}.bin",
-                            config.persistence.save_dir,
-                            temp_idx
-                        );
-
-                        match rl_controller.save_qtable(&save_path) {
-                            Ok(_) => println!("[FLUXNET] Q-table saved to: {}", save_path),
-                            Err(e) => eprintln!("[FLUXNET] Failed to save Q-table: {}", e),
-                        }
-                    }
-                }
-            }
-        }
+        // NOTE: Old FluxNet RL Q-table update disabled (multi-phase refactor)
+        // Functionality moved to pipeline-level multi-phase RL in world_record_pipeline.rs
 
         equilibrium_states.push(solution);
     }
@@ -1149,33 +1287,12 @@ pub fn equilibrate_thermodynamic_gpu(
         elapsed.as_secs_f64() * 1000.0
     );
 
-<<<<<<< HEAD
-    // FluxNet RL: Save final Q-table after equilibration completes
-    if let Some((ref _force_profile, ref mut rl_controller)) = fluxnet_state {
-        if let Some(config) = fluxnet_config {
-            if config.persistence.save_final {
-                let final_path = format!("{}/qtable_final.bin", config.persistence.save_dir);
-                match rl_controller.save_qtable(&final_path) {
-                    Ok(_) => println!("[FLUXNET] Final Q-table saved to: {}", final_path),
-                    Err(e) => eprintln!("[FLUXNET] Failed to save final Q-table: {}", e),
-                }
-            }
-
-            // Print learning statistics
-            println!(
-                "[FLUXNET] Training complete: {} experiences, ε={:.3}",
-                rl_controller.replay_buffer_size(),
-                rl_controller.epsilon()
-            );
-        }
-=======
     // TWEAK 6: Report best snapshot found
     if let Some((best_idx, best_sol, best_q)) = &best_snapshot {
         println!(
             "[THERMO-GPU][TWEAK-6] Best snapshot: temp {} with {} colors, {} conflicts (quality={:.6})",
             best_idx, best_sol.chromatic_number, best_sol.conflicts, best_q
         );
->>>>>>> main
     }
 
     Ok(equilibrium_states)
