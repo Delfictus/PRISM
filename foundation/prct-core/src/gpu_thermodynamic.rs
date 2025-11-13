@@ -384,6 +384,15 @@ pub fn equilibrate_thermodynamic_gpu(
     } // End of if false (disabled FluxNet block)
     */
 
+    // Create identity force buffers for when FluxNet is disabled
+    // These are reused across all temperatures to avoid repeated allocation
+    let identity_f_strong = cuda_device
+        .htod_copy(vec![1.0f32; n])
+        .map_err(|e| PRCTError::GpuError(format!("Failed to allocate identity f_strong: {}", e)))?;
+    let identity_f_weak = cuda_device
+        .htod_copy(vec![1.0f32; n])
+        .map_err(|e| PRCTError::GpuError(format!("Failed to allocate identity f_weak: {}", e)))?;
+
     // Process each temperature
     for (temp_idx, &temp) in temperatures.iter().enumerate() {
         let temp_start = std::time::Instant::now();
@@ -396,23 +405,7 @@ pub fn equilibrate_thermodynamic_gpu(
         );
 
         // NOTE: Old FluxNet RL per-temperature decision-making disabled (multi-phase refactor)
-        // // FluxNet RL: Per-temperature decision-making
-        // // Store telemetry before this temperature for reward computation
-        // let telemetry_before = if let Some((ref force_profile, ref rl_controller)) = fluxnet_state {
-        //     if temp_idx > 0 {
-        //         ...
-        //     }
-        // } else {
-        //     None
-        // };
-        //
-        // // FluxNet RL: Select and apply force command at start of temperature
-        // let mut fluxnet_command: Option<crate::fluxnet::ForceCommand> = None;
-        // let mut rl_state_before: Option<crate::fluxnet::RLState> = None;
-        //
-        // if let Some((ref mut force_profile, ref mut rl_controller)) = fluxnet_state {
-        //     ...
-        // }
+        // Functionality moved to pipeline-level multi-phase RL in world_record_pipeline.rs
 
         // Initialize oscillator phases on GPU
         let d_phases = cuda_device
@@ -542,28 +535,62 @@ pub fn equilibrate_thermodynamic_gpu(
                     })?;
             }
 
-            // Evolve oscillators
-            unsafe {
-                (*evolve_osc)
-                    .clone()
-                    .launch(
-                        LaunchConfig {
-                            grid_dim: (blocks as u32, 1, 1),
-                            block_dim: (threads as u32, 1, 1),
-                            shared_mem_bytes: 0,
-                        },
-                        (
-                            &d_phases,
-                            &d_velocities,
-                            &d_coupling_forces,
-                            n as i32,
-                            dt,
-                            temp as f32,
-                        ),
-                    )
-                    .map_err(|e| {
-                        PRCTError::GpuError(format!("Evolve kernel failed at step {}: {}", step, e))
-                    })?;
+            // Evolve oscillators with FluxNet force modulation if enabled
+            // FluxNet: Pass force buffers if available, otherwise pass zero-length dummy slices
+            // CUDA kernel checks for NULL pointer and uses multiplier=1.0 when NULL
+            if let Some((ref force_profile, ref _rl_controller)) = fluxnet_state {
+                // FluxNet enabled: use actual force buffers
+                unsafe {
+                    (*evolve_osc)
+                        .clone()
+                        .launch(
+                            LaunchConfig {
+                                grid_dim: (blocks as u32, 1, 1),
+                                block_dim: (threads as u32, 1, 1),
+                                shared_mem_bytes: 0,
+                            },
+                            (
+                                &d_phases,
+                                &d_velocities,
+                                &d_coupling_forces,
+                                n as i32,
+                                dt,
+                                temp as f32,
+                                &force_profile.device_f_strong,
+                                &force_profile.device_f_weak,
+                            ),
+                        )
+                        .map_err(|e| {
+                            PRCTError::GpuError(format!("Evolve kernel with FluxNet failed at step {}: {}", step, e))
+                        })?;
+                }
+            } else {
+                // FluxNet disabled: use pre-allocated identity multiplier buffers (all 1.0f)
+                // This ensures forces remain unchanged when FluxNet is not active
+                unsafe {
+                    (*evolve_osc)
+                        .clone()
+                        .launch(
+                            LaunchConfig {
+                                grid_dim: (blocks as u32, 1, 1),
+                                block_dim: (threads as u32, 1, 1),
+                                shared_mem_bytes: 0,
+                            },
+                            (
+                                &d_phases,
+                                &d_velocities,
+                                &d_coupling_forces,
+                                n as i32,
+                                dt,
+                                temp as f32,
+                                &identity_f_strong,
+                                &identity_f_weak,
+                            ),
+                        )
+                        .map_err(|e| {
+                            PRCTError::GpuError(format!("Evolve kernel failed at step {}: {}", step, e))
+                        })?;
+                }
             }
 
             // Periodic energy computation (every 100 steps)
@@ -1090,13 +1117,7 @@ pub fn equilibrate_thermodynamic_gpu(
         }
 
         // NOTE: Old FluxNet RL Q-table update disabled (multi-phase refactor)
-        // // FluxNet RL: Compute reward and update Q-table after temperature completes
-        // if let Some((ref mut _force_profile, ref mut rl_controller)) = fluxnet_state {
-        //     if let (Some(cmd), Some(state_before), Some((chromatic_before, conflicts_before, compaction_before)))
-        //         = (fluxnet_command, rl_state_before, telemetry_before) {
-        //         ... (Q-table update logic) ...
-        //     }
-        // }
+        // Functionality moved to pipeline-level multi-phase RL in world_record_pipeline.rs
 
         equilibrium_states.push(solution);
     }

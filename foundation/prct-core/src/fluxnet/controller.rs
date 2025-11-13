@@ -111,6 +111,11 @@ impl QTable {
             .unwrap_or(0.0)
     }
 
+    /// Get Q-value for state-action pair (alias for get, used by telemetry)
+    pub fn get_q_value(&self, state_idx: usize, action_idx: usize) -> f32 {
+        self.get(state_idx, action_idx)
+    }
+
     /// Set Q-value for state-action pair
     pub fn set(&mut self, state_idx: usize, action_idx: usize, value: f64) {
         if state_idx < self.table_size && action_idx < self.num_actions {
