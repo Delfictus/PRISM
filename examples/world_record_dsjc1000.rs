@@ -16,16 +16,17 @@
 use anyhow::Result;
 use prism_ai::data::DimacsGraph;
 use std::path::Path;
+use std::sync::Arc;
+use std::thread;
 
 #[cfg(feature = "cuda")]
 use cudarc::driver::CudaDevice;
 
-// Arc not needed with cudarc 0.9 - CudaDevice::new() returns Arc directly
-
 #[cfg(feature = "cuda")]
 use prct_core::world_record_pipeline::{WorldRecordConfig, WorldRecordPipeline};
 
-// Removed unused import
+#[cfg(feature = "cuda")]
+use prct_core::gpu::{device_topology, device_profile::DeviceProfile};
 
 #[cfg(feature = "cuda")]
 use shared_types::KuramotoState;
@@ -80,10 +81,25 @@ fn main() -> Result<()> {
     println!("   Best known: 83 colors (world record)");
     println!();
 
-    // Initialize CUDA device (cudarc 0.9 returns Arc<CudaDevice> directly)
-    println!("🚀 Initializing CUDA device...");
-    let cuda_device = CudaDevice::new(0)?;
-    println!("✅ GPU ready: GPU 0");
+    // Detect available GPUs
+    println!("🚀 Detecting GPUs...");
+    let device_filter = vec!["cuda:*".to_string()];
+    let devices = device_topology::discover(&device_filter)?;
+
+    println!("✅ Found {} GPU(s):", devices.len());
+    for dev in &devices {
+        println!("   {} - {} MB", dev.name, dev.memory_mb);
+    }
+    println!();
+
+    let num_gpus = devices.len();
+    let use_multi_gpu = num_gpus > 1 && std::env::var("PRISM_SINGLE_GPU").is_err();
+
+    if use_multi_gpu {
+        println!("🚀 Multi-GPU mode: Running {} parallel replicas", num_gpus);
+    } else {
+        println!("🎯 Single-GPU mode: Using GPU 0");
+    }
     println!();
 
     // Initialize Kuramoto oscillators for graph dynamics
@@ -189,25 +205,55 @@ fn main() -> Result<()> {
     );
     println!();
 
-    // Initialize world record pipeline
-    println!("🔧 Initializing World Record Pipeline...");
-    let pipeline = WorldRecordPipeline::new(config, cuda_device)?;
-
-    // Enable telemetry for real-time monitoring
-    let run_id = format!("dsjc1000_{}", chrono::Local::now().format("%Y%m%d_%H%M%S"));
-    println!("📊 Enabling telemetry: run_id={}", run_id);
-    let mut pipeline = pipeline.with_telemetry(&run_id)?;
-
-    println!("✅ Pipeline ready");
-    println!("✅ Telemetry enabled: target/run_artifacts/live_metrics_{}.jsonl", run_id);
-    println!();
-
     // Run world record attempt
     println!("🏁 Starting World Record Attempt...");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     let start = std::time::Instant::now();
-    let result = pipeline.optimize_world_record(&graph, &kuramoto)?;
+
+    let result = if use_multi_gpu {
+        // Multi-GPU: spawn thread per GPU
+        let handles: Vec<_> = (0..num_gpus).map(|gpu_id| {
+            let graph_clone = graph.clone();
+            let kuramoto_clone = kuramoto.clone();
+            let config_clone = config.clone();
+
+            thread::spawn(move || -> Result<_> {
+                let cuda_device = CudaDevice::new(gpu_id)?;
+                let run_id = format!("dsjc1000_gpu{}", gpu_id);
+                let pipeline = WorldRecordPipeline::new(config_clone, cuda_device)?;
+                let mut pipeline = pipeline.with_telemetry(&run_id)?;
+                pipeline.optimize_world_record(&graph_clone, &kuramoto_clone)
+            })
+        }).collect();
+
+        // Wait for all GPUs and take best result
+        let mut best_result = None;
+        for (gpu_id, handle) in handles.into_iter().enumerate() {
+            match handle.join() {
+                Ok(Ok(result)) => {
+                    println!("✅ GPU {} finished: {} colors, {} conflicts",
+                             gpu_id, result.chromatic_number, result.conflicts);
+                    if best_result.is_none() ||
+                       result.chromatic_number < best_result.as_ref().unwrap().chromatic_number {
+                        best_result = Some(result);
+                    }
+                }
+                Ok(Err(e)) => println!("❌ GPU {} failed: {}", gpu_id, e),
+                Err(_) => println!("❌ GPU {} thread panicked", gpu_id),
+            }
+        }
+
+        best_result.ok_or_else(|| anyhow::anyhow!("All GPU threads failed"))?
+    } else {
+        // Single-GPU
+        let cuda_device = CudaDevice::new(0)?;
+        let run_id = format!("dsjc1000_{}", chrono::Local::now().format("%Y%m%d_%H%M%S"));
+        let pipeline = WorldRecordPipeline::new(config, cuda_device)?;
+        let mut pipeline = pipeline.with_telemetry(&run_id)?;
+        pipeline.optimize_world_record(&graph, &kuramoto)?
+    };
+
     let elapsed = start.elapsed();
 
     // Final Report
