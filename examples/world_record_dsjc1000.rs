@@ -16,7 +16,6 @@
 use anyhow::Result;
 use prism_ai::data::DimacsGraph;
 use std::path::Path;
-use std::sync::Arc;
 use std::thread;
 
 #[cfg(feature = "cuda")]
@@ -26,7 +25,7 @@ use cudarc::driver::CudaDevice;
 use prct_core::world_record_pipeline::{WorldRecordConfig, WorldRecordPipeline};
 
 #[cfg(feature = "cuda")]
-use prct_core::gpu::{device_topology, device_profile::DeviceProfile};
+use prct_core::gpu::device_topology;
 
 #[cfg(feature = "cuda")]
 use shared_types::KuramotoState;
@@ -224,6 +223,7 @@ fn main() -> Result<()> {
                 let pipeline = WorldRecordPipeline::new(config_clone, cuda_device)?;
                 let mut pipeline = pipeline.with_telemetry(&run_id)?;
                 pipeline.optimize_world_record(&graph_clone, &kuramoto_clone)
+                    .map_err(|e| anyhow::anyhow!("GPU {} error: {}", gpu_id, e))
             })
         }).collect();
 
