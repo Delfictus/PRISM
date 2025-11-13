@@ -1,0 +1,156 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# PRISM RunPod Dockerfile - 8x B200 GPU Optimized
+# ═══════════════════════════════════════════════════════════════════════════════
+# Target: 8x NVIDIA B200 (1440 GB VRAM), 288 vCPU, 2264 GB RAM, CUDA 12.9
+# Architecture: Blackwell (sm_100)
+# Optimizations: Multi-GPU streams, minimal disk usage, production-ready
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Stage 1: Builder - Compile CUDA kernels and Rust binaries
+# ───────────────────────────────────────────────────────────────────────────────
+FROM nvidia/cuda:12.6.0-devel-ubuntu22.04 AS builder
+
+# Prevent interactive prompts during build
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CARGO_HOME=/opt/cargo
+ENV RUSTUP_HOME=/opt/rustup
+ENV PATH=/opt/cargo/bin:$PATH
+
+# Build arguments for optimization
+ARG CUDA_ARCH=sm_100
+ARG RUST_PROFILE=release
+ARG NUM_BUILD_JOBS=64
+
+LABEL org.opencontainers.image.title="PRISM RunPod Builder"
+LABEL org.opencontainers.image.description="Build stage for PRISM graph coloring (8x B200)"
+LABEL org.opencontainers.image.version="1.1.0"
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    curl \
+    git \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust with minimal components
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+    sh -s -- -y --default-toolchain stable --profile minimal
+
+# Verify CUDA installation
+RUN nvcc --version
+
+# Set working directory
+WORKDIR /build
+
+# Copy only dependency manifests first (better layer caching)
+COPY Cargo.toml Cargo.lock ./
+COPY foundation/neuromorphic/Cargo.toml foundation/neuromorphic/
+COPY foundation/prct-core/Cargo.toml foundation/prct-core/
+COPY foundation/quantum/Cargo.toml foundation/quantum/
+COPY foundation/shared-types/Cargo.toml foundation/shared-types/
+COPY foundation/kernels/Cargo.toml foundation/kernels/
+
+# Create dummy source files to build dependencies
+RUN mkdir -p src foundation/neuromorphic/src foundation/prct-core/src \
+    foundation/quantum/src foundation/shared-types/src foundation/kernels/src && \
+    echo "fn main() {}" > src/main.rs && \
+    echo "pub fn dummy() {}" > foundation/neuromorphic/src/lib.rs && \
+    echo "pub fn dummy() {}" > foundation/prct-core/src/lib.rs && \
+    echo "pub fn dummy() {}" > foundation/quantum/src/lib.rs && \
+    echo "pub fn dummy() {}" > foundation/shared-types/src/lib.rs && \
+    echo "pub fn dummy() {}" > foundation/kernels/src/lib.rs
+
+# Build dependencies only (cached layer)
+RUN cargo build --release --features cuda -j ${NUM_BUILD_JOBS}
+
+# Remove dummy sources
+RUN rm -rf src foundation/neuromorphic/src foundation/prct-core/src \
+    foundation/quantum/src foundation/shared-types/src foundation/kernels/src
+
+# Copy actual source code
+COPY . .
+
+# Update build.rs for B200 native compilation (sm_100)
+RUN sed -i 's/sm_90/sm_100/g' build.rs && \
+    sed -i 's/Hopper/Blackwell B200/g' build.rs
+
+# Build PRISM with CUDA kernels for B200 (sm_100)
+RUN cargo build --release --features cuda -j ${NUM_BUILD_JOBS} && \
+    cargo build --release --features cuda --example world_record_dsjc1000 -j ${NUM_BUILD_JOBS}
+
+# Strip binaries to reduce size
+RUN strip target/release/prism-ai && \
+    strip target/release/examples/world_record_dsjc1000 || true
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Stage 2: Runtime - Minimal production image
+# ───────────────────────────────────────────────────────────────────────────────
+FROM nvidia/cuda:12.6.0-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+LABEL org.opencontainers.image.title="PRISM RunPod Runtime"
+LABEL org.opencontainers.image.description="Production PRISM runtime (8x B200 optimized)"
+LABEL org.opencontainers.image.version="1.1.0"
+LABEL org.opencontainers.image.authors="PRISM Team"
+LABEL runpod.gpu.count="8"
+LABEL runpod.gpu.type="B200"
+
+# Install minimal runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Copy compiled binaries from builder
+COPY --from=builder /build/target/release/prism-ai /app/bin/
+COPY --from=builder /build/target/release/examples/world_record_dsjc1000 /app/bin/
+
+# Copy PTX kernels
+COPY --from=builder /build/target/ptx/*.ptx /app/ptx/
+
+# Copy configs
+COPY --from=builder /build/foundation/prct-core/configs/*.toml /app/configs/
+
+# Copy benchmarks (DIMACS graphs)
+COPY --from=builder /build/benchmarks/dimacs/*.col /app/benchmarks/dimacs/
+
+# Create directories for outputs
+RUN mkdir -p /app/results /app/fluxnet_cache /app/logs /app/bin
+
+# Copy entrypoint script
+COPY --from=builder /build/docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Set environment variables for 8-GPU optimization
+ENV PRISM_GPU_COUNT=8
+ENV CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+ENV CUDA_DEVICE_ORDER=PCI_BUS_ID
+ENV OMP_NUM_THREADS=288
+ENV RAYON_NUM_THREADS=288
+ENV RUST_BACKTRACE=1
+ENV RUST_LOG=info
+
+# RunPod specific: enable all GPUs
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+# Set entrypoint for terminal access
+ENTRYPOINT ["/app/entrypoint.sh"]
+
+# Default: Interactive bash (override with CMD for auto-run)
+CMD []
+
+# Health check (every 5 minutes)
+HEALTHCHECK --interval=5m --timeout=30s --start-period=2m --retries=3 \
+    CMD nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -1
+
+# Expose ports for monitoring (optional)
+EXPOSE 8080 9090

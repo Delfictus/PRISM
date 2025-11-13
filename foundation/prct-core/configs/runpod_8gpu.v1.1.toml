@@ -1,0 +1,204 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# PRISM RunPod Configuration - 8x B200 GPU Optimized
+# ═══════════════════════════════════════════════════════════════════════════════
+# Hardware: 8x NVIDIA B200 (1440 GB VRAM), 288 vCPU, 2264 GB RAM
+# CUDA: 12.9, Blackwell sm_100
+# Optimization: Multi-GPU streams, massive parallelization, extended memory tier
+# Target: DSJC1000.5 world record (< 83 colors)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+profile = "runpod_8gpu_wr"
+version = "1.1.0"
+target_chromatic = 82  # Aggressive target for 8x B200
+deterministic = false
+max_runtime_hours = 72.0  # 3-day maximum
+
+# ───────────────────────────────────────────────────────────────────────────────
+# CPU Configuration - 288 vCPU utilization
+# ───────────────────────────────────────────────────────────────────────────────
+[cpu]
+threads = 288  # Use all available vCPUs
+pin_pool = true  # Pin threads for NUMA optimization
+work_steal = true
+parallel_io = true
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Multi-GPU Configuration - 8x B200 (180 GB VRAM each)
+# ───────────────────────────────────────────────────────────────────────────────
+[gpu]
+device_id = 0  # Primary GPU (orchestrator will distribute)
+streams = 8  # 8 concurrent streams per GPU (64 total across all GPUs)
+batch_size = 8192  # Massive batch size (180 GB VRAM per GPU)
+enable_reservoir_gpu = true
+enable_te_gpu = true
+enable_statmech_gpu = true
+enable_quantum_gpu = true
+enable_pimc_gpu = true
+enable_thermo_gpu = true
+enable_tda_gpu = true
+
+# Multi-GPU specific settings
+multi_gpu = true
+num_gpus = 8
+gpu_memory_per_device = 180000  # 180 GB per B200
+enable_peer_access = true  # P2P GPU communication
+enable_nvlink = true  # Use NVLink for inter-GPU transfer
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Initial Coloring
+# ───────────────────────────────────────────────────────────────────────────────
+[initial_coloring]
+strategy = "greedy"
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Orchestrator - Maximum parallelization
+# ───────────────────────────────────────────────────────────────────────────────
+[orchestrator]
+use_reservoir_prediction = true
+use_active_inference = true
+use_gpu_active_inference = true
+use_transfer_entropy = true
+use_geodesic_features = true
+use_thermodynamic_equilibration = true
+use_pimc = true
+use_quantum_classical_hybrid = true
+use_gnn_screening = true
+use_adp_learning = true
+use_tda = true
+use_multiscale_analysis = true
+use_ensemble_consensus = true
+restarts = 32  # 32 restarts with 8 GPUs = 4 restarts per GPU
+seed = 42
+early_stop_no_improve_iters = 10
+checkpoint_minutes = 30  # Checkpoint every 30 min
+adp_dsatur_depth = 100000  # Deep search
+adp_quantum_iterations = 50
+adp_thermo_num_temps = 96  # 12 temps per GPU
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Neuromorphic Reservoir - 2x larger reservoir for massive VRAM
+# ───────────────────────────────────────────────────────────────────────────────
+[neuromorphic]
+enabled = true
+reservoir_size = 4096  # 4x larger (4K neurons)
+spectral_radius = 0.95
+leak_rate = 0.25
+input_scaling = 0.6
+
+# ───────────────────────────────────────────────────────────────────────────────
+# DSATUR Tie-Breaking
+# ───────────────────────────────────────────────────────────────────────────────
+[dsatur]
+geodesic_weight = 0.30
+reservoir_weight = 0.35
+ai_weight = 0.35
+tie_break = "quantum_then_thermo"
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Quantum Annealing - Deeper exploration with 8 GPUs
+# ───────────────────────────────────────────────────────────────────────────────
+[quantum]
+iterations = 10  # Deeper quantum search
+target_chromatic = 82
+depth = 10  # Maximum depth for thorough exploration
+attempts = 1024  # 128 attempts per GPU
+beta = 0.95
+temperature = 1.0
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Memetic Algorithm - Massive population
+# ───────────────────────────────────────────────────────────────────────────────
+[memetic]
+population_size = 2048  # 256 per GPU
+elite_size = 64  # 8 per GPU
+generations = 2000
+mutation_rate = 0.04
+tournament_size = 4
+local_search_depth = 10000
+use_tsp_guidance = true
+tsp_weight = 0.25
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Thermodynamic Equilibration - 96 replicas (12 per GPU)
+# ───────────────────────────────────────────────────────────────────────────────
+[thermo]
+replicas = 96  # Distributed across 8 GPUs
+num_temps = 96
+exchange_interval = 15
+t_min = 0.005
+t_max = 15.0
+batch_size = 4096  # Large batches for B200
+damping = 0.015
+schedule = "geometric"
+steps_per_temp = 5000  # Extended equilibration
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Path Integral Monte Carlo - Massive parallelization
+# ───────────────────────────────────────────────────────────────────────────────
+[pimc]
+replicas = 96  # 12 per GPU
+beads = 96  # 12 per GPU
+beta = 1.0
+tau = 0.08
+steps = 50000  # Extended PIMC
+
+# ───────────────────────────────────────────────────────────────────────────────
+# ADP Q-Learning
+# ───────────────────────────────────────────────────────────────────────────────
+[adp]
+epsilon = 0.25
+epsilon_decay = 0.998
+epsilon_min = 0.03
+alpha = 0.08
+gamma = 0.97
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FluxNet Adaptive RL - Extended Memory Tier (1440 GB VRAM available)
+# ═══════════════════════════════════════════════════════════════════════════════
+[fluxnet]
+enabled = true
+memory_tier = "Extended"  # Extended tier for massive VRAM
+verbose = true
+
+# RL Hyperparameters - Extended configuration
+[fluxnet.rl]
+# Massive Q-table: 65K states (4x larger)
+qtable_states = 65536
+
+# Large replay buffer: 8K experiences
+replay_capacity = 8192
+
+# Q-learning parameters
+learning_rate = 0.0005  # Lower for stability
+discount_factor = 0.97
+epsilon_start = 1.0
+epsilon_decay = 0.998
+epsilon_min = 0.01
+
+# Adaptive indexing
+use_adaptive_index = true
+
+# Prioritized replay
+priority_alpha = 0.7  # Stronger prioritization
+priority_beta = 0.5  # Stronger correction
+priority_eps = 0.005
+high_reward_cutoff = 15.0  # Higher threshold for B200
+
+# Batch replay
+batch_size = 128  # Large batches for efficiency
+
+# Persistence
+[fluxnet.persistence]
+cache_dir = "/app/fluxnet_cache"
+save_interval_temps = 5  # Save every 5 temps (frequent checkpoints)
+save_final = true
+load_pretrained = true
+# pretrained_path = "/app/fluxnet_cache/qtable_pretrained.bin"
+
+# Force profile
+[fluxnet.force_profile]
+strong_multiplier = 1.6
+weak_multiplier = 0.65
+neutral_multiplier = 1.0
+difficulty_threshold = 0.65
+easy_threshold = 0.25
