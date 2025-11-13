@@ -144,11 +144,11 @@ batch_size = 32            # Sample 32 experiences per update
 
 # Persistence Configuration
 [fluxnet.persistence]
-cache_dir = "target/fluxnet_cache"  # Where to save Q-tables and indexers
+cache_dir = "/app/fluxnet_cache"    # Where to save Q-tables and indexers (Docker path)
 save_interval_temps = 10            # Save checkpoint every 10 temperature steps
 save_final = true                   # Save when run completes
 load_pretrained = true              # Load existing Q-table if available
-# pretrained_path = "path/to/pretrained_qtable.bin"  # Optional: specific Q-table
+# pretrained_path = "/app/fluxnet_cache/qtable_pretrained.bin"  # Optional: specific Q-table
 
 # Force Profile (adaptive thermodynamic forces)
 [fluxnet.force_profile]

@@ -47,44 +47,37 @@ RUN nvcc --version
 WORKDIR /build
 
 # Copy only dependency manifests first (better layer caching)
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml Cargo.lock build.rs ./
 COPY foundation/neuromorphic/Cargo.toml foundation/neuromorphic/
 COPY foundation/prct-core/Cargo.toml foundation/prct-core/
 COPY foundation/quantum/Cargo.toml foundation/quantum/
 COPY foundation/shared-types/Cargo.toml foundation/shared-types/
-COPY foundation/kernels/Cargo.toml foundation/kernels/
+COPY foundation/mathematics/Cargo.toml foundation/mathematics/
 
 # Create dummy source files to build dependencies
 RUN mkdir -p src foundation/neuromorphic/src foundation/prct-core/src \
-    foundation/quantum/src foundation/shared-types/src foundation/kernels/src && \
+    foundation/quantum/src foundation/shared-types/src foundation/mathematics/src && \
     echo "fn main() {}" > src/main.rs && \
     echo "pub fn dummy() {}" > foundation/neuromorphic/src/lib.rs && \
     echo "pub fn dummy() {}" > foundation/prct-core/src/lib.rs && \
     echo "pub fn dummy() {}" > foundation/quantum/src/lib.rs && \
     echo "pub fn dummy() {}" > foundation/shared-types/src/lib.rs && \
-    echo "pub fn dummy() {}" > foundation/kernels/src/lib.rs
+    echo "pub fn dummy() {}" > foundation/mathematics/src/lib.rs
 
 # Build dependencies only (cached layer)
-RUN cargo build --release --features cuda -j ${NUM_BUILD_JOBS}
+RUN cargo build --release --features cuda -j ${NUM_BUILD_JOBS} || true
 
 # Remove dummy sources
 RUN rm -rf src foundation/neuromorphic/src foundation/prct-core/src \
-    foundation/quantum/src foundation/shared-types/src foundation/kernels/src
+    foundation/quantum/src foundation/shared-types/src foundation/mathematics/src
 
 # Copy actual source code
 COPY . .
 
-# Update build.rs for B200 native compilation (sm_100)
-RUN sed -i 's/sm_90/sm_100/g' build.rs && \
-    sed -i 's/Hopper/Blackwell B200/g' build.rs
-
-# Build PRISM with CUDA kernels for B200 (sm_100)
-RUN cargo build --release --features cuda -j ${NUM_BUILD_JOBS} && \
-    cargo build --release --features cuda --example world_record_dsjc1000 -j ${NUM_BUILD_JOBS}
-
-# Strip binaries to reduce size
-RUN strip target/release/prism-ai && \
-    strip target/release/examples/world_record_dsjc1000 || true
+# Build ONLY the world_record example (skip broken utility binaries)
+# Note: sm_90 PTX runs on B200 via JIT compilation
+# Keep debug symbols for profiling and error traces on RunPod
+RUN cargo build --release --features cuda --example world_record_dsjc1000 -j ${NUM_BUILD_JOBS}
 
 # ───────────────────────────────────────────────────────────────────────────────
 # Stage 2: Runtime - Minimal production image
@@ -109,8 +102,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Create app directory
 WORKDIR /app
 
-# Copy compiled binaries from builder
-COPY --from=builder /build/target/release/prism-ai /app/bin/
+# Copy compiled binary from builder (world_record example only)
 COPY --from=builder /build/target/release/examples/world_record_dsjc1000 /app/bin/
 
 # Copy PTX kernels

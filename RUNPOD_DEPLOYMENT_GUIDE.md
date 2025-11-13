@@ -2,6 +2,14 @@
 
 Complete guide to deploying PRISM on RunPod with 8x NVIDIA B200 GPUs (1440 GB VRAM).
 
+**✅ BUILD STATUS**: Successfully built and pushed to Docker Hub
+- **Image**: `delfictus/prism-ai-world-record:latest`
+- **Digest**: `sha256:1db6c03d0c7fd8182a6b24901bb3e1233092fce4ed5ea89e2e85d4648eeb0556`
+- **Size**: 2.32 GB
+- **Built**: 2025-11-13
+- **CUDA**: 12.6.0 (compatible with CUDA 12.9 on RunPod)
+- **PTX Target**: sm_90 (JIT compiles to sm_100 on B200)
+
 ---
 
 ## 📋 Table of Contents
@@ -42,14 +50,17 @@ cd PRISM
 git checkout claude/fluxnet-rl-gpu-implementation-011CUzcMsiXXsaMumMmenNtx
 ```
 
-### 2️⃣ Build Docker Image
+### 2️⃣ Pull Pre-Built Image (Recommended)
 ```bash
-# Set your Docker Hub username
-export DOCKER_USER=yourusername
+# Image already built and pushed to Docker Hub!
+docker pull delfictus/prism-ai-world-record:latest
+```
 
+**OR** Build from source:
+```bash
 # Build and push (takes 30-60 minutes)
-chmod +x docker/build-runpod.sh
-./docker/build-runpod.sh
+chmod +x build-and-push.sh
+./build-and-push.sh
 ```
 
 ### 3️⃣ Deploy to RunPod
@@ -58,7 +69,7 @@ chmod +x docker/build-runpod.sh
 1. Go to https://www.runpod.io/console/pods
 2. Click "Deploy" → "Custom Template"
 3. Configure:
-   - **Container Image**: `yourusername/prism-runpod:1.1.0`
+   - **Container Image**: `delfictus/prism-ai-world-record:latest`
    - **GPU Type**: 8x B200 (or 8x H100)
    - **GPU Count**: 8
    - **Container Disk**: 100 GB
@@ -77,7 +88,7 @@ runpod config
 # Deploy pod
 runpod create pod \
   --name "PRISM-WR-8xB200" \
-  --image "yourusername/prism-runpod:1.1.0" \
+  --image "delfictus/prism-ai-world-record:latest" \
   --gpu-type "NVIDIA B200" \
   --gpu-count 8 \
   --container-disk-size 100 \
@@ -88,38 +99,39 @@ runpod create pod \
 
 ## Building the Docker Image
 
-### Manual Build (alternative to script)
+### Manual Build (alternative to pre-built image)
 
 ```bash
 # Navigate to project root
-cd PRISM
+cd PRISM-FINNAL-PUSH
 
-# Build for B200 (sm_100 architecture)
+# Build for B200 (sm_90 architecture - JIT compiles to sm_100)
 docker build \
   -f Dockerfile.runpod \
-  -t yourusername/prism-runpod:1.1.0 \
-  --build-arg CUDA_ARCH=sm_100 \
+  -t delfictus/prism-ai-world-record:latest \
+  --build-arg CUDA_ARCH=sm_90 \
   --build-arg NUM_BUILD_JOBS=64 \
   .
-
-# Tag as latest
-docker tag yourusername/prism-runpod:1.1.0 yourusername/prism-runpod:latest
 
 # Login to Docker Hub
 docker login
 
 # Push to registry
-docker push yourusername/prism-runpod:1.1.0
-docker push yourusername/prism-runpod:latest
+docker push delfictus/prism-ai-world-record:latest
 ```
+
+**Why sm_90 instead of sm_100?**
+- CUDA 12.6.0 doesn't support sm_100 (Blackwell) directly
+- sm_90 PTX automatically JIT compiles to sm_100 at runtime on B200
+- Provides full performance with forward compatibility
 
 ### Verify Build
 ```bash
 # Check image size
-docker images yourusername/prism-runpod:1.1.0
+docker images delfictus/prism-ai-world-record:latest
 
 # Test locally (if you have GPU)
-docker run --rm --gpus all yourusername/prism-runpod:1.1.0 nvidia-smi
+docker run --rm --gpus all delfictus/prism-ai-world-record:latest nvidia-smi
 ```
 
 ---
@@ -130,8 +142,8 @@ docker run --rm --gpus all yourusername/prism-runpod:1.1.0 nvidia-smi
 
 1. **Create Template**
    - Name: `PRISM 8xB200 World Record`
-   - Container Image: `yourusername/prism-runpod:1.1.0`
-   - Docker Command: `/app/bin/world_record_dsjc1000 /app/configs/runpod_8gpu.v1.1.toml`
+   - Container Image: `delfictus/prism-ai-world-record:latest`
+   - Docker Command: `/app/entrypoint.sh`
    - Container Disk: `100 GB`
    - Volume Mount: `/workspace`
    - Expose Ports: `8080`
