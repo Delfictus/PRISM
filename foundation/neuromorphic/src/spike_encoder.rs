@@ -1,11 +1,11 @@
 //! Spike encoding for converting input data to neural spikes
 //! COMPLETE IMPLEMENTATION - ALL 427+ LINES PRESERVED
 
-use crate::types::{InputData, Spike, SpikePattern, PatternMetadata, EncodingMethod};
+use crate::types::{EncodingMethod, InputData, PatternMetadata, Spike, SpikePattern};
 use anyhow::Result;
+use chrono::{Datelike, Timelike};
 use rand::Rng;
 use std::collections::HashMap;
-use chrono::{Timelike, Datelike};
 
 /// Spike encoder for converting input data to spike trains
 /// COMPLETE MATHEMATICAL IMPLEMENTATION
@@ -23,18 +23,18 @@ pub struct SpikeEncoder {
 #[derive(Debug, Clone)]
 pub struct EncodingParameters {
     // Rate coding parameters
-    pub max_rate: f64,        // Maximum spike rate (Hz)
-    pub min_rate: f64,        // Minimum spike rate (Hz)
+    pub max_rate: f64, // Maximum spike rate (Hz)
+    pub min_rate: f64, // Minimum spike rate (Hz)
 
     // Temporal coding parameters
-    pub delay_range_ms: f64,  // Time delay range for temporal coding
+    pub delay_range_ms: f64, // Time delay range for temporal coding
 
     // Population coding parameters
     pub neurons_per_feature: usize, // Neurons per feature dimension
 
     // Phase coding parameters
-    pub base_frequency: f64,  // Base oscillation frequency (Hz)
-    pub phase_range: f64,     // Phase range in radians
+    pub base_frequency: f64, // Base oscillation frequency (Hz)
+    pub phase_range: f64,    // Phase range in radians
 }
 
 impl Default for EncodingParameters {
@@ -121,7 +121,10 @@ impl SpikeEncoder {
             } else {
                 value
             };
-            features.add(&format!("value_{}", i), self.normalize_value(normalized_value));
+            features.add(
+                &format!("value_{}", i),
+                self.normalize_value(normalized_value),
+            );
         }
 
         // Add time-based features (biological circadian rhythms)
@@ -309,9 +312,8 @@ impl SpikeEncoder {
 
         // Calculate variance as a measure of pattern strength
         let mean: f64 = features.values().sum::<f64>() / features.len() as f64;
-        let variance: f64 = features.values()
-            .map(|v| (v - mean).powi(2))
-            .sum::<f64>() / features.len() as f64;
+        let variance: f64 =
+            features.values().map(|v| (v - mean).powi(2)).sum::<f64>() / features.len() as f64;
 
         // Normalize variance to [0, 1] range
         (variance.sqrt() * 2.0).min(1.0) as f32
@@ -325,12 +327,18 @@ impl SpikeEncoder {
         // Add comprehensive feature statistics
         if !features.is_empty() {
             let values: Vec<f64> = features.values().cloned().collect();
-            metadata.insert("feature_mean".to_string(),
-                           values.iter().sum::<f64>() / values.len() as f64);
-            metadata.insert("feature_min".to_string(),
-                           values.iter().cloned().fold(f64::INFINITY, f64::min));
-            metadata.insert("feature_max".to_string(),
-                           values.iter().cloned().fold(f64::NEG_INFINITY, f64::max));
+            metadata.insert(
+                "feature_mean".to_string(),
+                values.iter().sum::<f64>() / values.len() as f64,
+            );
+            metadata.insert(
+                "feature_min".to_string(),
+                values.iter().cloned().fold(f64::INFINITY, f64::min),
+            );
+            metadata.insert(
+                "feature_max".to_string(),
+                values.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+            );
         }
 
         metadata.insert("encoding_window_ms".to_string(), self.window_ms);

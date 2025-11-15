@@ -15,11 +15,11 @@
 //! - Causal information flow for query routing
 //! - GPU-accelerated causal network computation
 
-use anyhow::Result;
-use std::sync::Arc;
-use std::collections::HashMap;
-use cudarc::driver::CudaDevice;
 use crate::gpu::GpuKernelExecutor;
+use anyhow::Result;
+use cudarc::driver::CudaDevice;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Query domain representation
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -37,15 +37,30 @@ impl QueryDomain {
     pub fn detect(query: &str) -> Self {
         let query_lower = query.to_lowercase();
 
-        if query_lower.contains("code") || query_lower.contains("function") || query_lower.contains("debug") {
+        if query_lower.contains("code")
+            || query_lower.contains("function")
+            || query_lower.contains("debug")
+        {
             QueryDomain::Code
-        } else if query_lower.contains("calculate") || query_lower.contains("equation") || query_lower.contains("proof") {
+        } else if query_lower.contains("calculate")
+            || query_lower.contains("equation")
+            || query_lower.contains("proof")
+        {
             QueryDomain::Math
-        } else if query_lower.contains("physics") || query_lower.contains("chemistry") || query_lower.contains("biology") {
+        } else if query_lower.contains("physics")
+            || query_lower.contains("chemistry")
+            || query_lower.contains("biology")
+        {
             QueryDomain::Science
-        } else if query_lower.contains("story") || query_lower.contains("creative") || query_lower.contains("poem") {
+        } else if query_lower.contains("story")
+            || query_lower.contains("creative")
+            || query_lower.contains("poem")
+        {
             QueryDomain::Creative
-        } else if query_lower.contains("business") || query_lower.contains("market") || query_lower.contains("strategy") {
+        } else if query_lower.contains("business")
+            || query_lower.contains("market")
+            || query_lower.contains("strategy")
+        {
             QueryDomain::Business
         } else {
             QueryDomain::General
@@ -70,7 +85,7 @@ impl QueryDomain {
 pub struct QueryRecord {
     pub domain: QueryDomain,
     pub model_used: String,
-    pub quality_score: f64,  // User feedback or automatic evaluation
+    pub quality_score: f64, // User feedback or automatic evaluation
     pub latency_ms: f64,
     pub timestamp: u64,
 }
@@ -79,9 +94,9 @@ pub struct QueryRecord {
 #[derive(Debug, Clone)]
 pub struct RoutingDecision {
     pub selected_model: String,
-    pub causal_strength: f64,  // Transfer entropy from domain to model
+    pub causal_strength: f64, // Transfer entropy from domain to model
     pub confidence: f64,
-    pub alternative_models: Vec<(String, f64)>,  // (model, TE score)
+    pub alternative_models: Vec<(String, f64)>, // (model, TE score)
 }
 
 /// GPU-Accelerated Transfer Entropy Router
@@ -119,7 +134,7 @@ impl GpuTransferEntropyRouter {
             models,
             history: Vec::new(),
             causal_matrix: HashMap::new(),
-            min_history_size: 20,  // Need at least 20 samples for TE
+            min_history_size: 20, // Need at least 20 samples for TE
         })
     }
 
@@ -161,7 +176,10 @@ impl GpuTransferEntropyRouter {
 
         println!("   Selected: {} (TE={:.4})", selected.0, selected.1);
         println!("   Confidence: {:.1}%", confidence * 100.0);
-        println!("   Causal routing based on {} historical queries\n", self.history.len());
+        println!(
+            "   Causal routing based on {} historical queries\n",
+            self.history.len()
+        );
 
         Ok(RoutingDecision {
             selected_model: selected.0.clone(),
@@ -179,12 +197,22 @@ impl GpuTransferEntropyRouter {
     /// GPU COMPUTATION - NO CPU LOOPS
     fn compute_causal_strength_gpu(&self, domain: &QueryDomain, model: &str) -> Result<f64> {
         // Extract time series for this domain and model
-        let domain_series: Vec<f32> = self.history.iter()
+        let domain_series: Vec<f32> = self
+            .history
+            .iter()
             .map(|r| if &r.domain == domain { 1.0 } else { 0.0 })
             .collect();
 
-        let model_quality_series: Vec<f32> = self.history.iter()
-            .map(|r| if r.model_used == model { r.quality_score as f32 } else { 0.0 })
+        let model_quality_series: Vec<f32> = self
+            .history
+            .iter()
+            .map(|r| {
+                if r.model_used == model {
+                    r.quality_score as f32
+                } else {
+                    0.0
+                }
+            })
             .collect();
 
         if domain_series.len() < 10 {
@@ -195,11 +223,13 @@ impl GpuTransferEntropyRouter {
         let executor = self.gpu_executor.lock().unwrap();
 
         // Element-wise multiply on GPU
-        let product = executor.elementwise_multiply(&domain_series, &model_quality_series)
+        let product = executor
+            .elementwise_multiply(&domain_series, &model_quality_series)
             .expect("GPU causal computation failed - NO CPU FALLBACK");
 
         // Sum on GPU - NO CPU LOOP
-        let sum = executor.reduce_sum(&product)
+        let sum = executor
+            .reduce_sum(&product)
             .expect("GPU sum failed - NO CPU FALLBACK");
 
         let te_proxy = sum / product.len() as f32;
@@ -208,7 +238,13 @@ impl GpuTransferEntropyRouter {
     }
 
     /// Record query result for learning
-    pub fn record_result(&mut self, domain: QueryDomain, model: String, quality: f64, latency_ms: f64) {
+    pub fn record_result(
+        &mut self,
+        domain: QueryDomain,
+        model: String,
+        quality: f64,
+        latency_ms: f64,
+    ) {
         let record = QueryRecord {
             domain: domain.clone(),
             model_used: model.clone(),
@@ -229,7 +265,7 @@ impl GpuTransferEntropyRouter {
 
         // Limit history size
         if self.history.len() > 1000 {
-            self.history.drain(0..100);  // Remove oldest 100
+            self.history.drain(0..100); // Remove oldest 100
         }
     }
 
@@ -276,7 +312,11 @@ mod tests {
 
     #[test]
     fn test_transfer_entropy_router_creation() -> Result<()> {
-        let models = vec!["GPT-4".to_string(), "Claude".to_string(), "Gemini".to_string()];
+        let models = vec![
+            "GPT-4".to_string(),
+            "Claude".to_string(),
+            "Gemini".to_string(),
+        ];
         let router = GpuTransferEntropyRouter::new(models)?;
 
         assert_eq!(router.models.len(), 3);
@@ -287,8 +327,14 @@ mod tests {
 
     #[test]
     fn test_domain_detection() {
-        assert_eq!(QueryDomain::detect("Write a Python function"), QueryDomain::Code);
-        assert_eq!(QueryDomain::detect("Solve this equation"), QueryDomain::Math);
+        assert_eq!(
+            QueryDomain::detect("Write a Python function"),
+            QueryDomain::Code
+        );
+        assert_eq!(
+            QueryDomain::detect("Solve this equation"),
+            QueryDomain::Math
+        );
         assert_eq!(QueryDomain::detect("Explain physics"), QueryDomain::Science);
         assert_eq!(QueryDomain::detect("Write a story"), QueryDomain::Creative);
     }

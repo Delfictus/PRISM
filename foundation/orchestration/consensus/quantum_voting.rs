@@ -4,11 +4,11 @@
 //!
 //! BREAKTHROUGH: Reuses existing quantum/pimc.rs (saves 10 hours)
 
-use ndarray::Array1;
 use anyhow::Result;
+use ndarray::Array1;
 
-use crate::orchestration::thermodynamic::hamiltonian::InformationHamiltonian;
 use crate::orchestration::semantic_analysis::SemanticDistanceCalculator;
+use crate::orchestration::thermodynamic::hamiltonian::InformationHamiltonian;
 
 /// Quantum Consensus Optimizer
 ///
@@ -29,10 +29,7 @@ impl QuantumConsensusOptimizer {
     /// Find consensus via energy minimization
     ///
     /// Uses gradient descent (PIMC integration deferred - works without it)
-    pub fn find_consensus(
-        &self,
-        llm_responses: &[String],
-    ) -> Result<ConsensusState> {
+    pub fn find_consensus(&self, llm_responses: &[String]) -> Result<ConsensusState> {
         let n = llm_responses.len();
 
         // Compute pairwise distances
@@ -40,10 +37,9 @@ impl QuantumConsensusOptimizer {
         for i in 0..n {
             for j in 0..n {
                 if i != j {
-                    let dist = self.distance_calc.compute_distance(
-                        &llm_responses[i],
-                        &llm_responses[j],
-                    )?;
+                    let dist = self
+                        .distance_calc
+                        .compute_distance(&llm_responses[i], &llm_responses[j])?;
                     distances[[i, j]] = dist.combined;
                 }
             }

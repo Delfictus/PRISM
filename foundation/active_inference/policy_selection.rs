@@ -10,9 +10,9 @@
 
 use ndarray::Array1;
 
-use super::hierarchical_model::{HierarchicalModel, GaussianBelief};
+use super::hierarchical_model::{GaussianBelief, HierarchicalModel};
 use super::observation_model::MeasurementPattern;
-use super::transition_model::{TransitionModel, ControlAction};
+use super::transition_model::{ControlAction, TransitionModel};
 use super::variational_inference::VariationalInference;
 
 /// Policy: sequence of actions over time horizon
@@ -94,7 +94,8 @@ pub struct PolicySelector {
 
     /// GPU policy evaluator (if CUDA enabled)
     #[cfg(feature = "cuda")]
-    pub gpu_evaluator: Option<std::sync::Arc<std::sync::Mutex<super::gpu_policy_eval::GpuPolicyEvaluator>>>,
+    pub gpu_evaluator:
+        Option<std::sync::Arc<std::sync::Mutex<super::gpu_policy_eval::GpuPolicyEvaluator>>>,
 }
 
 // Manual Clone implementation because Mutex doesn't derive Clone
@@ -136,7 +137,7 @@ impl PolicySelector {
             inference,
             transition,
             #[cfg(feature = "cuda")]
-            gpu_evaluator: None,  // Will be set by set_gpu_evaluator()
+            gpu_evaluator: None, // Will be set by set_gpu_evaluator()
         }
     }
 
@@ -144,7 +145,7 @@ impl PolicySelector {
     #[cfg(feature = "cuda")]
     pub fn set_gpu_evaluator(
         &mut self,
-        evaluator: std::sync::Arc<std::sync::Mutex<super::gpu_policy_eval::GpuPolicyEvaluator>>
+        evaluator: std::sync::Arc<std::sync::Mutex<super::gpu_policy_eval::GpuPolicyEvaluator>>,
     ) {
         self.gpu_evaluator = Some(evaluator);
         println!("[POLICY] GPU policy evaluator enabled");
@@ -254,7 +255,10 @@ impl PolicySelector {
                 let (measurement_pattern, correction_gain) = match policy_id {
                     0 => {
                         // Exploitation: adaptive sensing + STRONG correction
-                        (MeasurementPattern::adaptive(100, &model.level1.belief), 0.95)
+                        (
+                            MeasurementPattern::adaptive(100, &model.level1.belief),
+                            0.95,
+                        )
                     }
                     1 => {
                         // Aggressive: uniform sensing + FULL correction
@@ -266,7 +270,10 @@ impl PolicySelector {
                     }
                     3 => {
                         // Smart exploration: adaptive + strong correction
-                        (MeasurementPattern::adaptive(120, &model.level1.belief), 0.85)
+                        (
+                            MeasurementPattern::adaptive(120, &model.level1.belief),
+                            0.85,
+                        )
                     }
                     _ => {
                         // Focused: target highest uncertainty + aggressive
@@ -291,11 +298,7 @@ impl PolicySelector {
     /// Compute expected free energy: G(π) = Risk + Ambiguity - Novelty
     ///
     /// G(π) = E_q[ln q(o|π) - ln p(o|C)] + E_q[ln q(θ|π) - ln q(θ)]
-    pub fn compute_expected_free_energy(
-        &self,
-        model: &HierarchicalModel,
-        policy: &Policy,
-    ) -> f64 {
+    pub fn compute_expected_free_energy(&self, model: &HierarchicalModel, policy: &Policy) -> f64 {
         let components = self.compute_efe_components(model, policy);
         components.total
     }
@@ -307,7 +310,9 @@ impl PolicySelector {
         policy: &Policy,
     ) -> ExpectedFreeEnergyComponents {
         // Simulate policy execution
-        let trajectory = self.transition.multi_step_prediction(model, &policy.actions);
+        let trajectory = self
+            .transition
+            .multi_step_prediction(model, &policy.actions);
 
         let mut total_risk = 0.0;
         let mut total_ambiguity = 0.0;
@@ -323,9 +328,10 @@ impl PolicySelector {
             total_risk += (&observation_error * &observation_error).sum();
 
             // Ambiguity: uncertainty in observations
-            let obs_variance = self.inference.observation_model.observation_variance(
-                &future_model.level1.belief,
-            );
+            let obs_variance = self
+                .inference
+                .observation_model
+                .observation_variance(&future_model.level1.belief);
             total_ambiguity += obs_variance.sum();
 
             // Novelty: information gain about state
@@ -359,12 +365,10 @@ impl PolicySelector {
     /// Information gain from policy: I(x; o | π)
     ///
     /// Mutual information between hidden states and observations
-    pub fn information_gain(
-        &self,
-        model: &HierarchicalModel,
-        policy: &Policy,
-    ) -> f64 {
-        let trajectory = self.transition.multi_step_prediction(model, &policy.actions);
+    pub fn information_gain(&self, model: &HierarchicalModel, policy: &Policy) -> f64 {
+        let trajectory = self
+            .transition
+            .multi_step_prediction(model, &policy.actions);
 
         let mut total_info_gain = 0.0;
 
@@ -385,10 +389,7 @@ impl PolicySelector {
     /// Select active measurement pattern for next observation
     ///
     /// Which windows to measure? Maximize information gain
-    pub fn select_measurement_pattern(
-        &self,
-        model: &HierarchicalModel,
-    ) -> MeasurementPattern {
+    pub fn select_measurement_pattern(&self, model: &HierarchicalModel) -> MeasurementPattern {
         // Simple heuristic: measure windows with highest uncertainty
         MeasurementPattern::adaptive(100, &model.level1.belief)
     }
@@ -472,9 +473,9 @@ impl ActiveInferenceController {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::hierarchical_model::constants;
     use super::super::observation_model::ObservationModel;
+    use super::*;
 
     fn create_test_controller() -> (ActiveInferenceController, HierarchicalModel) {
         let model = HierarchicalModel::new();
@@ -506,7 +507,9 @@ mod tests {
         let (controller, model) = create_test_controller();
 
         let policy = Policy::null(3, constants::N_WINDOWS, 0);
-        let efe = controller.selector.compute_expected_free_energy(&model, &policy);
+        let efe = controller
+            .selector
+            .compute_expected_free_energy(&model, &policy);
 
         assert!(efe.is_finite());
     }

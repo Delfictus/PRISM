@@ -2,4 +2,4 @@
 
 pub mod distance_metrics;
 
-pub use distance_metrics::{SemanticDistanceCalculator, SemanticDistance};
+pub use distance_metrics::{SemanticDistance, SemanticDistanceCalculator};

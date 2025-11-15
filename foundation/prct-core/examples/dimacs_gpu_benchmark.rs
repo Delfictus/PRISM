@@ -6,16 +6,16 @@
 //! Example: cargo run --features cuda --example dimacs_gpu_benchmark -- ../../benchmarks/dimacs/myciel6.col
 
 use prct_core::{
-    dimacs_parser::parse_graph_file,
-    ports::{NeuromorphicPort, NeuromorphicEncodingParams, QuantumPort, PhysicsCouplingPort},
     coloring::phase_guided_coloring,
+    dimacs_parser::parse_graph_file,
+    ports::{NeuromorphicEncodingParams, NeuromorphicPort, PhysicsCouplingPort, QuantumPort},
     QuantumColoringSolver,
 };
 
 #[cfg(feature = "cuda")]
-use prct_core::adapters::{NeuromorphicAdapter, QuantumAdapter, CouplingAdapter};
+use prct_core::adapters::{CouplingAdapter, NeuromorphicAdapter, QuantumAdapter};
 
-use shared_types::{Graph, QuantumState, EvolutionParams};
+use shared_types::{EvolutionParams, Graph, QuantumState};
 use std::env;
 use std::time::Instant;
 
@@ -35,14 +35,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n1. Loading graph...");
     let load_start = Instant::now();
     let graph = parse_graph_file(&benchmark_file)?;
-    println!("   ✅ Loaded: {} vertices, {} edges ({:.2}ms)",
-             graph.num_vertices, graph.num_edges,
-             load_start.elapsed().as_micros() as f64 / 1000.0);
+    println!(
+        "   ✅ Loaded: {} vertices, {} edges ({:.2}ms)",
+        graph.num_vertices,
+        graph.num_edges,
+        load_start.elapsed().as_micros() as f64 / 1000.0
+    );
 
     // Calculate graph properties
     let avg_degree = (2 * graph.num_edges) as f64 / graph.num_vertices as f64;
-    let density = (2 * graph.num_edges) as f64 /
-                  (graph.num_vertices * (graph.num_vertices - 1)) as f64;
+    let density =
+        (2 * graph.num_edges) as f64 / (graph.num_vertices * (graph.num_vertices - 1)) as f64;
     println!("   Average degree: {:.2}", avg_degree);
     println!("   Graph density: {:.4}", density);
 
@@ -60,8 +63,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let quantum_adapter = QuantumAdapter::new(Some(device))?;
                 let coupling_adapter = CouplingAdapter::new(0.5)?;
 
-                println!("   ✅ Adapters initialized ({:.2}ms)",
-                         init_start.elapsed().as_micros() as f64 / 1000.0);
+                println!(
+                    "   ✅ Adapters initialized ({:.2}ms)",
+                    init_start.elapsed().as_micros() as f64 / 1000.0
+                );
 
                 // Run PRCT pipeline
                 run_prct_pipeline(graph, neuro_adapter, quantum_adapter, coupling_adapter)?;
@@ -107,9 +112,14 @@ fn run_prct_pipeline(
     phase_times.push(("Spike Encoding", phase_time));
 
     println!("      Spikes generated: {}", spike_pattern.spikes.len());
-    println!("      Time: {:.3}ms", phase_time.as_micros() as f64 / 1000.0);
-    println!("      Throughput: {:.0} spikes/ms",
-             spike_pattern.spikes.len() as f64 / (phase_time.as_micros() as f64 / 1000.0));
+    println!(
+        "      Time: {:.3}ms",
+        phase_time.as_micros() as f64 / 1000.0
+    );
+    println!(
+        "      Throughput: {:.0} spikes/ms",
+        spike_pattern.spikes.len() as f64 / (phase_time.as_micros() as f64 / 1000.0)
+    );
 
     // Phase 2: Reservoir Processing
     println!("\n   Phase 2: Reservoir Computing (GPU)");
@@ -118,8 +128,14 @@ fn run_prct_pipeline(
     let phase_time = phase_start.elapsed();
     phase_times.push(("Reservoir Processing", phase_time));
 
-    println!("      Neuron activations: {}", neuro_state.neuron_states.len());
-    println!("      Time: {:.3}ms", phase_time.as_micros() as f64 / 1000.0);
+    println!(
+        "      Neuron activations: {}",
+        neuro_state.neuron_states.len()
+    );
+    println!(
+        "      Time: {:.3}ms",
+        phase_time.as_micros() as f64 / 1000.0
+    );
 
     // Phase 3: Quantum Evolution
     println!("\n   Phase 3: Quantum Hamiltonian Evolution");
@@ -146,10 +162,19 @@ fn run_prct_pipeline(
     let phase_time = phase_start.elapsed();
     phase_times.push(("Quantum Evolution", phase_time));
 
-    println!("      Quantum amplitudes: {}", quantum_state.amplitudes.len());
-    println!("      Phase coherence: {:.4}", quantum_state.phase_coherence);
+    println!(
+        "      Quantum amplitudes: {}",
+        quantum_state.amplitudes.len()
+    );
+    println!(
+        "      Phase coherence: {:.4}",
+        quantum_state.phase_coherence
+    );
     println!("      Energy: {:.4}", quantum_state.energy);
-    println!("      Time: {:.3}ms", phase_time.as_micros() as f64 / 1000.0);
+    println!(
+        "      Time: {:.3}ms",
+        phase_time.as_micros() as f64 / 1000.0
+    );
 
     // Phase 4: Bidirectional Coupling
     println!("\n   Phase 4: Neuromorphic-Quantum Coupling");
@@ -158,19 +183,37 @@ fn run_prct_pipeline(
     let phase_time = phase_start.elapsed();
     phase_times.push(("Coupling Analysis", phase_time));
 
-    println!("      Kuramoto order parameter: {:.4}", coupling_result.kuramoto_state.order_parameter);
-    println!("      Mean phase: {:.4} rad", coupling_result.kuramoto_state.mean_phase);
-    println!("      Coupling quality: {:.4}", coupling_result.coupling_quality);
-    println!("      Time: {:.3}ms", phase_time.as_micros() as f64 / 1000.0);
+    println!(
+        "      Kuramoto order parameter: {:.4}",
+        coupling_result.kuramoto_state.order_parameter
+    );
+    println!(
+        "      Mean phase: {:.4} rad",
+        coupling_result.kuramoto_state.mean_phase
+    );
+    println!(
+        "      Coupling quality: {:.4}",
+        coupling_result.coupling_quality
+    );
+    println!(
+        "      Time: {:.3}ms",
+        phase_time.as_micros() as f64 / 1000.0
+    );
 
     // Transfer entropy analysis
     println!("\n   Phase 5: Information Flow Analysis");
-    println!("      Neuro → Quantum: {:.4} bits",
-             coupling_result.neuro_to_quantum_entropy.entropy_bits);
-    println!("      Quantum → Neuro: {:.4} bits",
-             coupling_result.quantum_to_neuro_entropy.entropy_bits);
-    println!("      Confidence: {:.2}%",
-             coupling_result.neuro_to_quantum_entropy.confidence * 100.0);
+    println!(
+        "      Neuro → Quantum: {:.4} bits",
+        coupling_result.neuro_to_quantum_entropy.entropy_bits
+    );
+    println!(
+        "      Quantum → Neuro: {:.4} bits",
+        coupling_result.quantum_to_neuro_entropy.entropy_bits
+    );
+    println!(
+        "      Confidence: {:.2}%",
+        coupling_result.neuro_to_quantum_entropy.confidence * 100.0
+    );
 
     // Phase 6: Extract Graph Coloring (Greedy Baseline)
     println!("\n   Phase 6: Phase-Guided Graph Coloring (Greedy Baseline)");
@@ -182,7 +225,12 @@ fn run_prct_pipeline(
     let estimated_chromatic = estimate_chromatic_number(&graph);
     let target_colors = estimated_chromatic + 10; // Give some slack
 
-    let greedy_solution = match phase_guided_coloring(&graph, &phase_field, &coupling_result.kuramoto_state, target_colors) {
+    let greedy_solution = match phase_guided_coloring(
+        &graph,
+        &phase_field,
+        &coupling_result.kuramoto_state,
+        target_colors,
+    ) {
         Ok(solution) => {
             let coloring_time = coloring_start.elapsed();
             phase_times.push(("Graph Coloring (Greedy)", coloring_time));
@@ -190,7 +238,10 @@ fn run_prct_pipeline(
             println!("      Colors used: {}", solution.chromatic_number);
             println!("      Conflicts: {}", solution.conflicts);
             println!("      Quality score: {:.4}", solution.quality_score);
-            println!("      Time: {:.3}ms", coloring_time.as_micros() as f64 / 1000.0);
+            println!(
+                "      Time: {:.3}ms",
+                coloring_time.as_micros() as f64 / 1000.0
+            );
 
             if solution.conflicts == 0 {
                 println!("      ✅ VALID COLORING FOUND!");
@@ -218,10 +269,15 @@ fn run_prct_pipeline(
 
         match QuantumColoringSolver::new(
             #[cfg(feature = "cuda")]
-            device
+            device,
         ) {
             Ok(mut qa_solver) => {
-                match qa_solver.find_coloring(&graph, &phase_field, &coupling_result.kuramoto_state, estimated_chromatic) {
+                match qa_solver.find_coloring(
+                    &graph,
+                    &phase_field,
+                    &coupling_result.kuramoto_state,
+                    estimated_chromatic,
+                ) {
                     Ok(qa_solution) => {
                         let qa_time = qa_start.elapsed();
                         phase_times.push(("Quantum Annealing", qa_time));
@@ -233,10 +289,16 @@ fn run_prct_pipeline(
                         } else if greedy_colors == qa_solution.chromatic_number {
                             "same".to_string()
                         } else {
-                            format!("{:.2}x worse", qa_solution.chromatic_number as f64 / greedy_colors as f64)
+                            format!(
+                                "{:.2}x worse",
+                                qa_solution.chromatic_number as f64 / greedy_colors as f64
+                            )
                         };
 
-                        println!("      Colors used: {} (greedy: {})", qa_solution.chromatic_number, greedy_colors);
+                        println!(
+                            "      Colors used: {} (greedy: {})",
+                            qa_solution.chromatic_number, greedy_colors
+                        );
                         println!("      Improvement: {}", improvement);
                         println!("      Conflicts: {}", qa_solution.conflicts);
                         println!("      Quality score: {:.4}", qa_solution.quality_score);
@@ -245,7 +307,9 @@ fn run_prct_pipeline(
                         if qa_solution.chromatic_number < greedy_colors {
                             println!("      ✅ QUANTUM ANNEALING IMPROVED SOLUTION!");
                         } else {
-                            println!("      🟡 Quantum annealing did not improve (may need more steps)");
+                            println!(
+                                "      🟡 Quantum annealing did not improve (may need more steps)"
+                            );
                         }
                     }
                     Err(e) => {
@@ -269,15 +333,20 @@ fn run_prct_pipeline(
 
     for (phase_name, phase_time) in &phase_times {
         let percentage = (phase_time.as_micros() as f64 / total_time.as_micros() as f64) * 100.0;
-        println!("      {:25} {:8.3}ms  ({:5.1}%)",
-                 phase_name,
-                 phase_time.as_micros() as f64 / 1000.0,
-                 percentage);
+        println!(
+            "      {:25} {:8.3}ms  ({:5.1}%)",
+            phase_name,
+            phase_time.as_micros() as f64 / 1000.0,
+            percentage
+        );
     }
 
     println!("   ─────────────────────────────────────────────────");
-    println!("      {:25} {:8.3}ms  (100.0%)", "TOTAL",
-             total_time.as_micros() as f64 / 1000.0);
+    println!(
+        "      {:25} {:8.3}ms  (100.0%)",
+        "TOTAL",
+        total_time.as_micros() as f64 / 1000.0
+    );
 
     // Performance metrics
     println!("\n5. Graph Complexity Metrics");
@@ -286,10 +355,14 @@ fn run_prct_pipeline(
     let vertices_per_ms = graph.num_vertices as f64 / (total_time.as_micros() as f64 / 1000.0);
     let edges_per_ms = graph.num_edges as f64 / (total_time.as_micros() as f64 / 1000.0);
 
-    println!("      Vertices processed: {} ({:.0} vertices/ms)",
-             graph.num_vertices, vertices_per_ms);
-    println!("      Edges processed: {} ({:.0} edges/ms)",
-             graph.num_edges, edges_per_ms);
+    println!(
+        "      Vertices processed: {} ({:.0} vertices/ms)",
+        graph.num_vertices, vertices_per_ms
+    );
+    println!(
+        "      Edges processed: {} ({:.0} edges/ms)",
+        graph.num_edges, edges_per_ms
+    );
 
     // Coupling strength interpretation
     println!("\n6. Coupling Strength Analysis");
@@ -331,7 +404,10 @@ fn estimate_chromatic_number(graph: &Graph) -> usize {
     let mut max_degree = 0;
 
     for i in 0..n {
-        let degree = graph.adjacency[i*n..(i+1)*n].iter().filter(|&&e| e).count();
+        let degree = graph.adjacency[i * n..(i + 1) * n]
+            .iter()
+            .filter(|&&e| e)
+            .count();
         max_degree = max_degree.max(degree);
     }
 

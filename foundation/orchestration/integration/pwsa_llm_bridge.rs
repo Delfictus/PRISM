@@ -4,11 +4,13 @@
 //!
 //! Integrates Mission Bravo sensor fusion with Mission Charlie LLM intelligence
 
-use std::sync::Arc;
-use parking_lot::Mutex;
 use anyhow::Result;
+use parking_lot::Mutex;
+use std::sync::Arc;
 
-use crate::foundation::pwsa::satellite_adapters::{PwsaFusionPlatform, MissionAwareness, ThreatDetection};
+use crate::foundation::pwsa::satellite_adapters::{
+    MissionAwareness, PwsaFusionPlatform, ThreatDetection,
+};
 use crate::orchestration::llm_clients::LLMOrchestrator;
 
 /// Complete Intelligence (Sensor + AI)

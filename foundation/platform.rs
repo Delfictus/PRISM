@@ -12,7 +12,10 @@ use neuromorphic_engine::pattern_detector::PatternDetectorConfig;
 use neuromorphic_engine::{InputData, PatternDetector, ReservoirComputer, SpikeEncoder};
 use num_complex::Complex64;
 use parking_lot::Mutex;
-use quantum_engine::{ForceFieldParams, Hamiltonian, GpuChromaticColoring, GpuTspSolver, ChromaticColoring, TSPPathOptimizer};
+use quantum_engine::{
+    ChromaticColoring, ForceFieldParams, GpuChromaticColoring, GpuTspSolver, Hamiltonian,
+    TSPPathOptimizer,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;

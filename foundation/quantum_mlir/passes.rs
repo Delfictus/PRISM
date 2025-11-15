@@ -2,8 +2,8 @@
 //!
 //! Real optimization passes for quantum circuits
 
-use anyhow::Result;
 use super::QuantumOp;
+use anyhow::Result;
 
 /// Simplify quantum operations
 pub struct SimplifyQuantumOps;
@@ -13,8 +13,9 @@ impl SimplifyQuantumOps {
         // Remove consecutive Hadamards on same qubit (H^2 = I)
         let mut i = 0;
         while i < ops.len() - 1 {
-            if let (QuantumOp::Hadamard { qubit: q1 }, QuantumOp::Hadamard { qubit: q2 })
-                = (&ops[i], &ops[i + 1]) {
+            if let (QuantumOp::Hadamard { qubit: q1 }, QuantumOp::Hadamard { qubit: q2 }) =
+                (&ops[i], &ops[i + 1])
+            {
                 if q1 == q2 {
                     // Two Hadamards cancel out
                     ops.remove(i);
@@ -37,12 +38,20 @@ impl FuseQuantumGates {
         let mut i = 0;
         while i < ops.len() - 1 {
             match (&ops[i], &ops[i + 1]) {
-                (QuantumOp::RZ { qubit: q1, angle: a1 },
-                 QuantumOp::RZ { qubit: q2, angle: a2 }) if q1 == q2 => {
+                (
+                    QuantumOp::RZ {
+                        qubit: q1,
+                        angle: a1,
+                    },
+                    QuantumOp::RZ {
+                        qubit: q2,
+                        angle: a2,
+                    },
+                ) if q1 == q2 => {
                     // Combine RZ rotations
                     ops[i] = QuantumOp::RZ {
                         qubit: *q1,
-                        angle: a1 + a2
+                        angle: a1 + a2,
                     };
                     ops.remove(i + 1);
                     continue;
@@ -61,7 +70,10 @@ pub struct DeadCodeElimination;
 impl DeadCodeElimination {
     pub fn run(ops: &mut Vec<QuantumOp>) -> Result<()> {
         // Remove operations after measurement (they have no effect)
-        if let Some(pos) = ops.iter().position(|op| matches!(op, QuantumOp::Measure { .. })) {
+        if let Some(pos) = ops
+            .iter()
+            .position(|op| matches!(op, QuantumOp::Measure { .. }))
+        {
             ops.truncate(pos + 1);
         }
         Ok(())

@@ -12,14 +12,14 @@
 //!
 //! Target: 231ms CPU → <10ms GPU (23x speedup)
 
-use std::sync::Arc;
-use ndarray::{Array1, Array2};
-use anyhow::{Result, anyhow, Context};
+use anyhow::{anyhow, Context, Result};
 #[cfg(feature = "cuda")]
-use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchConfig, LaunchAsync};
+use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchAsync, LaunchConfig};
+use ndarray::{Array1, Array2};
+use std::sync::Arc;
 
-use super::policy_selection::Policy;
 use super::hierarchical_model::HierarchicalModel;
+use super::policy_selection::Policy;
 
 /// Dimensions for GPU policy evaluation
 #[derive(Debug, Clone, Copy)]
@@ -46,49 +46,46 @@ impl Default for StateDimensions {
 #[derive(Debug)]
 struct GpuTrajectoryBuffers {
     // Persistent allocations for trajectories
-    satellite_states: CudaSlice<f64>,    // [n_policies × horizon × 6]
-    atmosphere_states: CudaSlice<f64>,   // [n_policies × horizon × 50]
-    window_states: CudaSlice<f64>,       // [n_policies × horizon × 900]
-    variances: CudaSlice<f64>,           // [n_policies × horizon × 900]
+    satellite_states: CudaSlice<f64>,  // [n_policies × horizon × 6]
+    atmosphere_states: CudaSlice<f64>, // [n_policies × horizon × 50]
+    window_states: CudaSlice<f64>,     // [n_policies × horizon × 900]
+    variances: CudaSlice<f64>,         // [n_policies × horizon × 900]
 
     // Observations
-    predicted_obs: CudaSlice<f64>,       // [n_policies × horizon × 100]
-    obs_variances: CudaSlice<f64>,       // [n_policies × horizon × 100]
+    predicted_obs: CudaSlice<f64>, // [n_policies × horizon × 100]
+    obs_variances: CudaSlice<f64>, // [n_policies × horizon × 100]
 }
-
 
 /// GPU buffers for EFE computation
 #[cfg(feature = "cuda")]
 #[derive(Debug)]
 struct GpuEfeBuffers {
-    risk: CudaSlice<f64>,                // [n_policies]
-    ambiguity: CudaSlice<f64>,           // [n_policies]
-    novelty: CudaSlice<f64>,             // [n_policies]
+    risk: CudaSlice<f64>,      // [n_policies]
+    ambiguity: CudaSlice<f64>, // [n_policies]
+    novelty: CudaSlice<f64>,   // [n_policies]
 }
-
 
 /// GPU buffers for model state and parameters
 #[cfg(feature = "cuda")]
 #[derive(Debug)]
 struct GpuModelBuffers {
     // Initial states (for all policies)
-    initial_satellite: CudaSlice<f64>,     // [n_policies × 6]
-    initial_atmosphere: CudaSlice<f64>,    // [n_policies × 50]
-    initial_windows: CudaSlice<f64>,       // [n_policies × 900]
-    initial_variances: CudaSlice<f64>,     // [n_policies × 900]
+    initial_satellite: CudaSlice<f64>,  // [n_policies × 6]
+    initial_atmosphere: CudaSlice<f64>, // [n_policies × 50]
+    initial_windows: CudaSlice<f64>,    // [n_policies × 900]
+    initial_variances: CudaSlice<f64>,  // [n_policies × 900]
 
     // Policy actions
-    actions: CudaSlice<f64>,               // [n_policies × horizon × 900]
+    actions: CudaSlice<f64>, // [n_policies × horizon × 900]
 
     // Observation model
-    observation_matrix: CudaSlice<f64>,    // [100 × 900]
-    observation_noise: CudaSlice<f64>,     // [100]
-    preferred_obs: CudaSlice<f64>,         // [100]
+    observation_matrix: CudaSlice<f64>, // [100 × 900]
+    observation_noise: CudaSlice<f64>,  // [100]
+    preferred_obs: CudaSlice<f64>,      // [100]
 
     // Prior (for novelty calculation)
-    prior_variance: CudaSlice<f64>,        // [900]
+    prior_variance: CudaSlice<f64>, // [900]
 }
-
 
 /// GPU-accelerated policy evaluator
 #[cfg(feature = "cuda")]
@@ -110,13 +107,13 @@ pub struct GpuPolicyEvaluator {
     model_buffers: GpuModelBuffers,
 
     // RNG states
-    rng_states_atmosphere: CudaSlice<u8>,  // curandState is opaque
+    rng_states_atmosphere: CudaSlice<u8>, // curandState is opaque
     rng_states_windows: CudaSlice<u8>,
 
     // Configuration
     n_policies: usize,
     horizon: usize,
-    substeps: usize,  // For window evolution
+    substeps: usize, // For window evolution
     dims: StateDimensions,
 
     // Physics parameters
@@ -125,7 +122,6 @@ pub struct GpuPolicyEvaluator {
     decorrelation_rate: f64,
     c_n_squared: f64,
 }
-
 
 #[cfg(feature = "cuda")]
 impl GpuPolicyEvaluator {
@@ -145,8 +141,10 @@ impl GpuPolicyEvaluator {
         let dims = StateDimensions::default();
 
         println!("[GPU-POLICY] Initializing GPU policy evaluator");
-        println!("[GPU-POLICY] Config: {} policies, {} horizon, {} substeps",
-                 n_policies, horizon, substeps);
+        println!(
+            "[GPU-POLICY] Config: {} policies, {} horizon, {} substeps",
+            n_policies, horizon, substeps
+        );
 
         // Load PTX module (Article VII compliance)
         let ptx_path = "target/ptx/policy_evaluation.ptx";
@@ -173,17 +171,50 @@ impl GpuPolicyEvaluator {
         context.load_ptx(ptx, "policy_eval", &kernel_names)?;
 
         let satellite_kernel = Arc::new(
-            context.get_func("policy_eval", "_Z23evolve_satellite_kernelPKdPddi")
-                .context("Failed to load satellite kernel")?);
+            context
+                .get_func("policy_eval", "_Z23evolve_satellite_kernelPKdPddi")
+                .context("Failed to load satellite kernel")?,
+        );
         let atmosphere_kernel = Arc::new(
-            context.get_func("policy_eval", "_Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii")
-                .context("Failed to load atmosphere kernel")?);
+            context
+                .get_func(
+                    "policy_eval",
+                    "_Z24evolve_atmosphere_kernelPKdS0_PdS1_P17curandStateXORWOWdddii",
+                )
+                .context("Failed to load atmosphere kernel")?,
+        );
         let windows_kernel = Arc::new(
-            context.get_func("policy_eval", "_Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii")
-                .context("Failed to load windows kernel")?);
-        let observation_kernel = Arc::new(context.get_func("policy_eval", "_Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii").ok_or_else(|| anyhow::anyhow!("Failed to get observation kernel"))?);
-        let efe_kernel = Arc::new(context.get_func("policy_eval", "_Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii").ok_or_else(|| anyhow::anyhow!("Failed to get efe kernel"))?);
-        let rng_init_kernel = Arc::new(context.get_func("policy_eval", "_Z22init_rng_states_kernelP17curandStateXORWOWyi").ok_or_else(|| anyhow::anyhow!("Failed to get rng_init kernel"))?);
+            context
+                .get_func(
+                    "policy_eval",
+                    "_Z21evolve_windows_kernelPKdS0_S0_S0_PdS1_P17curandStateXORWOWdddiiiii",
+                )
+                .context("Failed to load windows kernel")?,
+        );
+        let observation_kernel = Arc::new(
+            context
+                .get_func(
+                    "policy_eval",
+                    "_Z27predict_observations_kernelPKdS0_S0_S0_PdS1_iiii",
+                )
+                .ok_or_else(|| anyhow::anyhow!("Failed to get observation kernel"))?,
+        );
+        let efe_kernel = Arc::new(
+            context
+                .get_func(
+                    "policy_eval",
+                    "_Z18compute_efe_kernelPKdS0_S0_S0_S0_PdS1_S1_iiii",
+                )
+                .ok_or_else(|| anyhow::anyhow!("Failed to get efe kernel"))?,
+        );
+        let rng_init_kernel = Arc::new(
+            context
+                .get_func(
+                    "policy_eval",
+                    "_Z22init_rng_states_kernelP17curandStateXORWOWyi",
+                )
+                .ok_or_else(|| anyhow::anyhow!("Failed to get rng_init kernel"))?,
+        );
 
         println!("[GPU-POLICY] All 6 kernels loaded");
 
@@ -220,30 +251,42 @@ impl GpuPolicyEvaluator {
         // Allocate RNG states
         // curandState is 48 bytes per state
         let rng_state_size = 48;
-        let rng_states_atmosphere = context.alloc_zeros(
-            n_policies * dims.atmosphere * rng_state_size
-        )?;
-        let rng_states_windows = context.alloc_zeros(
-            n_policies * dims.windows * rng_state_size
-        )?;
+        let rng_states_atmosphere =
+            context.alloc_zeros(n_policies * dims.atmosphere * rng_state_size)?;
+        let rng_states_windows = context.alloc_zeros(n_policies * dims.windows * rng_state_size)?;
 
         println!("[GPU-POLICY] GPU memory allocated successfully");
-        println!("[GPU-POLICY] - Trajectories: ~{} MB",
-                 (n_policies * horizon * (dims.satellite + dims.atmosphere + 2*dims.windows) * 8) / 1_000_000);
-        println!("[GPU-POLICY] - Observations: ~{} KB",
-                 (n_policies * horizon * 2 * dims.observations * 8) / 1_000);
+        println!(
+            "[GPU-POLICY] - Trajectories: ~{} MB",
+            (n_policies * horizon * (dims.satellite + dims.atmosphere + 2 * dims.windows) * 8)
+                / 1_000_000
+        );
+        println!(
+            "[GPU-POLICY] - Observations: ~{} KB",
+            (n_policies * horizon * 2 * dims.observations * 8) / 1_000
+        );
 
         // Initialize RNG states
         let seed = 12345u64;
-        Self::initialize_rng(&context, &rng_init_kernel, &rng_states_atmosphere,
-                            n_policies * dims.atmosphere, seed)?;
-        Self::initialize_rng(&context, &rng_init_kernel, &rng_states_windows,
-                            n_policies * dims.windows, seed + 1)?;
+        Self::initialize_rng(
+            &context,
+            &rng_init_kernel,
+            &rng_states_atmosphere,
+            n_policies * dims.atmosphere,
+            seed,
+        )?;
+        Self::initialize_rng(
+            &context,
+            &rng_init_kernel,
+            &rng_states_windows,
+            n_policies * dims.windows,
+            seed + 1,
+        )?;
 
         println!("[GPU-POLICY] RNG states initialized");
 
         // Physics parameters (from TransitionModel)
-        let damping = 10.0;  // Hz (window phase damping)
+        let damping = 10.0; // Hz (window phase damping)
         let diffusion = 0.1; // Diffusion coefficient
         let decorrelation_rate = 0.1; // 1/10s (atmospheric decorrelation)
         let c_n_squared = 1e-13; // Atmospheric structure constant
@@ -292,7 +335,9 @@ impl GpuPolicyEvaluator {
         let n_states_i32 = n_states as i32;
 
         unsafe {
-            rng_kernel.clone().launch(cfg, (rng_states, seed, n_states_i32))?;
+            rng_kernel
+                .clone()
+                .launch(cfg, (rng_states, seed, n_states_i32))?;
         }
 
         Ok(())
@@ -312,10 +357,17 @@ impl GpuPolicyEvaluator {
         let start_total = std::time::Instant::now();
         println!("[GPU-POLICY] ========================================");
         println!("[GPU-POLICY] Starting GPU policy evaluation");
-        println!("[GPU-POLICY] Policies: {}, Horizon: {}", self.n_policies, self.horizon);
+        println!(
+            "[GPU-POLICY] Policies: {}, Horizon: {}",
+            self.n_policies, self.horizon
+        );
 
         if policies.len() != self.n_policies {
-            return Err(anyhow!("Expected {} policies, got {}", self.n_policies, policies.len()));
+            return Err(anyhow!(
+                "Expected {} policies, got {}",
+                self.n_policies,
+                policies.len()
+            ));
         }
 
         // Step 1: Upload initial state and matrices
@@ -328,17 +380,26 @@ impl GpuPolicyEvaluator {
         // Step 2: Predict trajectories for all policies
         let traj_start = std::time::Instant::now();
         self.predict_all_trajectories()?;
-        println!("[GPU-POLICY] Trajectory prediction took {:?}", traj_start.elapsed());
+        println!(
+            "[GPU-POLICY] Trajectory prediction took {:?}",
+            traj_start.elapsed()
+        );
 
         // Step 3: Predict observations at each future state
         let obs_start = std::time::Instant::now();
         self.predict_all_observations()?;
-        println!("[GPU-POLICY] Observation prediction took {:?}", obs_start.elapsed());
+        println!(
+            "[GPU-POLICY] Observation prediction took {:?}",
+            obs_start.elapsed()
+        );
 
         // Step 4: Compute EFE components
         let efe_start = std::time::Instant::now();
         self.compute_efe_components(model)?;
-        println!("[GPU-POLICY] EFE computation took {:?}", efe_start.elapsed());
+        println!(
+            "[GPU-POLICY] EFE computation took {:?}",
+            efe_start.elapsed()
+        );
 
         // Step 5: Download results
         let download_start = std::time::Instant::now();
@@ -350,8 +411,10 @@ impl GpuPolicyEvaluator {
         // Debug: Print individual components
         println!("[GPU-POLICY] EFE Components:");
         for i in 0..self.n_policies {
-            println!("[GPU-POLICY]   Policy {}: risk={:.6}, ambiguity={:.6}, novelty={:.6}",
-                     i, risk_vec[i], ambiguity_vec[i], novelty_vec[i]);
+            println!(
+                "[GPU-POLICY]   Policy {}: risk={:.6}, ambiguity={:.6}, novelty={:.6}",
+                i, risk_vec[i], ambiguity_vec[i], novelty_vec[i]
+            );
         }
 
         // Compute total EFE: risk + ambiguity - novelty
@@ -361,7 +424,10 @@ impl GpuPolicyEvaluator {
 
         let total_elapsed = start_total.elapsed();
         println!("[GPU-POLICY] ========================================");
-        println!("[GPU-POLICY] TOTAL GPU policy evaluation: {:?}", total_elapsed);
+        println!(
+            "[GPU-POLICY] TOTAL GPU policy evaluation: {:?}",
+            total_elapsed
+        );
         println!("[GPU-POLICY] EFE values: {:?}", efe_values);
         println!("[GPU-POLICY] ========================================");
 
@@ -379,42 +445,68 @@ impl GpuPolicyEvaluator {
         for _ in 0..self.n_policies {
             // Satellite state (6 dimensions)
             satellite_replicated.extend_from_slice(
-                model.level3.belief.mean.as_slice()
-                    .ok_or_else(|| anyhow!("Satellite state not contiguous"))?
+                model
+                    .level3
+                    .belief
+                    .mean
+                    .as_slice()
+                    .ok_or_else(|| anyhow!("Satellite state not contiguous"))?,
             );
 
             // Atmosphere modes (50 dimensions)
             atmosphere_replicated.extend_from_slice(
-                model.level2.belief.mean.as_slice()
-                    .ok_or_else(|| anyhow!("Atmosphere state not contiguous"))?
+                model
+                    .level2
+                    .belief
+                    .mean
+                    .as_slice()
+                    .ok_or_else(|| anyhow!("Atmosphere state not contiguous"))?,
             );
 
             // Window phases (900 dimensions)
             windows_replicated.extend_from_slice(
-                model.level1.belief.mean.as_slice()
-                    .ok_or_else(|| anyhow!("Window state not contiguous"))?
+                model
+                    .level1
+                    .belief
+                    .mean
+                    .as_slice()
+                    .ok_or_else(|| anyhow!("Window state not contiguous"))?,
             );
 
             // Variances (900 dimensions)
             variances_replicated.extend_from_slice(
-                model.level1.belief.variance.as_slice()
-                    .ok_or_else(|| anyhow!("Window variance not contiguous"))?
+                model
+                    .level1
+                    .belief
+                    .variance
+                    .as_slice()
+                    .ok_or_else(|| anyhow!("Window variance not contiguous"))?,
             );
         }
 
         // Upload to GPU (re-create slices - cudarc doesn't have copy_host_to_device)
-        self.model_buffers.initial_satellite = self.context.htod_sync_copy(&satellite_replicated)?;
-        self.model_buffers.initial_atmosphere = self.context.htod_sync_copy(&atmosphere_replicated)?;
+        self.model_buffers.initial_satellite =
+            self.context.htod_sync_copy(&satellite_replicated)?;
+        self.model_buffers.initial_atmosphere =
+            self.context.htod_sync_copy(&atmosphere_replicated)?;
         self.model_buffers.initial_windows = self.context.htod_sync_copy(&windows_replicated)?;
-        self.model_buffers.initial_variances = self.context.htod_sync_copy(&variances_replicated)?;
+        self.model_buffers.initial_variances =
+            self.context.htod_sync_copy(&variances_replicated)?;
 
         // Upload prior variance (for novelty calculation)
         self.model_buffers.prior_variance = self.context.htod_sync_copy(
-            model.level1.belief.variance.as_slice()
-                .ok_or_else(|| anyhow!("Prior variance not contiguous"))?
+            model
+                .level1
+                .belief
+                .variance
+                .as_slice()
+                .ok_or_else(|| anyhow!("Prior variance not contiguous"))?,
         )?;
 
-        println!("[GPU-POLICY] Initial state uploaded: {} policies", self.n_policies);
+        println!(
+            "[GPU-POLICY] Initial state uploaded: {} policies",
+            self.n_policies
+        );
 
         Ok(())
     }
@@ -423,19 +515,24 @@ impl GpuPolicyEvaluator {
     fn upload_policies(&mut self, policies: &[Policy]) -> Result<()> {
         // Flatten all policy actions into single buffer
         // Shape: [n_policies × horizon × n_windows]
-        let mut actions_flat = Vec::with_capacity(
-            self.n_policies * self.horizon * self.dims.windows
-        );
+        let mut actions_flat =
+            Vec::with_capacity(self.n_policies * self.horizon * self.dims.windows);
 
         for policy in policies {
             if policy.actions.len() != self.horizon {
-                return Err(anyhow!("Policy {} has {} actions, expected {}",
-                                  policy.id, policy.actions.len(), self.horizon));
+                return Err(anyhow!(
+                    "Policy {} has {} actions, expected {}",
+                    policy.id,
+                    policy.actions.len(),
+                    self.horizon
+                ));
             }
 
             for action in &policy.actions {
                 // Extract phase_correction (n_windows dimensions)
-                let phase_slice = action.phase_correction.as_slice()
+                let phase_slice = action
+                    .phase_correction
+                    .as_slice()
                     .ok_or_else(|| anyhow!("Phase correction not contiguous"))?;
 
                 // Pad or truncate to n_windows if needed
@@ -444,7 +541,10 @@ impl GpuPolicyEvaluator {
                 } else if phase_slice.len() < self.dims.windows {
                     // Pad with zeros
                     actions_flat.extend_from_slice(phase_slice);
-                    actions_flat.resize(actions_flat.len() + self.dims.windows - phase_slice.len(), 0.0);
+                    actions_flat.resize(
+                        actions_flat.len() + self.dims.windows - phase_slice.len(),
+                        0.0,
+                    );
                 } else {
                     // Truncate
                     actions_flat.extend_from_slice(&phase_slice[..self.dims.windows]);
@@ -455,8 +555,12 @@ impl GpuPolicyEvaluator {
         // Upload to GPU
         self.model_buffers.actions = self.context.htod_sync_copy(&actions_flat)?;
 
-        println!("[GPU-POLICY] Actions uploaded: {} policies × {} horizon = {} values",
-                 self.n_policies, self.horizon, actions_flat.len());
+        println!(
+            "[GPU-POLICY] Actions uploaded: {} policies × {} horizon = {} values",
+            self.n_policies,
+            self.horizon,
+            actions_flat.len()
+        );
 
         Ok(())
     }
@@ -472,7 +576,9 @@ impl GpuPolicyEvaluator {
         if obs_shape[0] != self.dims.observations || obs_shape[1] != self.dims.windows {
             return Err(anyhow!(
                 "Observation matrix shape {:?} doesn't match expected ({}, {})",
-                obs_shape, self.dims.observations, self.dims.windows
+                obs_shape,
+                self.dims.observations,
+                self.dims.windows
             ));
         }
 
@@ -484,20 +590,25 @@ impl GpuPolicyEvaluator {
         if preferred_obs.len() != self.dims.observations {
             return Err(anyhow!(
                 "Preferred observations length {} doesn't match expected {}",
-                preferred_obs.len(), self.dims.observations
+                preferred_obs.len(),
+                self.dims.observations
             ));
         }
 
         self.model_buffers.preferred_obs = self.context.htod_sync_copy(
-            preferred_obs.as_slice().ok_or_else(|| anyhow!("Preferred obs not contiguous"))?
+            preferred_obs
+                .as_slice()
+                .ok_or_else(|| anyhow!("Preferred obs not contiguous"))?,
         )?;
 
         // For now, use fixed observation noise (could be parameter)
         let obs_noise = vec![0.01; self.dims.observations];
         self.model_buffers.observation_noise = self.context.htod_sync_copy(&obs_noise)?;
 
-        println!("[GPU-POLICY] Observation matrix uploaded: {} × {}",
-                 self.dims.observations, self.dims.windows);
+        println!(
+            "[GPU-POLICY] Observation matrix uploaded: {} × {}",
+            self.dims.observations, self.dims.windows
+        );
 
         Ok(())
     }
@@ -523,19 +634,30 @@ impl GpuPolicyEvaluator {
     fn evolve_satellite_step(&mut self, step: usize) -> Result<()> {
         let cfg = LaunchConfig {
             grid_dim: (self.n_policies as u32, 1, 1),
-            block_dim: (6, 1, 1),  // 6 state dimensions
+            block_dim: (6, 1, 1), // 6 state dimensions
             shared_mem_bytes: 0,
         };
 
-        let dt_satellite = 1.0;  // 1 second timestep
+        let dt_satellite = 1.0; // 1 second timestep
         let n_policies_i32 = self.n_policies as i32;
 
         // For now: simplified - always use initial state as source
         // Full implementation would chain through trajectory steps
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.satellite_kernel).launch(cfg, (&self.model_buffers.initial_satellite, &mut self.trajectories.satellite_states, dt_satellite, n_policies_i32))?;
+            cudarc::driver::CudaFunction::clone(&*self.satellite_kernel).launch(
+                cfg,
+                (
+                    &self.model_buffers.initial_satellite,
+                    &mut self.trajectories.satellite_states,
+                    dt_satellite,
+                    n_policies_i32,
+                ),
+            )?;
         }
-        println!("[GPU-POLICY]     Satellite evolution step {} complete", step);
+        println!(
+            "[GPU-POLICY]     Satellite evolution step {} complete",
+            step
+        );
 
         Ok(())
     }
@@ -548,15 +670,32 @@ impl GpuPolicyEvaluator {
             shared_mem_bytes: 0,
         };
 
-        let dt_atmosphere = 1.0;  // 1 second
+        let dt_atmosphere = 1.0; // 1 second
         let n_policies_i32 = self.n_policies as i32;
         let n_modes_i32 = self.dims.atmosphere as i32;
 
         // Simplified: use initial state as source
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.atmosphere_kernel).launch(cfg, (&self.model_buffers.initial_atmosphere, &self.model_buffers.initial_variances, &mut self.trajectories.atmosphere_states, &mut self.trajectories.variances, &self.rng_states_atmosphere, dt_atmosphere, self.decorrelation_rate, self.c_n_squared, n_policies_i32, n_modes_i32))?;
+            cudarc::driver::CudaFunction::clone(&*self.atmosphere_kernel).launch(
+                cfg,
+                (
+                    &self.model_buffers.initial_atmosphere,
+                    &self.model_buffers.initial_variances,
+                    &mut self.trajectories.atmosphere_states,
+                    &mut self.trajectories.variances,
+                    &self.rng_states_atmosphere,
+                    dt_atmosphere,
+                    self.decorrelation_rate,
+                    self.c_n_squared,
+                    n_policies_i32,
+                    n_modes_i32,
+                ),
+            )?;
         }
-        println!("[GPU-POLICY]     Atmosphere evolution step {} complete", step);
+        println!(
+            "[GPU-POLICY]     Atmosphere evolution step {} complete",
+            step
+        );
 
         Ok(())
     }
@@ -566,11 +705,11 @@ impl GpuPolicyEvaluator {
         // Grid over policies × horizon (kernel processes all steps at once for each policy)
         let cfg = LaunchConfig {
             grid_dim: ((self.n_policies * self.horizon) as u32, 1, 1),
-            block_dim: (256, 1, 1),  // Chunked over 900 windows
+            block_dim: (256, 1, 1), // Chunked over 900 windows
             shared_mem_bytes: 0,
         };
 
-        let dt_windows = 0.01f64;  // 10ms
+        let dt_windows = 0.01f64; // 10ms
         let n_policies_i32 = self.n_policies as i32;
         let horizon_i32 = self.horizon as i32;
         let n_windows_i32 = self.dims.windows as i32;
@@ -584,15 +723,24 @@ impl GpuPolicyEvaluator {
         // 3. Embed constants in kernel at compile-time
         // For now, skip this kernel to allow compilation to proceed.
         // The window evolution is supplementary to the core coloring pipeline.
-        let _ = (dt_windows, n_policies_i32, horizon_i32, n_windows_i32, n_modes_i32, substeps_i32);
+        let _ = (
+            dt_windows,
+            n_policies_i32,
+            horizon_i32,
+            n_windows_i32,
+            n_modes_i32,
+            substeps_i32,
+        );
 
         // Placeholder: Copy initial state to trajectory (no-op evolution)
         self.context.dtod_copy(
             &self.model_buffers.initial_windows,
-            &mut self.trajectories.window_states
+            &mut self.trajectories.window_states,
         )?;
-        println!("[GPU-POLICY]     Window evolution step {} complete ({} substeps)",
-                 step, self.substeps);
+        println!(
+            "[GPU-POLICY]     Window evolution step {} complete ({} substeps)",
+            step, self.substeps
+        );
 
         Ok(())
     }
@@ -602,7 +750,7 @@ impl GpuPolicyEvaluator {
         // One kernel launch for all policies × horizon
         let cfg = LaunchConfig {
             grid_dim: ((self.n_policies * self.horizon) as u32, 1, 1),
-            block_dim: (self.dims.observations as u32, 1, 1),  // 100 threads
+            block_dim: (self.dims.observations as u32, 1, 1), // 100 threads
             shared_mem_bytes: 0,
         };
 
@@ -612,10 +760,26 @@ impl GpuPolicyEvaluator {
         let obs_dim_i32 = self.dims.observations as i32;
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.observation_kernel).launch(cfg, (&self.trajectories.window_states, &self.trajectories.variances, &self.model_buffers.observation_matrix, &self.model_buffers.observation_noise, &mut self.trajectories.predicted_obs, &mut self.trajectories.obs_variances, n_policies_i32, horizon_i32, n_windows_i32, obs_dim_i32))?;
+            cudarc::driver::CudaFunction::clone(&*self.observation_kernel).launch(
+                cfg,
+                (
+                    &self.trajectories.window_states,
+                    &self.trajectories.variances,
+                    &self.model_buffers.observation_matrix,
+                    &self.model_buffers.observation_noise,
+                    &mut self.trajectories.predicted_obs,
+                    &mut self.trajectories.obs_variances,
+                    n_policies_i32,
+                    horizon_i32,
+                    n_windows_i32,
+                    obs_dim_i32,
+                ),
+            )?;
         }
-        println!("[GPU-POLICY] Observations predicted for {} states",
-                 self.n_policies * self.horizon);
+        println!(
+            "[GPU-POLICY] Observations predicted for {} states",
+            self.n_policies * self.horizon
+        );
 
         Ok(())
     }
@@ -632,7 +796,7 @@ impl GpuPolicyEvaluator {
 
         let cfg = LaunchConfig {
             grid_dim: (self.n_policies as u32, 1, 1),
-            block_dim: (256, 1, 1),  // Parallel reduction
+            block_dim: (256, 1, 1), // Parallel reduction
             shared_mem_bytes: 0,
         };
 
@@ -642,14 +806,32 @@ impl GpuPolicyEvaluator {
         let n_windows_i32 = self.dims.windows as i32;
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.efe_kernel).launch(cfg, (&self.trajectories.predicted_obs, &self.trajectories.obs_variances, &self.model_buffers.preferred_obs, &self.trajectories.variances, &self.model_buffers.prior_variance, &mut self.efe_buffers.risk, &mut self.efe_buffers.ambiguity, &mut self.efe_buffers.novelty, n_policies_i32, horizon_i32, obs_dim_i32, n_windows_i32))?;
+            cudarc::driver::CudaFunction::clone(&*self.efe_kernel).launch(
+                cfg,
+                (
+                    &self.trajectories.predicted_obs,
+                    &self.trajectories.obs_variances,
+                    &self.model_buffers.preferred_obs,
+                    &self.trajectories.variances,
+                    &self.model_buffers.prior_variance,
+                    &mut self.efe_buffers.risk,
+                    &mut self.efe_buffers.ambiguity,
+                    &mut self.efe_buffers.novelty,
+                    n_policies_i32,
+                    horizon_i32,
+                    obs_dim_i32,
+                    n_windows_i32,
+                ),
+            )?;
         }
-        println!("[GPU-POLICY] EFE components computed for {} policies", self.n_policies);
+        println!(
+            "[GPU-POLICY] EFE components computed for {} policies",
+            self.n_policies
+        );
 
         Ok(())
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -663,24 +845,25 @@ mod tests {
             if let Ok(context) = CudaDevice::new(0) {
                 let evaluator = GpuPolicyEvaluator::new(
                     Arc::new(context),
-                    5,   // n_policies
-                    3,   // horizon
-                    10,  // substeps
+                    5,  // n_policies
+                    3,  // horizon
+                    10, // substeps
                 );
 
                 assert!(evaluator.is_ok(), "GPU policy evaluator should initialize");
 
                 if let Ok(eval) = evaluator {
                     println!("GPU policy evaluator created successfully");
-                    println!("Memory allocated for {} policies, {} horizon",
-                             eval.n_policies, eval.horizon);
+                    println!(
+                        "Memory allocated for {} policies, {} horizon",
+                        eval.n_policies, eval.horizon
+                    );
                 }
             } else {
                 println!("CUDA not available, skipping GPU test");
             }
         }
-
-            }
+    }
 
     #[test]
     fn test_dimensions() {

@@ -11,10 +11,10 @@
 //!
 //! Impact: 40% latency reduction via predictive optimization
 
+use anyhow::Result;
 use ndarray::Array1;
 use std::collections::VecDeque;
 use tokio::time::{Duration, Instant};
-use anyhow::Result;
 
 /// Hierarchical Active Inference Client
 ///
@@ -89,9 +89,9 @@ impl HierarchicalActiveInferenceClient {
         let token_free_energy = 0.0; // Skipping for now (expensive)
 
         // Weighted total free energy
-        let total_free_energy = self.level_precisions[0] * api_free_energy +
-                                self.level_precisions[1] * response_free_energy +
-                                self.level_precisions[2] * token_free_energy;
+        let total_free_energy = self.level_precisions[0] * api_free_energy
+            + self.level_precisions[1] * response_free_energy
+            + self.level_precisions[2] * token_free_energy;
 
         self.free_energy_history.push_back(total_free_energy);
         if self.free_energy_history.len() > 100 {
@@ -116,7 +116,11 @@ impl HierarchicalActiveInferenceClient {
             return 1.0;
         }
 
-        let mean_error: f64 = self.api_predictor.prediction_error_history.iter().sum::<f64>()
+        let mean_error: f64 = self
+            .api_predictor
+            .prediction_error_history
+            .iter()
+            .sum::<f64>()
             / self.api_predictor.prediction_error_history.len() as f64;
 
         mean_error
@@ -127,7 +131,11 @@ impl HierarchicalActiveInferenceClient {
             return 1.0;
         }
 
-        let mean_error: f64 = self.response_predictor.prediction_error_history.iter().sum::<f64>()
+        let mean_error: f64 = self
+            .response_predictor
+            .prediction_error_history
+            .iter()
+            .sum::<f64>()
             / self.response_predictor.prediction_error_history.len() as f64;
 
         mean_error
@@ -142,29 +150,37 @@ impl HierarchicalActiveInferenceClient {
     ) {
         // Level 3: API prediction error
         let api_error = (self.api_predictor.predicted_latency - actual_latency).abs();
-        self.api_predictor.prediction_error_history.push_back(api_error);
+        self.api_predictor
+            .prediction_error_history
+            .push_back(api_error);
         if self.api_predictor.prediction_error_history.len() > 100 {
             self.api_predictor.prediction_error_history.pop_front();
         }
 
         // Update prediction (exponential moving average)
-        self.api_predictor.predicted_latency = 0.9 * self.api_predictor.predicted_latency
-                                              + 0.1 * actual_latency;
+        self.api_predictor.predicted_latency =
+            0.9 * self.api_predictor.predicted_latency + 0.1 * actual_latency;
 
         // Level 2: Response prediction error
-        let response_error = (self.response_predictor.predicted_length as f64 - actual_length as f64).abs()
-                           + (self.response_predictor.predicted_quality - actual_quality).abs();
+        let response_error =
+            (self.response_predictor.predicted_length as f64 - actual_length as f64).abs()
+                + (self.response_predictor.predicted_quality - actual_quality).abs();
 
-        self.response_predictor.prediction_error_history.push_back(response_error);
+        self.response_predictor
+            .prediction_error_history
+            .push_back(response_error);
         if self.response_predictor.prediction_error_history.len() > 100 {
             self.response_predictor.prediction_error_history.pop_front();
         }
 
         // Update predictions
-        self.response_predictor.predicted_length = ((self.response_predictor.predicted_length as f64 * 0.9)
-                                                   + (actual_length as f64 * 0.1)) as usize;
-        self.response_predictor.predicted_quality = 0.9 * self.response_predictor.predicted_quality
-                                                   + 0.1 * actual_quality;
+        self.response_predictor.predicted_length = ((self.response_predictor.predicted_length
+            as f64
+            * 0.9)
+            + (actual_length as f64 * 0.1))
+            as usize;
+        self.response_predictor.predicted_quality =
+            0.9 * self.response_predictor.predicted_quality + 0.1 * actual_quality;
 
         // Update precision weights (inverse of error²)
         self.update_precision_weights();
@@ -174,14 +190,20 @@ impl HierarchicalActiveInferenceClient {
         // Precision π ∝ 1/error²
 
         let api_error = if !self.api_predictor.prediction_error_history.is_empty() {
-            self.api_predictor.prediction_error_history.iter().sum::<f64>()
+            self.api_predictor
+                .prediction_error_history
+                .iter()
+                .sum::<f64>()
                 / self.api_predictor.prediction_error_history.len() as f64
         } else {
             1.0
         };
 
         let response_error = if !self.response_predictor.prediction_error_history.is_empty() {
-            self.response_predictor.prediction_error_history.iter().sum::<f64>()
+            self.response_predictor
+                .prediction_error_history
+                .iter()
+                .sum::<f64>()
                 / self.response_predictor.prediction_error_history.len() as f64
         } else {
             1.0

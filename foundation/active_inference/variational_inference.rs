@@ -13,7 +13,7 @@
 
 use ndarray::Array1;
 
-use super::hierarchical_model::{HierarchicalModel, GaussianBelief};
+use super::hierarchical_model::{GaussianBelief, HierarchicalModel};
 use super::observation_model::ObservationModel;
 use super::transition_model::TransitionModel;
 
@@ -84,7 +84,7 @@ impl VariationalInference {
         // Store initial beliefs as priors with broad variance
         // (to avoid penalizing inference updates too heavily)
         let mut prior_level1 = model.level1.belief.clone();
-        prior_level1.variance.fill(10.0);  // Broad prior (low confidence)
+        prior_level1.variance.fill(10.0); // Broad prior (low confidence)
         prior_level1.precision = prior_level1.variance.mapv(|v| 1.0 / v);
 
         let mut prior_level2 = model.level2.belief.clone();
@@ -92,11 +92,11 @@ impl VariationalInference {
         prior_level2.precision = prior_level2.variance.mapv(|v| 1.0 / v);
 
         let mut prior_level3 = model.level3.belief.clone();
-        prior_level3.variance *= 10.0;  // Broader prior
+        prior_level3.variance *= 10.0; // Broader prior
         prior_level3.precision = prior_level3.variance.mapv(|v| 1.0 / v);
 
         Self {
-            learning_rate: 0.01,  // Reduced from 0.1 to prevent divergence
+            learning_rate: 0.01, // Reduced from 0.1 to prevent divergence
             convergence_threshold: 1e-4,
             max_iterations: 100,
             observation_model,
@@ -162,10 +162,9 @@ impl VariationalInference {
 
         // Accuracy: Expected log-likelihood E_q[ln p(o|x)]
         // For Gaussian beliefs, use mean state
-        let accuracy = self.observation_model.log_likelihood(
-            observations,
-            &model.level1.belief.mean,
-        );
+        let accuracy = self
+            .observation_model
+            .log_likelihood(observations, &model.level1.belief.mean);
 
         // Surprise: -ln p(o|x) at most probable state
         let surprise = -accuracy;
@@ -183,11 +182,7 @@ impl VariationalInference {
     /// - κ: learning rate
     /// - ε_sensory: bottom-up sensory error
     /// - ε_dynamical: top-down prediction error
-    pub fn update_beliefs(
-        &self,
-        model: &mut HierarchicalModel,
-        observations: &Array1<f64>,
-    ) {
+    pub fn update_beliefs(&self, model: &mut HierarchicalModel, observations: &Array1<f64>) {
         // Level 1: Window phases (bottom-up + top-down)
         self.update_level1(model, observations);
 
@@ -205,18 +200,17 @@ impl VariationalInference {
     /// - Top-down: predictions from atmospheric model
     fn update_level1(&self, model: &mut HierarchicalModel, observations: &Array1<f64>) {
         // Sensory prediction error: ε = Π·(o - g(μ))
-        let sensory_error = self.observation_model.prediction_error(
-            observations,
-            &model.level1.belief.mean,
-        );
+        let sensory_error = self
+            .observation_model
+            .prediction_error(observations, &model.level1.belief.mean);
 
         // Dynamical prediction error (from atmospheric driving)
-        let atmospheric_drive = self.project_atmosphere_to_windows(
-            &model.level2.belief.mean,
-            model.level1.n_windows,
-        );
+        let atmospheric_drive =
+            self.project_atmosphere_to_windows(&model.level2.belief.mean, model.level1.n_windows);
 
-        let predicted_phase = model.level1.drift(&model.level1.belief.mean, &atmospheric_drive);
+        let predicted_phase = model
+            .level1
+            .drift(&model.level1.belief.mean, &atmospheric_drive);
         let dynamical_error = &model.level1.generalized.velocity - &predicted_phase;
 
         // Combined error (weighted by precision)
@@ -231,17 +225,17 @@ impl VariationalInference {
         // Total update
         // NOTE: Temporarily disabling dynamical error to debug stability
         // let total_update = obs_update + weighted_dynamical;
-        let total_update = obs_update;  // Only observation-driven updates
+        let total_update = obs_update; // Only observation-driven updates
 
         // Apply update with ADAPTIVE learning rate for better convergence
         // Increase learning rate when stuck, decrease when oscillating
         let error_magnitude = sensory_error.dot(&sensory_error).sqrt();
         let adaptive_rate = if error_magnitude > 10.0 {
-            self.learning_rate * 5.0  // Much more aggressive for high errors
+            self.learning_rate * 5.0 // Much more aggressive for high errors
         } else if error_magnitude > 5.0 {
-            self.learning_rate * 2.0  // Moderate boost
+            self.learning_rate * 2.0 // Moderate boost
         } else {
-            self.learning_rate  // Normal rate
+            self.learning_rate // Normal rate
         };
 
         let scaled_update = &total_update * adaptive_rate;
@@ -249,7 +243,7 @@ impl VariationalInference {
 
         // Check for numerical issues (safety check)
         if !new_mean.iter().all(|x| x.is_finite()) {
-            return;  // Don't update if non-finite
+            return; // Don't update if non-finite
         }
 
         model.level1.belief.mean = new_mean;
@@ -354,7 +348,8 @@ impl VariationalInference {
         }
 
         // Learn observation model Jacobian (sensitivity matrix)
-        self.observation_model.calibrate_jacobian(states_history, observations_history);
+        self.observation_model
+            .calibrate_jacobian(states_history, observations_history);
 
         // Learn noise covariance (empirical variance)
         let mut empirical_variance = Array1::zeros(self.observation_model.n_measurements);
@@ -374,12 +369,15 @@ impl VariationalInference {
 
             // Smooth update (avoid rapid changes)
             let alpha = 0.1;
-            self.observation_model.noise_covariance =
-                &self.observation_model.noise_covariance * (1.0 - alpha) + &empirical_variance * alpha;
+            self.observation_model.noise_covariance = &self.observation_model.noise_covariance
+                * (1.0 - alpha)
+                + &empirical_variance * alpha;
 
             // Update precision
-            self.observation_model.noise_precision =
-                self.observation_model.noise_covariance.mapv(|v| 1.0 / v.max(1e-10));
+            self.observation_model.noise_precision = self
+                .observation_model
+                .noise_covariance
+                .mapv(|v| 1.0 / v.max(1e-10));
         }
     }
 
@@ -403,8 +401,8 @@ impl VariationalInference {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::hierarchical_model::constants;
+    use super::*;
 
     fn create_test_setup() -> (VariationalInference, HierarchicalModel) {
         let model = HierarchicalModel::new();
@@ -432,7 +430,9 @@ mod tests {
         let (inference, mut model) = create_test_setup();
 
         // Generate observations from model (without noise for numerical stability)
-        let observations = inference.observation_model.predict(&model.level1.belief.mean);
+        let observations = inference
+            .observation_model
+            .predict(&model.level1.belief.mean);
 
         // Initial free energy
         let fe_initial = inference.compute_free_energy(&model, &observations);
@@ -446,8 +446,12 @@ mod tests {
 
         // With clean observations, free energy should decrease
         if fe_final.total < 1e10 && fe_initial.total < 1e10 {
-            assert!(fe_final.total <= fe_initial.total,
-                "FE should decrease (initial: {}, final: {})", fe_initial.total, fe_final.total);
+            assert!(
+                fe_final.total <= fe_initial.total,
+                "FE should decrease (initial: {}, final: {})",
+                fe_initial.total,
+                fe_final.total
+            );
         }
     }
 
@@ -478,9 +482,13 @@ mod tests {
         let (inference, model) = create_test_setup();
 
         // Perfect observation (no noise)
-        let perfect_obs = inference.observation_model.predict(&model.level1.belief.mean);
+        let perfect_obs = inference
+            .observation_model
+            .predict(&model.level1.belief.mean);
 
-        let surprise = inference.observation_model.surprise(&perfect_obs, &model.level1.belief.mean);
+        let surprise = inference
+            .observation_model
+            .surprise(&perfect_obs, &model.level1.belief.mean);
 
         // Should be low (but not exactly zero due to noise variance)
         assert!(surprise < 10.0);
@@ -491,13 +499,16 @@ mod tests {
         let (mut inference, model) = create_test_setup();
 
         // Generate synthetic data
-        let states: Vec<_> = (0..10).map(|i| {
-            let mut s = model.level1.belief.mean.clone();
-            s[i] = 1.0;
-            s
-        }).collect();
+        let states: Vec<_> = (0..10)
+            .map(|i| {
+                let mut s = model.level1.belief.mean.clone();
+                s[i] = 1.0;
+                s
+            })
+            .collect();
 
-        let observations: Vec<_> = states.iter()
+        let observations: Vec<_> = states
+            .iter()
             .map(|s| inference.observation_model.predict(s))
             .collect();
 
@@ -522,9 +533,7 @@ mod tests {
         let recovered = inference.invert_atmosphere_projection(&window_state);
 
         // Should approximately recover (within correlation)
-        let correlation: f64 = (0..100).map(|i| {
-            atm_state[i] * recovered[i]
-        }).sum::<f64>() / 100.0;
+        let correlation: f64 = (0..100).map(|i| atm_state[i] * recovered[i]).sum::<f64>() / 100.0;
 
         assert!(correlation > 0.5); // Positive correlation
     }

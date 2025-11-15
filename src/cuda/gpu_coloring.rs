@@ -1,13 +1,12 @@
+use anyhow::{anyhow, Result};
 ///! GPU-Accelerated Graph Coloring using CUDA
 ///!
 ///! Loads compiled PTX and executes adaptive coloring kernels on GPU.
 ///! GPU-ONLY: No CPU fallbacks - fails if CUDA unavailable.
-
-use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchConfig, LaunchAsync};
+use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchAsync, LaunchConfig};
 use cudarc::nvrtc::Ptx;
 use ndarray::Array2;
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
 
 /// GPU coloring result
 #[derive(Debug, Clone)]
@@ -45,25 +44,39 @@ impl GpuColoringEngine {
 
         // Load PTX module from build output (cudarc 0.9 API)
         let ptx_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/ptx/adaptive_coloring.ptx"));
-        let ptx_str = std::str::from_utf8(ptx_bytes)
-            .map_err(|e| anyhow!("Invalid PTX UTF-8: {}", e))?;
+        let ptx_str =
+            std::str::from_utf8(ptx_bytes).map_err(|e| anyhow!("Invalid PTX UTF-8: {}", e))?;
 
         // cudarc 0.9: load_ptx returns () and functions are retrieved from device
-        device.load_ptx(
-            Ptx::from_src(ptx_str),
-            "adaptive_coloring",
-            &[
-                "_Z28sparse_parallel_coloring_csrPKiS0_PKfPiS3_Pfiiify",
-                "_Z30dense_parallel_coloring_tensorPKfS0_PiS1_Pfiiify"
-            ]
-        ).map_err(|e| anyhow!("Failed to load PTX module: {:?}", e))?;
+        device
+            .load_ptx(
+                Ptx::from_src(ptx_str),
+                "adaptive_coloring",
+                &[
+                    "_Z28sparse_parallel_coloring_csrPKiS0_PKfPiS3_Pfiiify",
+                    "_Z30dense_parallel_coloring_tensorPKfS0_PiS1_Pfiiify",
+                ],
+            )
+            .map_err(|e| anyhow!("Failed to load PTX module: {:?}", e))?;
 
         // Get kernel functions from device (cudarc 0.9 API)
-        let sparse_kernel = Arc::new(device.get_func("adaptive_coloring", "_Z28sparse_parallel_coloring_csrPKiS0_PKfPiS3_Pfiiify")
-            .ok_or_else(|| anyhow!("Failed to load sparse kernel"))?);
+        let sparse_kernel = Arc::new(
+            device
+                .get_func(
+                    "adaptive_coloring",
+                    "_Z28sparse_parallel_coloring_csrPKiS0_PKfPiS3_Pfiiify",
+                )
+                .ok_or_else(|| anyhow!("Failed to load sparse kernel"))?,
+        );
 
-        let dense_kernel = Arc::new(device.get_func("adaptive_coloring", "_Z30dense_parallel_coloring_tensorPKfS0_PiS1_Pfiiify")
-            .ok_or_else(|| anyhow!("Failed to load dense kernel"))?);
+        let dense_kernel = Arc::new(
+            device
+                .get_func(
+                    "adaptive_coloring",
+                    "_Z30dense_parallel_coloring_tensorPKfS0_PiS1_Pfiiify",
+                )
+                .ok_or_else(|| anyhow!("Failed to load dense kernel"))?,
+        );
 
         println!("[GPU] ✅ Loaded adaptive_coloring.ptx");
         println!("[GPU]   - sparse_parallel_coloring_csr with dynamic memory");
@@ -130,17 +143,27 @@ impl GpuColoringEngine {
             0.0
         };
 
-        println!("[GPU] Coloring graph: {} vertices, {} edges ({:.1}% density)",
-                 n, num_edges, density * 100.0);
-        println!("[GPU]   Attempts: {}, Temperature: {:.2}, Max colors: {}",
-                 num_attempts, temperature, max_colors);
+        println!(
+            "[GPU] Coloring graph: {} vertices, {} edges ({:.1}% density)",
+            n,
+            num_edges,
+            density * 100.0
+        );
+        println!(
+            "[GPU]   Attempts: {}, Temperature: {:.2}, Max colors: {}",
+            num_attempts, temperature, max_colors
+        );
 
         let start = std::time::Instant::now();
 
         // Use provided coherence or default uniform
         let coherence_vec = if let Some(coh) = coherence {
             if coh.len() != n * n {
-                return Err(anyhow!("Coherence size mismatch: expected {}, got {}", n * n, coh.len()));
+                return Err(anyhow!(
+                    "Coherence size mismatch: expected {}, got {}",
+                    n * n,
+                    coh.len()
+                ));
             }
             println!("[GPU] Using PRISM-AI enhanced coherence");
             coh.to_vec()
@@ -152,16 +175,30 @@ impl GpuColoringEngine {
         // Select strategy based on density
         let result = if density < 0.40 {
             println!("[GPU] Using SPARSE kernel (CSR format)");
-            self.color_sparse(adjacency, &coherence_vec, num_attempts, temperature, max_colors)?
+            self.color_sparse(
+                adjacency,
+                &coherence_vec,
+                num_attempts,
+                temperature,
+                max_colors,
+            )?
         } else {
             println!("[GPU] Using DENSE kernel (FP16 Tensor Core)");
-            self.color_dense(adjacency, &coherence_vec, num_attempts, temperature, max_colors)?
+            self.color_dense(
+                adjacency,
+                &coherence_vec,
+                num_attempts,
+                temperature,
+                max_colors,
+            )?
         };
 
         let runtime_ms = start.elapsed().as_secs_f64() * 1000.0;
 
-        println!("[GPU] ✅ Best chromatic: {} colors ({:.2}ms)",
-                 result.chromatic_number, runtime_ms);
+        println!(
+            "[GPU] ✅ Best chromatic: {} colors ({:.2}ms)",
+            result.chromatic_number, runtime_ms
+        );
 
         Ok(GpuColoringResult {
             runtime_ms,
@@ -208,8 +245,12 @@ impl GpuColoringEngine {
             shared_mem_bytes: 0,
         };
 
-        println!("[GPU] Launching sparse kernel: {} blocks x {} threads = {} threads",
-                 num_blocks, threads_per_block, num_blocks * threads_per_block);
+        println!(
+            "[GPU] Launching sparse kernel: {} blocks x {} threads = {} threads",
+            num_blocks,
+            threads_per_block,
+            num_blocks * threads_per_block
+        );
 
         // Prepare kernel arguments
         let n_i32 = n as i32;
@@ -234,7 +275,7 @@ impl GpuColoringEngine {
                     max_colors_i32,
                     temperature,
                     seed,
-                )
+                ),
             )?;
         }
 
@@ -246,7 +287,8 @@ impl GpuColoringEngine {
         let chromatic_host: Vec<i32> = self.device.dtoh_sync_copy(&chromatic_gpu)?;
 
         // Find best attempt
-        let (best_idx, &best_chromatic) = chromatic_host.iter()
+        let (best_idx, &best_chromatic) = chromatic_host
+            .iter()
             .enumerate()
             .min_by_key(|(_, &c)| c)
             .ok_or_else(|| anyhow!("No valid colorings found"))?;
@@ -279,7 +321,8 @@ impl GpuColoringEngine {
         let n = adjacency.nrows();
 
         // Convert to FP16 adjacency matrix (cudarc has built-in half support via f16 feature)
-        let adjacency_f32: Vec<f32> = adjacency.iter()
+        let adjacency_f32: Vec<f32> = adjacency
+            .iter()
             .map(|&b| if b { 1.0 } else { 0.0 })
             .collect();
 
@@ -307,8 +350,10 @@ impl GpuColoringEngine {
             shared_mem_bytes: 0,
         };
 
-        println!("[GPU] Launching dense kernel: {} blocks x {} threads",
-                 num_blocks, threads_per_block);
+        println!(
+            "[GPU] Launching dense kernel: {} blocks x {} threads",
+            num_blocks, threads_per_block
+        );
 
         // Prepare kernel arguments
         let n_i32 = n as i32;
@@ -332,7 +377,7 @@ impl GpuColoringEngine {
                     max_colors_i32,
                     temperature,
                     seed,
-                )
+                ),
             )?;
         }
 
@@ -344,7 +389,8 @@ impl GpuColoringEngine {
         let chromatic_host: Vec<i32> = self.device.dtoh_sync_copy(&chromatic_gpu)?;
 
         // Find best
-        let (best_idx, &best_chromatic) = chromatic_host.iter()
+        let (best_idx, &best_chromatic) = chromatic_host
+            .iter()
             .enumerate()
             .min_by_key(|(_, &c)| c)
             .ok_or_else(|| anyhow!("No valid colorings"))?;
@@ -404,7 +450,9 @@ mod tests {
         adj[[2, 0]] = true;
 
         let engine = GpuColoringEngine::new().expect("GPU unavailable");
-        let result = engine.color_graph(&adj, 10, 1.0, 10).expect("Coloring failed");
+        let result = engine
+            .color_graph(&adj, 10, 1.0, 10)
+            .expect("Coloring failed");
 
         // Triangle requires 3 colors
         assert_eq!(result.chromatic_number, 3);

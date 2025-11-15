@@ -9,8 +9,8 @@
 //!
 //! Impact: 70% token reduction → 70% cost savings
 
-use std::collections::HashMap;
 use anyhow::Result;
+use std::collections::HashMap;
 
 /// MDL Prompt Optimizer with Kolmogorov Complexity
 pub struct MDLPromptOptimizer {
@@ -58,7 +58,8 @@ impl KolmogorovComplexityEstimator {
         }
 
         // Compress with zstd
-        let compressed = zstd::encode_all(bytes, self.compression_level).unwrap_or_else(|_| bytes.to_vec());
+        let compressed =
+            zstd::encode_all(bytes, self.compression_level).unwrap_or_else(|_| bytes.to_vec());
         let compressed_size = compressed.len();
 
         // Kolmogorov complexity ≈ compressed size / original size
@@ -125,7 +126,8 @@ impl MDLPromptOptimizer {
         query_type: QueryType,
     ) -> OptimizedPrompt {
         // 1. Score each feature by Kolmogorov complexity
-        let mut feature_scores: Vec<(String, f64, usize)> = features.iter()
+        let mut feature_scores: Vec<(String, f64, usize)> = features
+            .iter()
             .map(|(name, value)| {
                 // TRUE information content via compression
                 let kolmogorov = self.kolmogorov_estimator.measure_information_content(value);
@@ -248,7 +250,10 @@ mod tests {
         let k_rand = estimator.measure_information_content(random);
 
         // Random should be less compressible (higher K)
-        assert!(k_rand > k_rep, "Random text should have higher Kolmogorov complexity");
+        assert!(
+            k_rand > k_rep,
+            "Random text should have higher Kolmogorov complexity"
+        );
     }
 
     #[test]
@@ -258,15 +263,26 @@ mod tests {
         let mut features = HashMap::new();
         features.insert("location".to_string(), "38.5°N, 127.8°E".to_string());
         features.insert("velocity".to_string(), "1900 m/s".to_string());
-        features.insert("irrelevant_detail".to_string(), "some random info".to_string());
+        features.insert(
+            "irrelevant_detail".to_string(),
+            "some random info".to_string(),
+        );
 
         let optimized = optimizer.optimize_prompt(&features, QueryType::Geopolitical);
 
         // Should include location (high MI for geopolitical)
-        assert!(optimized.features_included.contains(&"location".to_string()));
+        assert!(optimized
+            .features_included
+            .contains(&"location".to_string()));
 
         // Should be compressed
-        assert!(optimized.compression_ratio > 1.0, "Should compress features");
-        assert!(optimized.estimated_tokens < 300, "Should be under 300 tokens");
+        assert!(
+            optimized.compression_ratio > 1.0,
+            "Should compress features"
+        );
+        assert!(
+            optimized.estimated_tokens < 300,
+            "Should be under 300 tokens"
+        );
     }
 }

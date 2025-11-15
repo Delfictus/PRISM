@@ -1,0 +1,66 @@
+# DSJC250.5 Fast Configuration v1
+# Aggressive settings for medium-sized benchmark
+# Target: Fast convergence with high-quality solutions
+
+[system]
+name = "dsjc250_fast_v1"
+description = "Fast aggressive configuration for DSJC250.5"
+gpu_count = 1
+cuda_enabled = true
+
+[solver]
+algorithm = "prism_hybrid"
+max_iterations = 50000
+target_chromatic = 28  # Known best for DSJC250.5
+enable_warm_start = true
+enable_backtracking = true
+
+[thermo]
+# Aggressive thermodynamic settings for fast convergence
+replicas = 48
+num_temps = 48
+exchange_interval = 10
+t_min = 0.01
+t_max = 10.0
+steps_per_temp = 8000  # Aggressive for medium-sized graphs
+aggressive_midband = true  # Force 4× step burn-in
+
+[thermo.compaction]
+# Color compaction tuned for DSJC250
+force_start_temp = 6
+max_force_blend_factor = 0.35
+color_range_expand_threshold = 0.25
+color_range_expand_percent = 12
+reheat_consecutive_guards = 2
+reheat_temp_boost = 1.4
+
+[dsatur]
+# DSATUR backtracking for DSJC250
+max_colors = 35  # Upper bound
+enable_warm_start_adjustment = true
+backtrack_depth = 75
+branching_strategy = "saturation_degree"
+
+[gpu]
+# Single GPU configuration
+device_ids = [0]
+memory_per_device_gb = 16
+enable_peer_access = false
+concurrent_kernels = true
+streams_per_device = 2
+
+[optimization]
+# Balanced optimization for medium graphs
+enable_quantum_tabu = true
+enable_neuromorphic = true
+enable_multilevel_kempe = true
+enable_adaptive_tuning = true
+population_size = 64
+quantum_field_strength = 0.4
+
+[logging]
+level = "info"
+progress_interval_seconds = 15
+checkpoint_interval_iterations = 500
+save_best_solutions = true
+output_dir = "results/dsjc250"

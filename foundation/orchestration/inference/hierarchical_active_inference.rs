@@ -6,9 +6,9 @@
 
 use crate::orchestration::OrchestrationError;
 use nalgebra::{DMatrix, DVector};
-use std::collections::{HashMap, VecDeque};
 use rand::distributions::Distribution;
 use rand_distr::Normal;
+use std::collections::{HashMap, VecDeque};
 
 /// Hierarchical Active Inference system with multiple levels
 pub struct HierarchicalActiveInference {
@@ -34,13 +34,13 @@ struct GenerativeLevel {
     /// State dimension at this level
     state_dim: usize,
     /// Hidden state beliefs (sufficient statistics)
-    mu: DVector<f64>,           // Mean
-    sigma: DMatrix<f64>,         // Covariance
+    mu: DVector<f64>, // Mean
+    sigma: DMatrix<f64>, // Covariance
     /// Generative model parameters
-    A: DMatrix<f64>,             // Observation model
-    B: DMatrix<f64>,             // Transition model
-    C: DVector<f64>,             // Observation bias
-    D: DVector<f64>,             // Prior over initial states
+    A: DMatrix<f64>, // Observation model
+    B: DMatrix<f64>,     // Transition model
+    C: DVector<f64>,     // Observation bias
+    D: DVector<f64>,     // Prior over initial states
     /// Temporal depth (how far into future to predict)
     temporal_depth: usize,
     /// Empirical priors from higher level
@@ -135,7 +135,7 @@ impl HierarchicalActiveInference {
     pub fn new(level_dims: Vec<usize>, temporal_depth: usize) -> Result<Self, OrchestrationError> {
         if level_dims.is_empty() {
             return Err(OrchestrationError::InvalidConfiguration(
-                "level_dims: empty - Need at least one level".to_string()
+                "level_dims: empty - Need at least one level".to_string(),
             ));
         }
 
@@ -145,20 +145,25 @@ impl HierarchicalActiveInference {
 
         for (i, &dim) in level_dims.iter().enumerate() {
             // Initialize generative model for this level
-            let level = GenerativeLevel {
-                level: i,
-                state_dim: dim,
-                mu: DVector::zeros(dim),
-                sigma: DMatrix::identity(dim, dim),
-                A: DMatrix::from_fn(dim, dim, |i, j| if i == j { 1.0 } else { 0.1 }),
-                B: DMatrix::from_fn(dim, dim, |i, j| {
-                    if i == j { 0.9 } else { 0.1 / (dim - 1) as f64 }
-                }),
-                C: DVector::zeros(dim),
-                D: DVector::from_element(dim, 1.0 / dim as f64),
-                temporal_depth,
-                empirical_prior: None,
-            };
+            let level =
+                GenerativeLevel {
+                    level: i,
+                    state_dim: dim,
+                    mu: DVector::zeros(dim),
+                    sigma: DMatrix::identity(dim, dim),
+                    A: DMatrix::from_fn(dim, dim, |i, j| if i == j { 1.0 } else { 0.1 }),
+                    B: DMatrix::from_fn(dim, dim, |i, j| {
+                        if i == j {
+                            0.9
+                        } else {
+                            0.1 / (dim - 1) as f64
+                        }
+                    }),
+                    C: DVector::zeros(dim),
+                    D: DVector::from_element(dim, 1.0 / dim as f64),
+                    temporal_depth,
+                    empirical_prior: None,
+                };
 
             levels.push(level);
 
@@ -208,12 +213,15 @@ impl HierarchicalActiveInference {
     }
 
     /// Perform hierarchical inference given observations
-    pub fn infer(&mut self, observations: &[DVector<f64>]) -> Result<InferenceResult, OrchestrationError> {
+    pub fn infer(
+        &mut self,
+        observations: &[DVector<f64>],
+    ) -> Result<InferenceResult, OrchestrationError> {
         // Validate observations
         if observations.is_empty() {
             return Err(OrchestrationError::InsufficientData {
                 required: 1,
-                available: 0
+                available: 0,
             });
         }
 
@@ -221,7 +229,8 @@ impl HierarchicalActiveInference {
         self.bottom_up_pass(&observations[0], 0)?;
 
         // 2. Recursive message passing between levels
-        for iteration in 0..10 {  // Fixed iterations for now
+        for iteration in 0..10 {
+            // Fixed iterations for now
             // Bottom-up: prediction errors
             for level in 0..self.levels.len() {
                 self.compute_prediction_errors(level)?;
@@ -268,7 +277,11 @@ impl HierarchicalActiveInference {
     }
 
     /// Bottom-up processing of observations
-    fn bottom_up_pass(&mut self, observation: &DVector<f64>, level_idx: usize) -> Result<(), OrchestrationError> {
+    fn bottom_up_pass(
+        &mut self,
+        observation: &DVector<f64>,
+        level_idx: usize,
+    ) -> Result<(), OrchestrationError> {
         let level = &mut self.levels[level_idx];
         let precision = &self.precisions[level_idx];
 
@@ -280,8 +293,12 @@ impl HierarchicalActiveInference {
         let weighted_error = &precision.pi_z * &error;
 
         // Store for message passing
-        self.message_passing.bottom_up.insert(level_idx, error.clone());
-        self.message_passing.weighted_errors.insert(level_idx, weighted_error);
+        self.message_passing
+            .bottom_up
+            .insert(level_idx, error.clone());
+        self.message_passing
+            .weighted_errors
+            .insert(level_idx, weighted_error);
 
         Ok(())
     }
@@ -299,7 +316,9 @@ impl HierarchicalActiveInference {
         };
 
         // Store prediction error
-        self.message_passing.bottom_up.insert(level_idx, state_error);
+        self.message_passing
+            .bottom_up
+            .insert(level_idx, state_error);
 
         Ok(())
     }
@@ -316,16 +335,24 @@ impl HierarchicalActiveInference {
 
         // Transform parent state to empirical prior for current level
         // This involves a learned mapping between levels
-        let empirical_prior = self.transform_between_levels(&parent_state, parent_idx, level_idx)?;
+        let empirical_prior =
+            self.transform_between_levels(&parent_state, parent_idx, level_idx)?;
 
         self.levels[level_idx].empirical_prior = Some(empirical_prior.clone());
-        self.message_passing.top_down.insert(level_idx, empirical_prior);
+        self.message_passing
+            .top_down
+            .insert(level_idx, empirical_prior);
 
         Ok(())
     }
 
     /// Transform states between hierarchical levels
-    fn transform_between_levels(&self, state: &DVector<f64>, from_level: usize, to_level: usize) -> Result<DVector<f64>, OrchestrationError> {
+    fn transform_between_levels(
+        &self,
+        state: &DVector<f64>,
+        from_level: usize,
+        to_level: usize,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         let from_dim = self.levels[from_level].state_dim;
         let to_dim = self.levels[to_level].state_dim;
 
@@ -371,10 +398,11 @@ impl HierarchicalActiveInference {
         let learning_rate = self.learning_rates.eta_mu;
 
         // Get prediction errors
-        let bottom_up_error = self.message_passing.bottom_up.get(&level_idx)
-            .ok_or_else(|| OrchestrationError::MissingData(
-                "bottom_up_error".to_string()
-            ))?;
+        let bottom_up_error = self
+            .message_passing
+            .bottom_up
+            .get(&level_idx)
+            .ok_or_else(|| OrchestrationError::MissingData("bottom_up_error".to_string()))?;
 
         // Variational update (gradient descent on free energy)
         let grad_F = self.compute_free_energy_gradient(level_idx, bottom_up_error)?;
@@ -399,7 +427,11 @@ impl HierarchicalActiveInference {
     }
 
     /// Compute gradient of free energy
-    fn compute_free_energy_gradient(&self, level_idx: usize, error: &DVector<f64>) -> Result<DVector<f64>, OrchestrationError> {
+    fn compute_free_energy_gradient(
+        &self,
+        level_idx: usize,
+        error: &DVector<f64>,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         let level = &self.levels[level_idx];
         let precision = &self.precisions[level_idx];
 
@@ -428,10 +460,11 @@ impl HierarchicalActiveInference {
     /// Update precision matrices
     fn update_precisions(&mut self) -> Result<(), OrchestrationError> {
         for level_idx in 0..self.levels.len() {
-            let errors = self.message_passing.weighted_errors.get(&level_idx)
-                .ok_or_else(|| OrchestrationError::MissingData(
-                    "weighted_errors".to_string()
-                ))?;
+            let errors = self
+                .message_passing
+                .weighted_errors
+                .get(&level_idx)
+                .ok_or_else(|| OrchestrationError::MissingData("weighted_errors".to_string()))?;
 
             // Estimate precision from prediction errors (inverse variance)
             let error_variance = errors.component_mul(errors).mean();
@@ -489,7 +522,7 @@ impl HierarchicalActiveInference {
         self.variational.F = total_F;
         self.variational.accuracy = total_accuracy;
         self.variational.complexity = total_complexity;
-        self.variational.elbo = -total_F;  // ELBO is negative free energy
+        self.variational.elbo = -total_F; // ELBO is negative free energy
 
         Ok(())
     }
@@ -513,20 +546,26 @@ impl HierarchicalActiveInference {
         }
 
         // Convert to probabilities using softmax
-        let min_G = self.action_selection.G.iter().fold(f64::INFINITY, |a, &b| a.min(b));
-        let exp_neg_G: Vec<f64> = self.action_selection.G.iter()
+        let min_G = self
+            .action_selection
+            .G
+            .iter()
+            .fold(f64::INFINITY, |a, &b| a.min(b));
+        let exp_neg_G: Vec<f64> = self
+            .action_selection
+            .G
+            .iter()
             .map(|&g| (min_G - g).exp())
             .collect();
 
         let sum_exp: f64 = exp_neg_G.iter().sum();
 
         // Select policy probabilistically
-        let probabilities: Vec<f64> = exp_neg_G.iter()
-            .map(|&e| e / sum_exp)
-            .collect();
+        let probabilities: Vec<f64> = exp_neg_G.iter().map(|&e| e / sum_exp).collect();
 
         // Sample action from best policy (or use maximum)
-        let best_policy_idx = probabilities.iter()
+        let best_policy_idx = probabilities
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(i, _)| i)
@@ -548,7 +587,7 @@ impl HierarchicalActiveInference {
 
             // Generate action sequence
             for t in 0..self.levels[0].temporal_depth {
-                actions.push((i + t) % 5);  // Simple pattern for demonstration
+                actions.push((i + t) % 5); // Simple pattern for demonstration
             }
 
             let policy = Policy {
@@ -585,7 +624,11 @@ impl HierarchicalActiveInference {
     }
 
     /// Predict future state given an action
-    fn predict_future_state(&self, action: usize, time_step: usize) -> Result<DVector<f64>, OrchestrationError> {
+    fn predict_future_state(
+        &self,
+        action: usize,
+        time_step: usize,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         let level = &self.levels[0];
 
         // Use transition model with action
@@ -603,14 +646,17 @@ impl HierarchicalActiveInference {
     }
 
     /// Compute expected information gain
-    fn compute_expected_information_gain(&self, state: &DVector<f64>) -> Result<f64, OrchestrationError> {
+    fn compute_expected_information_gain(
+        &self,
+        state: &DVector<f64>,
+    ) -> Result<f64, OrchestrationError> {
         let level = &self.levels[0];
 
         // Information gain is reduction in entropy
         let current_entropy = 0.5 * level.sigma.determinant().ln();
 
         // Predicted entropy after observing this state
-        let predicted_cov = &level.sigma * 0.9;  // Simplified
+        let predicted_cov = &level.sigma * 0.9; // Simplified
         let predicted_entropy = 0.5 * predicted_cov.determinant().ln();
 
         Ok(current_entropy - predicted_entropy)
@@ -625,7 +671,7 @@ impl HierarchicalActiveInference {
 
     /// Convert discrete action to continuous control
     fn action_to_control(&self, action: usize) -> DVector<f64> {
-        let dim = 10;  // Control dimension
+        let dim = 10; // Control dimension
         let mut control = DVector::zeros(dim);
 
         // Map discrete action to continuous control
@@ -640,7 +686,10 @@ impl HierarchicalActiveInference {
     }
 
     /// Update model parameters through learning
-    fn update_model_parameters(&mut self, observations: &[DVector<f64>]) -> Result<(), OrchestrationError> {
+    fn update_model_parameters(
+        &mut self,
+        observations: &[DVector<f64>],
+    ) -> Result<(), OrchestrationError> {
         for level_idx in 0..self.levels.len() {
             let learning_rate = self.learning_rates.eta_theta;
 
@@ -709,7 +758,7 @@ impl HierarchicalActiveInference {
 
     /// Meta-learning to adjust learning rates
     fn meta_learning(&mut self) -> Result<(), OrchestrationError> {
-        let performance = -self.variational.F;  // Use negative free energy as performance
+        let performance = -self.variational.F; // Use negative free energy as performance
 
         // Adjust learning rates based on performance gradient
         let meta_lr = self.learning_rates.eta_meta;
@@ -738,9 +787,7 @@ impl HierarchicalActiveInference {
 
     /// Compute overall confidence
     fn compute_overall_confidence(&self) -> f64 {
-        let total_confidence: f64 = self.precisions.iter()
-            .map(|p| p.confidence)
-            .sum();
+        let total_confidence: f64 = self.precisions.iter().map(|p| p.confidence).sum();
 
         total_confidence / self.precisions.len() as f64
     }
@@ -748,7 +795,7 @@ impl HierarchicalActiveInference {
     /// Generate predictions for future time steps
     fn generate_predictions(&self) -> Result<Vec<DVector<f64>>, OrchestrationError> {
         let mut predictions = Vec::new();
-        let level = &self.levels[0];  // Use lowest level for predictions
+        let level = &self.levels[0]; // Use lowest level for predictions
 
         let mut state = level.mu.clone();
 
@@ -770,9 +817,11 @@ impl HierarchicalActiveInference {
     }
 
     /// Orchestrate LLMs using hierarchical active inference
-    pub fn orchestrate_llms(&mut self,
-                             query: &str,
-                             llm_responses: &[String]) -> Result<OrchestrationResult, OrchestrationError> {
+    pub fn orchestrate_llms(
+        &mut self,
+        query: &str,
+        llm_responses: &[String],
+    ) -> Result<OrchestrationResult, OrchestrationError> {
         // Convert LLM responses to observations
         let observations = self.encode_llm_responses(llm_responses)?;
 
@@ -791,7 +840,10 @@ impl HierarchicalActiveInference {
     }
 
     /// Encode LLM responses as observations
-    fn encode_llm_responses(&self, responses: &[String]) -> Result<Vec<DVector<f64>>, OrchestrationError> {
+    fn encode_llm_responses(
+        &self,
+        responses: &[String],
+    ) -> Result<Vec<DVector<f64>>, OrchestrationError> {
         let mut encoded = Vec::new();
 
         for response in responses {
@@ -809,9 +861,11 @@ impl HierarchicalActiveInference {
     }
 
     /// Select best response combination
-    fn select_best_combination(&self,
-                                responses: &[String],
-                                inference: &InferenceResult) -> Result<ResponseSelection, OrchestrationError> {
+    fn select_best_combination(
+        &self,
+        responses: &[String],
+        inference: &InferenceResult,
+    ) -> Result<ResponseSelection, OrchestrationError> {
         let mut best_score = f64::NEG_INFINITY;
         let mut best_response = String::new();
         let mut best_info_gain = 0.0;
@@ -819,7 +873,7 @@ impl HierarchicalActiveInference {
         for (i, response) in responses.iter().enumerate() {
             // Score based on active inference principles
             let epistemic_value = inference.confidence;
-            let pragmatic_value = 1.0 / (1.0 + response.len() as f64 / 100.0);  // Prefer concise
+            let pragmatic_value = 1.0 / (1.0 + response.len() as f64 / 100.0); // Prefer concise
 
             let score = epistemic_value + pragmatic_value;
 
@@ -843,9 +897,7 @@ impl HierarchicalActiveInference {
         for level in &self.levels {
             explanation.push_str(&format!(
                 "Level {}: dim={}, confidence={:.3}\n",
-                level.level,
-                level.state_dim,
-                self.precisions[level.level].confidence
+                level.level, level.state_dim, self.precisions[level.level].confidence
             ));
         }
 

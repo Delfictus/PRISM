@@ -5,10 +5,10 @@
 //! Implements comprehensive error handling, circuit breakers,
 //! fallback strategies, and recovery mechanisms for production deployment.
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use std::collections::HashMap;
 
 /// Production-grade Error Handler with Multiple Fallback Strategies
 pub struct ProductionErrorHandler {
@@ -181,9 +181,9 @@ impl CircuitBreaker {
             success_count: 0,
             last_failure_time: None,
             state: CircuitBreakerState::Closed,
-            failure_threshold: 5,     // Open after 5 failures
+            failure_threshold: 5,             // Open after 5 failures
             timeout: Duration::from_secs(60), // Try again after 60s
-            success_threshold: 2,     // Close after 2 successes in half-open
+            success_threshold: 2,             // Close after 2 successes in half-open
         }
     }
 
@@ -308,7 +308,11 @@ impl FallbackRegistry {
         }
     }
 
-    fn register(&mut self, error_type: String, handler: Box<dyn Fn(&str) -> Result<String> + Send + Sync>) {
+    fn register(
+        &mut self,
+        error_type: String,
+        handler: Box<dyn Fn(&str) -> Result<String> + Send + Sync>,
+    ) {
         self.handlers.insert(error_type, handler);
     }
 
@@ -316,7 +320,10 @@ impl FallbackRegistry {
         if let Some(handler) = self.handlers.get(error_type) {
             handler(context)
         } else {
-            Err(anyhow!("No fallback handler registered for: {}", error_type))
+            Err(anyhow!(
+                "No fallback handler registered for: {}",
+                error_type
+            ))
         }
     }
 }
@@ -344,7 +351,8 @@ impl ErrorStatistics {
         // Classify error type first
         let error_type = Self::classify_error_type(error);
 
-        let entry = self.stats
+        let entry = self
+            .stats
             .entry(llm_name.to_string())
             .or_insert_with(|| ErrorStats {
                 total_errors: 0,
@@ -523,7 +531,10 @@ mod tests {
         assert!(matches!(recovery, RecoveryAction::RetryAfterDelay(_)));
 
         let recovery = handler.classify_error("connection timeout");
-        assert!(matches!(recovery, RecoveryAction::RetryWithIncreasedTimeout(_)));
+        assert!(matches!(
+            recovery,
+            RecoveryAction::RetryWithIncreasedTimeout(_)
+        ));
     }
 
     #[test]

@@ -1,11 +1,10 @@
+use anyhow::{anyhow, Result};
 ///! ONNX Runtime CUDA GNN Inference - Simplified for ort 1.16
 ///!
 ///! Real ONNX Runtime integration with trained GNN model.
 ///! Uses ort 1.16 API for GPU-accelerated inference.
-
-use ndarray::{Array1, Array2, Axis, ArrayView1, ArrayView2};
+use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis};
 use std::path::Path;
-use anyhow::{Result, anyhow};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -75,8 +74,11 @@ impl OnnxGNN {
         let start_time = Instant::now();
         let n = node_features.nrows();
 
-        println!("[ONNX-GNN] Running inference: {} nodes, {} edges",
-                 n, edge_index.ncols());
+        println!(
+            "[ONNX-GNN] Running inference: {} nodes, {} edges",
+            n,
+            edge_index.ncols()
+        );
 
         // Placeholder predictions for testing
         // Real ONNX Runtime would be called here
@@ -130,7 +132,10 @@ impl OnnxGNN {
 
         let inference_time_ms = start_time.elapsed().as_secs_f64() * 1000.0;
 
-        println!("[ONNX-GNN] ✅ Inference complete in {:.2} ms", inference_time_ms);
+        println!(
+            "[ONNX-GNN] ✅ Inference complete in {:.2} ms",
+            inference_time_ms
+        );
         println!("[ONNX-GNN]   Predicted chromatic: {}", predicted_chromatic);
         println!("[ONNX-GNN]   Difficulty score: {:.2}", difficulty_score);
         println!("[ONNX-GNN]   Note: Using placeholder predictions");
@@ -146,7 +151,8 @@ impl OnnxGNN {
 
     /// Extract most likely color assignment from logits
     pub fn extract_coloring(&self, prediction: &OnnxGnnPrediction) -> Vec<usize> {
-        prediction.node_color_logits
+        prediction
+            .node_color_logits
             .axis_iter(Axis(0))
             .map(|row| {
                 row.iter()
@@ -204,13 +210,11 @@ mod tests {
 
         // Create simple test graph (triangle)
         let node_features = Array2::<f32>::zeros((3, 16));
-        let edge_index = arr2(&[
-            [0i64, 1, 0, 2, 1, 2],
-            [1i64, 0, 2, 0, 2, 1],
-        ]);
+        let edge_index = arr2(&[[0i64, 1, 0, 2, 1, 2], [1i64, 0, 2, 0, 2, 1]]);
 
         // Run inference
-        let prediction = gnn.predict(&node_features, &edge_index)
+        let prediction = gnn
+            .predict(&node_features, &edge_index)
             .expect("Inference failed");
 
         // Verify outputs

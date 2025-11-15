@@ -129,6 +129,16 @@ impl DSaturSolver {
         let mut best_coloring = if let Some(initial) = initial_solution {
             println!("[DSATUR] Warm start from initial solution: {} colors", initial.chromatic_number);
             self.best_chromatic = initial.chromatic_number;
+
+            // Adjust max_colors if warm start exceeds it (prevents premature pruning)
+            if self.best_chromatic > self.max_colors {
+                println!(
+                    "[DSATUR] Adjusting max_colors from {} → {} based on warm start",
+                    self.max_colors, self.best_chromatic
+                );
+                self.max_colors = self.best_chromatic;
+            }
+
             initial.colors.clone()
         } else {
             vec![usize::MAX; n]

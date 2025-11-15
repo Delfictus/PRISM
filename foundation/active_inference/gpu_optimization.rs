@@ -9,11 +9,19 @@ use super::{HierarchicalModel, VariationalInference};
 /// Extension trait to add GPU acceleration to Active Inference
 pub trait ActiveInferenceGpuExt {
     /// Run inference using GPU if available
-    fn infer_auto(&mut self, model: &mut HierarchicalModel, observations: &Array1<f64>) -> Result<f64>;
+    fn infer_auto(
+        &mut self,
+        model: &mut HierarchicalModel,
+        observations: &Array1<f64>,
+    ) -> Result<f64>;
 }
 
 impl ActiveInferenceGpuExt for VariationalInference {
-    fn infer_auto(&mut self, model: &mut HierarchicalModel, observations: &Array1<f64>) -> Result<f64> {
+    fn infer_auto(
+        &mut self,
+        model: &mut HierarchicalModel,
+        observations: &Array1<f64>,
+    ) -> Result<f64> {
         // When GPU kernels are compiled and available, use them
         // For now, use CPU implementation
 

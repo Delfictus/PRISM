@@ -6,10 +6,10 @@
 
 use crate::orchestration::OrchestrationError;
 use nalgebra::{DMatrix, DVector};
-use std::collections::{HashMap, VecDeque};
-use rand::Rng;
-use rand_distr::{Poisson, Distribution};
 use ordered_float::OrderedFloat;
+use rand::Rng;
+use rand_distr::{Distribution, Poisson};
+use std::collections::{HashMap, VecDeque};
 
 /// Unified neuromorphic processing system
 pub struct UnifiedNeuromorphicProcessor {
@@ -54,10 +54,10 @@ struct IzhikevichNeuron {
     /// Recovery variable
     u: f64,
     /// Model parameters
-    a: f64,  // Time scale of recovery
-    b: f64,  // Sensitivity of recovery
-    c: f64,  // After-spike reset value
-    d: f64,  // After-spike recovery increment
+    a: f64, // Time scale of recovery
+    b: f64, // Sensitivity of recovery
+    c: f64, // After-spike reset value
+    d: f64, // After-spike recovery increment
     /// Neuron type
     neuron_type: NeuronType,
     /// Input current
@@ -70,12 +70,12 @@ struct IzhikevichNeuron {
 
 #[derive(Clone, Debug, PartialEq)]
 enum NeuronType {
-    RegularSpiking,      // Excitatory cortical neurons
-    FastSpiking,         // Inhibitory interneurons
-    Bursting,            // Thalamic neurons
-    LowThreshold,        // LTS interneurons
-    Resonator,           // Resonator neurons
-    Integrator,          // Integrator neurons
+    RegularSpiking, // Excitatory cortical neurons
+    FastSpiking,    // Inhibitory interneurons
+    Bursting,       // Thalamic neurons
+    LowThreshold,   // LTS interneurons
+    Resonator,      // Resonator neurons
+    Integrator,     // Integrator neurons
 }
 
 /// Synapse with plasticity
@@ -136,28 +136,28 @@ enum LayerType {
     Input,
     Hidden,
     Output,
-    Reservoir,  // For liquid state machine
+    Reservoir, // For liquid state machine
 }
 
 /// STDP (Spike-Timing Dependent Plasticity) engine
 #[derive(Clone, Debug)]
 struct STDPEngine {
     /// STDP window parameters
-    tau_plus: f64,   // LTP time constant (ms)
-    tau_minus: f64,  // LTD time constant (ms)
-    A_plus: f64,     // LTP amplitude
-    A_minus: f64,    // LTD amplitude
+    tau_plus: f64, // LTP time constant (ms)
+    tau_minus: f64, // LTD time constant (ms)
+    A_plus: f64,    // LTP amplitude
+    A_minus: f64,   // LTD amplitude
     /// Weight bounds
     w_min: f64,
     w_max: f64,
     /// Triplet STDP parameters
-    tau_x: f64,      // Fast presynaptic trace
+    tau_x: f64, // Fast presynaptic trace
     tau_y: f64,      // Fast postsynaptic trace
     tau_x_slow: f64, // Slow presynaptic trace
     tau_y_slow: f64, // Slow postsynaptic trace
     /// Traces for each neuron
-    x_traces: Vec<f64>,      // Presynaptic traces
-    y_traces: Vec<f64>,      // Postsynaptic traces
+    x_traces: Vec<f64>, // Presynaptic traces
+    y_traces: Vec<f64>, // Postsynaptic traces
     x_slow_traces: Vec<f64>, // Slow presynaptic traces
     y_slow_traces: Vec<f64>, // Slow postsynaptic traces
     /// Metaplasticity state
@@ -245,7 +245,7 @@ struct HomeostaticController {
     /// Homeostatic time constant
     tau_homeostatic: f64,
     /// Intrinsic plasticity parameters
-    eta_ip: f64,  // Learning rate for intrinsic plasticity
+    eta_ip: f64, // Learning rate for intrinsic plasticity
     /// Synaptic scaling factors
     scaling_factors: Vec<f64>,
 }
@@ -326,7 +326,11 @@ struct EnergyTracker {
 
 impl UnifiedNeuromorphicProcessor {
     /// Create new neuromorphic processor
-    pub fn new(input_dim: usize, hidden_dim: usize, output_dim: usize) -> Result<Self, OrchestrationError> {
+    pub fn new(
+        input_dim: usize,
+        hidden_dim: usize,
+        output_dim: usize,
+    ) -> Result<Self, OrchestrationError> {
         // Build network architecture
         let network = Self::build_network(input_dim, hidden_dim, output_dim)?;
 
@@ -357,7 +361,7 @@ impl UnifiedNeuromorphicProcessor {
 
         // Initialize homeostasis
         let homeostasis = HomeostaticController {
-            target_rates: vec![5.0; network.neurons.len()],  // 5 Hz target
+            target_rates: vec![5.0; network.neurons.len()], // 5 Hz target
             actual_rates: vec![0.0; network.neurons.len()],
             tau_homeostatic: 1000.0,
             eta_ip: 0.001,
@@ -374,8 +378,8 @@ impl UnifiedNeuromorphicProcessor {
 
         // Initialize energy tracker
         let energy_tracker = EnergyTracker {
-            energy_per_spike: 0.1,      // 0.1 pJ per spike
-            energy_per_synapse: 0.01,   // 0.01 pJ per synapse op
+            energy_per_spike: 0.1,    // 0.1 pJ per spike
+            energy_per_synapse: 0.01, // 0.01 pJ per synapse op
             total_energy: 0.0,
             spike_count: 0,
             synapse_ops: 0,
@@ -394,7 +398,11 @@ impl UnifiedNeuromorphicProcessor {
     }
 
     /// Build network architecture
-    fn build_network(input_dim: usize, hidden_dim: usize, output_dim: usize) -> Result<SpikingNeuralNetwork, OrchestrationError> {
+    fn build_network(
+        input_dim: usize,
+        hidden_dim: usize,
+        output_dim: usize,
+    ) -> Result<SpikingNeuralNetwork, OrchestrationError> {
         let mut neurons = Vec::new();
         let mut synapses = Vec::new();
         let mut connectivity = HashMap::new();
@@ -485,7 +493,8 @@ impl UnifiedNeuromorphicProcessor {
         // Add recurrent connections in hidden layer (sparse)
         for i in 0..hidden_neurons.len() {
             for j in 0..hidden_neurons.len() {
-                if i != j && rand::random::<f64>() < 0.1 {  // 10% connectivity
+                if i != j && rand::random::<f64>() < 0.1 {
+                    // 10% connectivity
                     let synapse = Synapse {
                         pre: hidden_neurons[i],
                         post: hidden_neurons[j],
@@ -508,12 +517,16 @@ impl UnifiedNeuromorphicProcessor {
             connectivity,
             layers,
             time: 0.0,
-            dt: 0.1,  // 0.1 ms time step
+            dt: 0.1, // 0.1 ms time step
         })
     }
 
     /// Process input through neuromorphic system
-    pub fn process(&mut self, input: &DVector<f64>, duration: f64) -> Result<ProcessingResult, OrchestrationError> {
+    pub fn process(
+        &mut self,
+        input: &DVector<f64>,
+        duration: f64,
+    ) -> Result<ProcessingResult, OrchestrationError> {
         // Encode input using population coding
         let spike_trains = self.population_coder.encode(input)?;
 
@@ -542,7 +555,8 @@ impl UnifiedNeuromorphicProcessor {
             self.spike_router.route(&spikes)?;
 
             // Track energy
-            self.energy_tracker.track(&spikes, self.network.synapses.len());
+            self.energy_tracker
+                .track(&spikes, self.network.synapses.len());
         }
 
         // Decode output
@@ -561,18 +575,23 @@ impl UnifiedNeuromorphicProcessor {
     }
 
     /// Apply input spikes to network
-    fn apply_input_spikes(&mut self, spike_trains: &[SpikeTrain]) -> Result<(), OrchestrationError> {
+    fn apply_input_spikes(
+        &mut self,
+        spike_trains: &[SpikeTrain],
+    ) -> Result<(), OrchestrationError> {
         for train in spike_trains {
             if train.neuron >= self.network.neurons.len() {
-                return Err(OrchestrationError::InvalidIndex(
-                    format!("Invalid index {} (max: {})", train.neuron, self.network.neurons.len())
-                ));
+                return Err(OrchestrationError::InvalidIndex(format!(
+                    "Invalid index {} (max: {})",
+                    train.neuron,
+                    self.network.neurons.len()
+                )));
             }
 
             // Apply current based on spike train
             for spike_time in &train.spikes {
                 if (*spike_time - self.network.time).abs() < self.network.dt {
-                    self.network.neurons[train.neuron].I += 20.0;  // Strong input current
+                    self.network.neurons[train.neuron].I += 20.0; // Strong input current
                 }
             }
         }
@@ -590,7 +609,9 @@ impl UnifiedNeuromorphicProcessor {
 
             if spiked {
                 spikes.push(i);
-                self.network.neurons[i].spike_times.push_back(self.network.time);
+                self.network.neurons[i]
+                    .spike_times
+                    .push_back(self.network.time);
 
                 // Limit spike history
                 while self.network.neurons[i].spike_times.len() > 100 {
@@ -616,7 +637,10 @@ impl UnifiedNeuromorphicProcessor {
     /// Propagate spike through synapses
     fn propagate_spike(&mut self, neuron_idx: usize) -> Result<(), OrchestrationError> {
         // Find all outgoing synapses
-        let outgoing: Vec<usize> = self.network.connectivity.iter()
+        let outgoing: Vec<usize> = self
+            .network
+            .connectivity
+            .iter()
             .filter_map(|((pre, _), &syn_idx)| {
                 if *pre == neuron_idx {
                     Some(syn_idx)
@@ -652,7 +676,8 @@ impl UnifiedNeuromorphicProcessor {
         for layer in &self.network.layers {
             if layer.lateral_inhibition > 0.0 {
                 // Find neurons that spiked in this layer
-                let layer_spikes: Vec<usize> = spikes.iter()
+                let layer_spikes: Vec<usize> = spikes
+                    .iter()
                     .filter(|&&n| layer.neurons.contains(&n))
                     .copied()
                     .collect();
@@ -660,7 +685,8 @@ impl UnifiedNeuromorphicProcessor {
                 // Apply inhibition to non-spiking neurons in layer
                 for &neuron in &layer.neurons {
                     if !layer_spikes.contains(&neuron) {
-                        self.network.neurons[neuron].I -= layer.lateral_inhibition * layer_spikes.len() as f64;
+                        self.network.neurons[neuron].I -=
+                            layer.lateral_inhibition * layer_spikes.len() as f64;
                     }
                 }
             }
@@ -715,7 +741,7 @@ impl UnifiedNeuromorphicProcessor {
                 // Apply dopamine modulation if present
                 if synapse.dopamine > 0.0 {
                     synapse.weight *= 1.0 + synapse.dopamine * synapse.eligibility;
-                    synapse.eligibility *= 0.99;  // Decay eligibility
+                    synapse.eligibility *= 0.99; // Decay eligibility
                 }
             }
         }
@@ -727,7 +753,11 @@ impl UnifiedNeuromorphicProcessor {
     fn update_homeostasis(&mut self, spikes: &[usize]) -> Result<(), OrchestrationError> {
         // Update firing rates
         for i in 0..self.network.neurons.len() {
-            let instant_rate = if spikes.contains(&i) { 1000.0 / self.network.dt } else { 0.0 };
+            let instant_rate = if spikes.contains(&i) {
+                1000.0 / self.network.dt
+            } else {
+                0.0
+            };
             self.homeostasis.actual_rates[i] =
                 self.homeostasis.actual_rates[i] * 0.999 + instant_rate * 0.001;
 
@@ -740,14 +770,15 @@ impl UnifiedNeuromorphicProcessor {
             neuron.b = neuron.b.clamp(-0.5, 0.5);
 
             // Update synaptic scaling
-            self.homeostasis.scaling_factors[i] =
-                (self.homeostasis.target_rates[i] / (self.homeostasis.actual_rates[i] + 1.0)).sqrt();
+            self.homeostasis.scaling_factors[i] = (self.homeostasis.target_rates[i]
+                / (self.homeostasis.actual_rates[i] + 1.0))
+                .sqrt();
         }
 
         // Apply synaptic scaling
         for synapse in &mut self.network.synapses {
             let scale = self.homeostasis.scaling_factors[synapse.post];
-            synapse.weight *= 1.0 + (scale - 1.0) * 0.001;  // Slow scaling
+            synapse.weight *= 1.0 + (scale - 1.0) * 0.001; // Slow scaling
             synapse.weight = synapse.weight.clamp(self.stdp.w_min, self.stdp.w_max);
         }
 
@@ -761,11 +792,16 @@ impl UnifiedNeuromorphicProcessor {
     }
 
     /// Decode output from spike trains
-    fn decode_output(&self, spike_history: &[Vec<usize>]) -> Result<DVector<f64>, OrchestrationError> {
-        let output_neurons = &self.network.layers.last()
-            .ok_or_else(|| OrchestrationError::MissingData(
-                "output_layer".to_string()
-            ))?.neurons;
+    fn decode_output(
+        &self,
+        spike_history: &[Vec<usize>],
+    ) -> Result<DVector<f64>, OrchestrationError> {
+        let output_neurons = &self
+            .network
+            .layers
+            .last()
+            .ok_or_else(|| OrchestrationError::MissingData("output_layer".to_string()))?
+            .neurons;
 
         let mut output = DVector::zeros(output_neurons.len());
 
@@ -773,7 +809,10 @@ impl UnifiedNeuromorphicProcessor {
         for spikes in spike_history {
             for &neuron_idx in output_neurons {
                 if spikes.contains(&neuron_idx) {
-                    output[output_neurons.iter().position(|&n| n == neuron_idx).unwrap()] += 1.0;
+                    output[output_neurons
+                        .iter()
+                        .position(|&n| n == neuron_idx)
+                        .unwrap()] += 1.0;
                 }
             }
         }
@@ -782,24 +821,32 @@ impl UnifiedNeuromorphicProcessor {
         output /= spike_history.len() as f64;
 
         // Convert rates to values
-        output *= 0.01;  // Scale factor
+        output *= 0.01; // Scale factor
 
         Ok(output)
     }
 
     /// Compute processing metrics
-    fn compute_metrics(&self, spike_history: &[Vec<usize>]) -> Result<ProcessingMetrics, OrchestrationError> {
+    fn compute_metrics(
+        &self,
+        spike_history: &[Vec<usize>],
+    ) -> Result<ProcessingMetrics, OrchestrationError> {
         let total_spikes: usize = spike_history.iter().map(|s| s.len()).sum();
-        let mean_rate = total_spikes as f64 / (self.network.neurons.len() as f64 * spike_history.len() as f64) * 1000.0 / self.network.dt;
+        let mean_rate = total_spikes as f64
+            / (self.network.neurons.len() as f64 * spike_history.len() as f64)
+            * 1000.0
+            / self.network.dt;
 
         // Compute synchrony
         let mut synchrony = 0.0;
         for window in spike_history.windows(10) {
             let spike_counts: Vec<usize> = window.iter().map(|s| s.len()).collect();
             let mean_count = spike_counts.iter().sum::<usize>() as f64 / spike_counts.len() as f64;
-            let variance = spike_counts.iter()
+            let variance = spike_counts
+                .iter()
                 .map(|&c| (c as f64 - mean_count).powi(2))
-                .sum::<f64>() / spike_counts.len() as f64;
+                .sum::<f64>()
+                / spike_counts.len() as f64;
 
             synchrony += variance.sqrt() / (mean_count + 1.0);
         }
@@ -897,7 +944,10 @@ impl UnifiedNeuromorphicProcessor {
     }
 
     /// Process LLM responses using neuromorphic encoding
-    pub fn process_llm_responses(&mut self, responses: &[String]) -> Result<NeuromorphicConsensus, OrchestrationError> {
+    pub fn process_llm_responses(
+        &mut self,
+        responses: &[String],
+    ) -> Result<NeuromorphicConsensus, OrchestrationError> {
         let mut response_outputs = Vec::new();
 
         for response in responses {
@@ -905,7 +955,7 @@ impl UnifiedNeuromorphicProcessor {
             let encoded = self.encode_text(response)?;
 
             // Process through neuromorphic system
-            let result = self.process(&encoded, 100.0)?;  // 100ms processing
+            let result = self.process(&encoded, 100.0)?; // 100ms processing
 
             response_outputs.push(result);
         }
@@ -930,7 +980,10 @@ impl UnifiedNeuromorphicProcessor {
     }
 
     /// Spike-based consensus mechanism
-    fn spike_based_consensus(&self, results: &[ProcessingResult]) -> Result<NeuromorphicConsensus, OrchestrationError> {
+    fn spike_based_consensus(
+        &self,
+        results: &[ProcessingResult],
+    ) -> Result<NeuromorphicConsensus, OrchestrationError> {
         if results.is_empty() {
             return Err(OrchestrationError::InsufficientData {
                 required: 1,
@@ -955,7 +1008,11 @@ impl UnifiedNeuromorphicProcessor {
         // Compute consensus metrics
         let total_spikes: u64 = results.iter().map(|r| r.spike_count).sum();
         let total_energy: f64 = results.iter().map(|r| r.energy_consumed).sum();
-        let mean_synchrony: f64 = results.iter().map(|r| r.metrics.synchrony_index).sum::<f64>() / results.len() as f64;
+        let mean_synchrony: f64 = results
+            .iter()
+            .map(|r| r.metrics.synchrony_index)
+            .sum::<f64>()
+            / results.len() as f64;
 
         Ok(NeuromorphicConsensus {
             consensus_output: weighted_output,
@@ -1018,7 +1075,7 @@ impl IzhikevichNeuron {
         // Check refractory period
         if self.refractory > 0.0 {
             self.refractory -= dt;
-            self.I = 0.0;  // No input during refractory
+            self.I = 0.0; // No input during refractory
             return false;
         }
 
@@ -1028,13 +1085,13 @@ impl IzhikevichNeuron {
         self.u += dt * self.a * (self.b * v_prev - self.u);
 
         // Reset input current
-        self.I *= 0.9;  // Decay
+        self.I *= 0.9; // Decay
 
         // Check for spike
         if self.v >= 30.0 {
             self.v = self.c;
             self.u += self.d;
-            self.refractory = 2.0;  // 2ms refractory period
+            self.refractory = 2.0; // 2ms refractory period
             return true;
         }
 
@@ -1053,11 +1110,11 @@ impl STPState {
     }
 
     fn facilitate(&mut self) {
-        self.F += 0.1 * (2.0 - self.F);  // Facilitation
+        self.F += 0.1 * (2.0 - self.F); // Facilitation
     }
 
     fn depress(&mut self) {
-        self.D *= 0.95;  // Depression
+        self.D *= 0.95; // Depression
     }
 }
 
@@ -1106,17 +1163,17 @@ impl PopulationCoder {
                 let curve = &self.tuning_curves[neuron_idx];
 
                 // Compute firing rate based on tuning curve
-                let rate = curve.baseline + curve.max_rate *
-                    (-(value - curve.preferred).powi(2) / (2.0 * curve.sigma.powi(2))).exp();
+                let rate = curve.baseline
+                    + curve.max_rate
+                        * (-(value - curve.preferred).powi(2) / (2.0 * curve.sigma.powi(2))).exp();
 
                 // Generate spikes using Poisson process
                 let mut spikes = Vec::new();
-                let poisson = Poisson::new(rate * 0.1).map_err(|e| {
-                    OrchestrationError::InvalidParameter {
+                let poisson =
+                    Poisson::new(rate * 0.1).map_err(|e| OrchestrationError::InvalidParameter {
                         name: "poisson_rate".to_string(),
                         value: format!("Invalid Poisson rate: {}", e),
-                    }
-                })?;
+                    })?;
                 for t in 0..10 {
                     let n_spikes = poisson.sample(&mut rand::thread_rng());
                     for _ in 0..(n_spikes as usize) {
@@ -1139,13 +1196,11 @@ impl TemporalProcessor {
     fn new(hidden_dim: usize) -> Result<Self, OrchestrationError> {
         let reservoir = ReservoirState::new(hidden_dim * 2)?;
 
-        let temporal_kernel = (0..50)
-            .map(|i| (-i as f64 / 10.0).exp())
-            .collect();
+        let temporal_kernel = (0..50).map(|i| (-i as f64 / 10.0).exp()).collect();
 
         let pac_analyzer = PhaseAmplitudeCoupling {
             phase_freqs: vec![4.0, 8.0, 12.0],  // Theta, alpha, beta
-            amp_freqs: vec![30.0, 60.0, 100.0],  // Gamma bands
+            amp_freqs: vec![30.0, 60.0, 100.0], // Gamma bands
             coupling: DMatrix::zeros(3, 3),
         };
 
@@ -1166,7 +1221,11 @@ impl TemporalProcessor {
     fn update(&mut self, spikes: &[usize]) -> Result<(), OrchestrationError> {
         // Update reservoir state
         let input = DVector::from_fn(self.reservoir.size, |i, _| {
-            if spikes.contains(&i) { 1.0 } else { 0.0 }
+            if spikes.contains(&i) {
+                1.0
+            } else {
+                0.0
+            }
         });
 
         self.reservoir.state = &self.reservoir.weights * &self.reservoir.state * 0.9 + input * 0.1;
@@ -1188,9 +1247,7 @@ impl TemporalProcessor {
 impl ReservoirState {
     fn new(size: usize) -> Result<Self, OrchestrationError> {
         // Create random reservoir weights
-        let mut weights = DMatrix::from_fn(size, size, |_, _| {
-            rand::random::<f64>() * 2.0 - 1.0
-        });
+        let mut weights = DMatrix::from_fn(size, size, |_, _| rand::random::<f64>() * 2.0 - 1.0);
 
         // Normalize to desired spectral radius
         let spectral_radius = 0.95;
@@ -1210,7 +1267,7 @@ impl ReservoirState {
 impl EnergyTracker {
     fn track(&mut self, spikes: &[usize], n_synapses: usize) {
         self.spike_count += spikes.len() as u64;
-        self.synapse_ops += (spikes.len() * n_synapses / 10) as u64;  // Approximate
+        self.synapse_ops += (spikes.len() * n_synapses / 10) as u64; // Approximate
 
         let spike_energy = spikes.len() as f64 * self.energy_per_spike;
         let synapse_energy = self.synapse_ops as f64 * self.energy_per_synapse;

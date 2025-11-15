@@ -103,7 +103,11 @@ impl SemanticDriftDetector {
     }
 
     /// Evaluate drift between baseline and candidate embeddings.
-    pub fn evaluate(&self, baseline: &[f32], candidate: &[f32]) -> Result<DriftEvaluation, DriftError> {
+    pub fn evaluate(
+        &self,
+        baseline: &[f32],
+        candidate: &[f32],
+    ) -> Result<DriftEvaluation, DriftError> {
         if baseline.len() != candidate.len() {
             return Err(DriftError::DimensionMismatch {
                 expected: baseline.len(),
@@ -140,10 +144,7 @@ impl SemanticDriftDetector {
 }
 
 fn dot_product(left: &[f32], right: &[f32]) -> f32 {
-    left.iter()
-        .zip(right.iter())
-        .map(|(l, r)| l * r)
-        .sum()
+    left.iter().zip(right.iter()).map(|(l, r)| l * r).sum()
 }
 
 fn l2_norm(vector: &[f32]) -> Result<f32, DriftError> {

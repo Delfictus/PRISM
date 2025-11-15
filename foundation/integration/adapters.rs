@@ -3,19 +3,21 @@
 //! Infrastructure implementations of domain ports.
 //! GPU-accelerated adapters using shared CUDA context.
 
-use std::sync::Arc;
-use ndarray::{Array1, Array2};
 use anyhow::Result;
+use ndarray::{Array1, Array2};
+use std::sync::Arc;
 
 #[cfg(feature = "cuda")]
 use cudarc::driver::CudaDevice;
 
+use super::ports::{
+    ActiveInferencePort, InformationFlowPort, NeuromorphicPort, QuantumPort, ThermodynamicPort,
+};
+#[cfg(feature = "quantum_mlir_support")]
+use super::quantum_mlir_integration::{QuantumGate, QuantumMlirIntegration};
+use crate::statistical_mechanics::{ThermodynamicNetwork, ThermodynamicState};
 #[cfg(feature = "cuda")]
 use neuromorphic_engine::gpu_simulation::GpuReservoirComputer;
-use crate::statistical_mechanics::{ThermodynamicNetwork, ThermodynamicState};
-use super::ports::{NeuromorphicPort, InformationFlowPort, ThermodynamicPort, QuantumPort, ActiveInferencePort};
-#[cfg(feature = "quantum_mlir_support")]
-use super::quantum_mlir_integration::{QuantumMlirIntegration, QuantumGate};
 
 use crate::information_theory::TransferEntropy;
 
@@ -28,7 +30,11 @@ pub struct NeuromorphicAdapter {
 }
 
 impl NeuromorphicAdapter {
-    pub fn new_gpu(device: Arc<CudaDevice>, input_size: usize, reservoir_size: usize) -> Result<Self> {
+    pub fn new_gpu(
+        device: Arc<CudaDevice>,
+        input_size: usize,
+        reservoir_size: usize,
+    ) -> Result<Self> {
         println!("[NEURO-ADAPTER] Creating GPU reservoir with SHARED context (Article V)");
 
         #[cfg(feature = "cuda")]
@@ -36,21 +42,19 @@ impl NeuromorphicAdapter {
             use super::super::neuromorphic::reservoir::ReservoirConfig;
 
             Ok(Self {
-                reservoir: Some(GpuReservoirComputer::new(
-                    ReservoirConfig {
-                        size: reservoir_size.max(1000),  // Use parameter or default to 1000
-                        input_size,
-                        spectral_radius: 0.9,
-                        connection_prob: 0.1,
-                        leak_rate: 0.3,
-                        input_scaling: 1.0,
-                        noise_level: 0.01,
-                        enable_plasticity: false,
-                        stdp_profile: neuromorphic_engine::STDPProfile::default(),
-                    },
-                )?),
+                reservoir: Some(GpuReservoirComputer::new(ReservoirConfig {
+                    size: reservoir_size.max(1000), // Use parameter or default to 1000
+                    input_size,
+                    spectral_radius: 0.9,
+                    connection_prob: 0.1,
+                    leak_rate: 0.3,
+                    input_scaling: 1.0,
+                    noise_level: 0.01,
+                    enable_plasticity: false,
+                    stdp_profile: neuromorphic_engine::STDPProfile::default(),
+                })?),
                 spike_history: Vec::new(),
-                threshold: 0.01,  // Lowered from 0.5 to handle small values (financial data, etc.)
+                threshold: 0.01, // Lowered from 0.5 to handle small values (financial data, etc.)
             })
         }
 
@@ -63,7 +67,7 @@ impl NeuromorphicAdapter {
 
 impl NeuromorphicPort for NeuromorphicAdapter {
     fn encode_spikes(&mut self, input: &Array1<f64>) -> Result<Array1<bool>> {
-        use neuromorphic_engine::{SpikePattern, Spike};
+        use neuromorphic_engine::{Spike, SpikePattern};
 
         let start_total = std::time::Instant::now();
         println!("[NEURO-ADAPTER] encode_spikes() ENTRY");
@@ -91,22 +95,36 @@ impl NeuromorphicPort for NeuromorphicAdapter {
                 custom: std::collections::HashMap::new(),
             },
         };
-        println!("[NEURO-ADAPTER] Spike pattern conversion took {:?}", conv_start.elapsed());
+        println!(
+            "[NEURO-ADAPTER] Spike pattern conversion took {:?}",
+            conv_start.elapsed()
+        );
 
         // Process on GPU reservoir
         let gpu_start = std::time::Instant::now();
-        let reservoir_state = self.reservoir
+        let reservoir_state = self
+            .reservoir
             .as_mut()
             .ok_or_else(|| anyhow::anyhow!("Reservoir not initialized"))?
             .process_gpu(&spike_pattern)?;
-        println!("[NEURO-ADAPTER] GPU reservoir.process_gpu() took {:?}", gpu_start.elapsed());
+        println!(
+            "[NEURO-ADAPTER] GPU reservoir.process_gpu() took {:?}",
+            gpu_start.elapsed()
+        );
 
         // Extract spike encoding from reservoir state (Vec<f64> -> Array1<bool>)
         let extract_start = std::time::Instant::now();
         let spikes = Array1::from_vec(
-            reservoir_state.activations.iter().map(|&x| x > self.threshold).collect()
+            reservoir_state
+                .activations
+                .iter()
+                .map(|&x| x > self.threshold)
+                .collect(),
         );
-        println!("[NEURO-ADAPTER] Spike extraction took {:?}", extract_start.elapsed());
+        println!(
+            "[NEURO-ADAPTER] Spike extraction took {:?}",
+            extract_start.elapsed()
+        );
 
         // Store in history
         let hist_start = std::time::Instant::now();
@@ -114,10 +132,16 @@ impl NeuromorphicPort for NeuromorphicAdapter {
         if self.spike_history.len() > 100 {
             self.spike_history.remove(0);
         }
-        println!("[NEURO-ADAPTER] History update took {:?}", hist_start.elapsed());
+        println!(
+            "[NEURO-ADAPTER] History update took {:?}",
+            hist_start.elapsed()
+        );
 
         let total_elapsed = start_total.elapsed();
-        println!("[NEURO-ADAPTER] TOTAL encode_spikes() time: {:?}", total_elapsed);
+        println!(
+            "[NEURO-ADAPTER] TOTAL encode_spikes() time: {:?}",
+            total_elapsed
+        );
 
         Ok(spikes)
     }
@@ -133,16 +157,25 @@ pub struct InformationFlowAdapter {
 }
 
 impl InformationFlowAdapter {
-    pub fn new_gpu(context: Arc<CudaDevice>, embedding_dim: usize, tau: usize, _k: usize) -> Result<Self> {
+    pub fn new_gpu(
+        context: Arc<CudaDevice>,
+        embedding_dim: usize,
+        tau: usize,
+        _k: usize,
+    ) -> Result<Self> {
         // GPU ONLY - NO CPU FALLBACK
-        let _ = context;  // Will be used for GPU operations
+        let _ = context; // Will be used for GPU operations
         let te_calculator = TransferEntropy::new(embedding_dim, embedding_dim, tau);
         Ok(Self { te_calculator })
     }
 }
 
 impl InformationFlowPort for InformationFlowAdapter {
-    fn compute_transfer_entropy(&mut self, source: &Array1<bool>, target: &Array1<bool>) -> Result<f64> {
+    fn compute_transfer_entropy(
+        &mut self,
+        source: &Array1<bool>,
+        target: &Array1<bool>,
+    ) -> Result<f64> {
         // Convert bool to f64 for processing
         let source_f64 = source.mapv(|x| if x { 1.0 } else { 0.0 });
         let target_f64 = target.mapv(|x| if x { 1.0 } else { 0.0 });
@@ -168,12 +201,10 @@ impl InformationFlowPort for InformationFlowAdapter {
                 }
 
                 // Extract time series for nodes i and j
-                let source: Array1<bool> = Array1::from_vec(
-                    spike_history.iter().map(|s| s[i]).collect()
-                );
-                let target: Array1<bool> = Array1::from_vec(
-                    spike_history.iter().map(|s| s[j]).collect()
-                );
+                let source: Array1<bool> =
+                    Array1::from_vec(spike_history.iter().map(|s| s[i]).collect());
+                let target: Array1<bool> =
+                    Array1::from_vec(spike_history.iter().map(|s| s[j]).collect());
 
                 coupling[[i, j]] = self.compute_transfer_entropy(&source, &target)?;
             }
@@ -206,7 +237,10 @@ impl ThermodynamicAdapter {
         // GPU ONLY - NO CPU FALLBACK
         let config_copy = config.clone();
         let network = crate::statistical_mechanics::ThermodynamicGpu::new(context, config)?;
-        Ok(Self { network, config: config_copy })
+        Ok(Self {
+            network,
+            config: config_copy,
+        })
     }
 }
 
@@ -278,8 +312,8 @@ impl QuantumPort for QuantumAdapter {
         {
             // Apply quantum gates based on thermodynamic state
             let gates = vec![
-                QuantumGate::Hadamard(0),  // Create superposition
-                QuantumGate::RZ(0, thermo_state.phases[0]),  // Phase rotation
+                QuantumGate::Hadamard(0),                   // Create superposition
+                QuantumGate::RZ(0, thermo_state.phases[0]), // Phase rotation
             ];
 
             self.quantum_mlir.apply_gates(gates)?;
@@ -300,7 +334,8 @@ impl QuantumPort for QuantumAdapter {
         {
             // Fallback: simple phase evolution
             for (i, phase) in self.phases.iter_mut().enumerate() {
-                *phase = (*phase + thermo_state.phases.get(i).unwrap_or(&0.0)) % (2.0 * std::f64::consts::PI);
+                *phase = (*phase + thermo_state.phases.get(i).unwrap_or(&0.0))
+                    % (2.0 * std::f64::consts::PI);
                 self.amplitudes[i] = 1.0;
             }
             Ok(self.amplitudes.clone())
@@ -324,7 +359,9 @@ impl QuantumPort for QuantumAdapter {
         }
 
         // Compute order parameter
-        let (sum_cos, sum_sin): (f64, f64) = self.phases.iter()
+        let (sum_cos, sum_sin): (f64, f64) = self
+            .phases
+            .iter()
             .map(|&p| (p.cos(), p.sin()))
             .fold((0.0, 0.0), |(c, s), (pc, ps)| (c + pc, s + ps));
         let order_parameter = ((sum_cos * sum_cos + sum_sin * sum_sin).sqrt() / n as f64).min(1.0);
@@ -348,33 +385,31 @@ pub struct ActiveInferenceAdapter {
 impl ActiveInferenceAdapter {
     pub fn new_gpu(context: Arc<CudaDevice>, _n_dimensions: usize) -> Result<Self> {
         use crate::active_inference::{
-            HierarchicalModel, VariationalInference,
-            PolicySelector, ActiveInferenceController, SensingStrategy,
-            ObservationModel, TransitionModel,
+            ActiveInferenceController, HierarchicalModel, ObservationModel, PolicySelector,
+            SensingStrategy, TransitionModel, VariationalInference,
         };
 
         let hierarchical_model = HierarchicalModel::new();
         let n_windows = 900;
         let obs_model = ObservationModel::new(100, n_windows, 8.0, 0.01);
         let trans_model = TransitionModel::default_timescales();
-        let cpu_inference = VariationalInference::new(
-            obs_model.clone(),
-            trans_model.clone(),
-            &hierarchical_model
-        );
+        let cpu_inference =
+            VariationalInference::new(obs_model.clone(), trans_model.clone(), &hierarchical_model);
 
         let preferred_obs = Array1::zeros(100);
-        let mut selector = PolicySelector::new(3, 5, preferred_obs, cpu_inference.clone(), trans_model);
+        let mut selector =
+            PolicySelector::new(3, 5, preferred_obs, cpu_inference.clone(), trans_model);
 
         // GPU ONLY - NO CPU FALLBACK
         // Create GPU policy evaluator
         println!("[ADAPTER] Creating GPU policy evaluator...");
         let gpu_policy_eval = crate::active_inference::GpuPolicyEvaluator::new(
             context.clone(),
-            5,   // n_policies
-            3,   // horizon
-            10,  // substeps for window evolution
-        ).expect("GPU policy evaluator REQUIRED - NO CPU FALLBACK");
+            5,  // n_policies
+            3,  // horizon
+            10, // substeps for window evolution
+        )
+        .expect("GPU policy evaluator REQUIRED - NO CPU FALLBACK");
 
         let gpu_eval_arc = std::sync::Arc::new(std::sync::Mutex::new(gpu_policy_eval));
         selector.set_gpu_evaluator(gpu_eval_arc);
@@ -383,7 +418,8 @@ impl ActiveInferenceAdapter {
         let controller = ActiveInferenceController::new(selector, SensingStrategy::Adaptive);
 
         // GPU ONLY - NO CPU FALLBACK
-        let inference_engine = crate::active_inference::ActiveInferenceGpu::new(context, cpu_inference)?;
+        let inference_engine =
+            crate::active_inference::ActiveInferenceGpu::new(context, cpu_inference)?;
         Ok(Self {
             hierarchical_model,
             inference_engine,
@@ -396,7 +432,10 @@ impl ActiveInferencePort for ActiveInferenceAdapter {
     fn infer(&mut self, observations: &Array1<f64>, _quantum_obs: &Array1<f64>) -> Result<f64> {
         let start_total = std::time::Instant::now();
         println!("[ADAPTER] ========================================");
-        println!("[ADAPTER] infer() ENTRY - observations.len()={}", observations.len());
+        println!(
+            "[ADAPTER] infer() ENTRY - observations.len()={}",
+            observations.len()
+        );
 
         // Resize observations to 100 dimensions (ObservationModel requirement)
         let resize_start = std::time::Instant::now();
@@ -416,9 +455,14 @@ impl ActiveInferencePort for ActiveInferenceAdapter {
         // GPU ONLY - NO CPU FALLBACK
         println!("[ADAPTER] Using GPU path (MANDATORY)");
         let gpu_start = std::time::Instant::now();
-        let result = self.inference_engine.infer_gpu(&mut self.hierarchical_model, &obs_resized);
+        let result = self
+            .inference_engine
+            .infer_gpu(&mut self.hierarchical_model, &obs_resized);
         let gpu_elapsed = gpu_start.elapsed();
-        println!("[ADAPTER] inference_engine.infer_gpu() returned in {:?}", gpu_elapsed);
+        println!(
+            "[ADAPTER] inference_engine.infer_gpu() returned in {:?}",
+            gpu_elapsed
+        );
 
         let total_elapsed = start_total.elapsed();
         println!("[ADAPTER] TOTAL infer() time: {:?}", total_elapsed);

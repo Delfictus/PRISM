@@ -8,10 +8,7 @@
 
 use anyhow::Result;
 use prism_ai::foundation::{
-    PrismAIOrchestrator,
-    OrchestratorConfig,
-    MissionCharlieIntegration,
-    IntegrationConfig,
+    IntegrationConfig, MissionCharlieIntegration, OrchestratorConfig, PrismAIOrchestrator,
 };
 
 #[tokio::main]
@@ -73,11 +70,12 @@ async fn materials_discovery_demo(orchestrator: &PrismAIOrchestrator) -> Result<
     // - Quantum annealing for optimization
     // - Thermodynamic consensus for stability
 
-    let discovery_result = orchestrator
-        .discover_materials(target_properties)
-        .await?;
+    let discovery_result = orchestrator.discover_materials(target_properties).await?;
 
-    println!("Found {} candidate materials:", discovery_result.candidates.len());
+    println!(
+        "Found {} candidate materials:",
+        discovery_result.candidates.len()
+    );
     for (i, candidate) in discovery_result.candidates.iter().take(3).enumerate() {
         println!("  {}. {}", i + 1, candidate.formula);
         println!("     Confidence: {:.2}%", candidate.confidence * 100.0);
@@ -103,16 +101,19 @@ async fn drug_discovery_demo(orchestrator: &PrismAIOrchestrator) -> Result<()> {
     // - Path integral Monte Carlo (PIMC) for quantum effects
     // - Conformal prediction for confidence bounds
 
-    let drug_candidates = orchestrator
-        .find_drug_candidates(target)
-        .await?;
+    let drug_candidates = orchestrator.find_drug_candidates(target).await?;
 
-    println!("Discovered {} potential drug candidates:", drug_candidates.len());
+    println!(
+        "Discovered {} potential drug candidates:",
+        drug_candidates.len()
+    );
     for (i, drug) in drug_candidates.iter().take(3).enumerate() {
         println!("  {}. {}", i + 1, drug.smiles);
         println!("     Predicted affinity: {} nM", drug.predicted_affinity);
-        println!("     Confidence interval: [{:.1}, {:.1}] nM",
-                 drug.confidence_lower, drug.confidence_upper);
+        println!(
+            "     Confidence interval: [{:.1}, {:.1}] nM",
+            drug.confidence_lower, drug.confidence_upper
+        );
     }
 
     Ok(())
@@ -136,7 +137,10 @@ async fn llm_orchestration_demo(orchestrator: &PrismAIOrchestrator) -> Result<()
     println!("Query: {}", query);
     println!("\nConsensus Response:");
     println!("{}", consensus_response.text);
-    println!("\nConfidence: {:.2}%", consensus_response.confidence * 100.0);
+    println!(
+        "\nConfidence: {:.2}%",
+        consensus_response.confidence * 100.0
+    );
     println!("Agreement score: {:.2}", consensus_response.agreement_score);
 
     // Show which algorithms contributed
@@ -164,9 +168,7 @@ async fn sensor_fusion_demo(orchestrator: &PrismAIOrchestrator) -> Result<()> {
     // - AI intelligence analysis (Mission Charlie)
     // - Real-time threat assessment
 
-    let intelligence = orchestrator
-        .fuse_sensor_intelligence(sensor_data)
-        .await?;
+    let intelligence = orchestrator.fuse_sensor_intelligence(sensor_data).await?;
 
     println!("Mission Awareness Status:");
     println!("  Threat level: {:?}", intelligence.threat_level);
@@ -178,9 +180,18 @@ async fn sensor_fusion_demo(orchestrator: &PrismAIOrchestrator) -> Result<()> {
     }
 
     println!("\nSensor fusion components:");
-    println!("  - Satellite: {}% confidence", intelligence.satellite_confidence * 100.0);
-    println!("  - Infrared: {}% confidence", intelligence.ir_confidence * 100.0);
-    println!("  - Ground: {}% confidence", intelligence.ground_confidence * 100.0);
+    println!(
+        "  - Satellite: {}% confidence",
+        intelligence.satellite_confidence * 100.0
+    );
+    println!(
+        "  - Infrared: {}% confidence",
+        intelligence.ir_confidence * 100.0
+    );
+    println!(
+        "  - Ground: {}% confidence",
+        intelligence.ground_confidence * 100.0
+    );
 
     Ok(())
 }

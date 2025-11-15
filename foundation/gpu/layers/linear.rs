@@ -1,7 +1,7 @@
 //! GPU-accelerated Linear Layer (using simple implementation)
 
+use crate::gpu::gpu_enabled::{SimpleGpuLinear, SimpleGpuTensor};
 use anyhow::Result;
-use crate::gpu::gpu_enabled::{SimpleGpuTensor, SimpleGpuLinear};
 
 /// GPU Linear layer (wraps SimpleGpuLinear)
 pub struct GpuLinear {
@@ -12,7 +12,11 @@ pub struct GpuLinear {
 
 impl GpuLinear {
     /// Create new GPU Linear layer
-    pub fn new(in_features: usize, out_features: usize, _pool: std::sync::Arc<super::super::gpu_enabled::SimpleGpuContext>) -> Result<Self> {
+    pub fn new(
+        in_features: usize,
+        out_features: usize,
+        _pool: std::sync::Arc<super::super::gpu_enabled::SimpleGpuContext>,
+    ) -> Result<Self> {
         let inner = SimpleGpuLinear::new(in_features, out_features)?;
         Ok(Self {
             inner,
@@ -62,9 +66,11 @@ impl GpuLinearBuilder {
     }
 
     pub fn build(self) -> Result<GpuLinear> {
-        let in_features = self.in_features
+        let in_features = self
+            .in_features
             .ok_or_else(|| anyhow::anyhow!("in_features not specified"))?;
-        let out_features = self.out_features
+        let out_features = self
+            .out_features
             .ok_or_else(|| anyhow::anyhow!("out_features not specified"))?;
 
         let inner = SimpleGpuLinear::new(in_features, out_features)?;

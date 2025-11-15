@@ -78,8 +78,11 @@ impl ChannelState {
         self.mutual_information = h_x + h_y - h_xy;
 
         // Verify non-negativity (information inequality)
-        assert!(self.mutual_information >= -1e-6,
-            "Mutual information must be non-negative: {}", self.mutual_information);
+        assert!(
+            self.mutual_information >= -1e-6,
+            "Mutual information must be non-negative: {}",
+            self.mutual_information
+        );
         self.mutual_information = self.mutual_information.max(0.0);
     }
 }
@@ -329,7 +332,11 @@ mod tests {
         let result = channel.transfer(&signal);
 
         // Should meet latency requirement
-        assert!(result.latency_ms < 1.0, "Latency: {:.3} ms", result.latency_ms);
+        assert!(
+            result.latency_ms < 1.0,
+            "Latency: {:.3} ms",
+            result.latency_ms
+        );
     }
 
     #[test]

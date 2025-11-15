@@ -11,9 +11,9 @@
 //!
 //! Impact: Robust semantic distance for consensus optimization
 
+use anyhow::Result;
 use ndarray::{Array1, Array2};
 use std::collections::HashSet;
-use anyhow::Result;
 
 /// Semantic Distance Calculator with Multiple Metrics
 pub struct SemanticDistanceCalculator;
@@ -26,11 +26,7 @@ impl SemanticDistanceCalculator {
     /// Compute comprehensive semantic distance
     ///
     /// Combines 5 complementary metrics for robustness
-    pub fn compute_distance(
-        &self,
-        text1: &str,
-        text2: &str,
-    ) -> Result<SemanticDistance> {
+    pub fn compute_distance(&self, text1: &str, text2: &str) -> Result<SemanticDistance> {
         // 1. Cosine distance (fast, approximate)
         let cosine = self.cosine_distance(text1, text2);
 
@@ -47,7 +43,11 @@ impl SemanticDistanceCalculator {
         let fisher = self.fisher_distance_approx(text1, text2);
 
         // Weighted combination
-        let combined = 0.3*cosine + 0.2*wasserstein + 0.2*(1.0-bleu) + 0.15*(1.0-bertscore) + 0.15*fisher;
+        let combined = 0.3 * cosine
+            + 0.2 * wasserstein
+            + 0.2 * (1.0 - bleu)
+            + 0.15 * (1.0 - bertscore)
+            + 0.15 * fisher;
 
         Ok(SemanticDistance {
             cosine,
@@ -72,7 +72,7 @@ impl SemanticDistanceCalculator {
 
         if union > 0 {
             let jaccard = intersection as f64 / union as f64;
-            1.0 - jaccard  // Convert similarity to distance
+            1.0 - jaccard // Convert similarity to distance
         } else {
             1.0
         }
@@ -141,7 +141,7 @@ impl SemanticDistanceCalculator {
         let fisher_dist = 2.0 * sum.acos();
 
         if fisher_dist.is_finite() {
-            fisher_dist / std::f64::consts::PI  // Normalize to [0,1]
+            fisher_dist / std::f64::consts::PI // Normalize to [0,1]
         } else {
             1.0
         }
@@ -167,7 +167,7 @@ pub struct SemanticDistance {
     pub wasserstein: f64,
     pub bleu: f64,
     pub bertscore: f64,
-    pub fisher: f64,  // Fisher-Rao (information geometry)
+    pub fisher: f64, // Fisher-Rao (information geometry)
     pub combined: f64,
 }
 
@@ -183,7 +183,10 @@ mod tests {
         let dist = calc.compute_distance(text, text).unwrap();
 
         // Identical texts should have low distance
-        assert!(dist.combined < 0.1, "Identical texts should have low distance");
+        assert!(
+            dist.combined < 0.1,
+            "Identical texts should have low distance"
+        );
     }
 
     #[test]
@@ -195,7 +198,10 @@ mod tests {
         let dist = calc.compute_distance(text1, text2).unwrap();
 
         // Different texts should have higher distance
-        assert!(dist.combined > 0.3, "Different texts should have higher distance");
+        assert!(
+            dist.combined > 0.3,
+            "Different texts should have higher distance"
+        );
     }
 
     #[test]
@@ -205,6 +211,9 @@ mod tests {
         let dist = calc.fisher_distance_approx("hello world", "hello world");
 
         // Fisher distance should be in [0,1]
-        assert!(dist >= 0.0 && dist <= 1.0, "Fisher distance should be normalized");
+        assert!(
+            dist >= 0.0 && dist <= 1.0,
+            "Fisher distance should be normalized"
+        );
     }
 }

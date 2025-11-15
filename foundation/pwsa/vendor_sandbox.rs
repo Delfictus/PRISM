@@ -11,18 +11,18 @@
 //! - API-only access: No direct memory access
 //! - Whitelisted operations only
 
-use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, Instant, Duration};
-use std::collections::HashMap;
-use anyhow::{Result, Context, bail};
-use uuid::Uuid;
-use cudarc::driver::CudaDevice;
 use aes_gcm::{
     aead::{Aead, KeyInit, OsRng},
-    Aes256Gcm, Nonce, Key
+    Aes256Gcm, Key, Nonce,
 };
+use anyhow::{bail, Context, Result};
+use argon2::password_hash::{PasswordHash, SaltString};
 use argon2::{Argon2, PasswordHasher};
-use argon2::password_hash::{SaltString, PasswordHash};
+use cudarc::driver::CudaDevice;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, SystemTime};
+use uuid::Uuid;
 use zeroize::Zeroize;
 
 //=============================================================================
@@ -33,7 +33,7 @@ use zeroize::Zeroize;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DataClassification {
     Unclassified,
-    ControlledUnclassified,  // CUI
+    ControlledUnclassified, // CUI
     Secret,
     TopSecret,
 }
@@ -73,7 +73,7 @@ impl SecureDataSlice {
         Self {
             data_id: Uuid::new_v4(),
             classification,
-            data: vec![0u8; size_bytes],  // Placeholder data
+            data: vec![0u8; size_bytes], // Placeholder data
             size_bytes,
             encrypted: should_encrypt,
             checksum: None,
@@ -95,7 +95,7 @@ impl SecureDataSlice {
             classification,
             data,
             size_bytes,
-            encrypted: false,  // Starts unencrypted
+            encrypted: false, // Starts unencrypted
             checksum: None,
             nonce: if should_encrypt {
                 Some(Self::generate_nonce())
@@ -119,7 +119,7 @@ impl SecureDataSlice {
     /// Uses provided key for encryption.
     pub fn encrypt(&mut self, key: &[u8; 32]) -> Result<()> {
         if self.encrypted {
-            return Ok(());  // Already encrypted
+            return Ok(()); // Already encrypted
         }
 
         if self.classification >= DataClassification::Secret {
@@ -133,7 +133,8 @@ impl SecureDataSlice {
             let nonce_bytes = self.nonce.as_ref().unwrap();
             let nonce = Nonce::from_slice(&nonce_bytes[..12]);
 
-            let ciphertext = cipher.encrypt(nonce, self.data.as_ref())
+            let ciphertext = cipher
+                .encrypt(nonce, self.data.as_ref())
                 .map_err(|e| anyhow::anyhow!("Encryption failed: {:?}", e))?;
 
             self.data = ciphertext;
@@ -147,16 +148,19 @@ impl SecureDataSlice {
     /// Decrypt data using AES-256-GCM
     pub fn decrypt(&mut self, key: &[u8; 32]) -> Result<()> {
         if !self.encrypted {
-            return Ok(());  // Already decrypted
+            return Ok(()); // Already decrypted
         }
 
         let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
 
-        let nonce_bytes = self.nonce.as_ref()
+        let nonce_bytes = self
+            .nonce
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No nonce available for decryption"))?;
         let nonce = Nonce::from_slice(&nonce_bytes[..12]);
 
-        let plaintext = cipher.decrypt(nonce, self.data.as_ref())
+        let plaintext = cipher
+            .decrypt(nonce, self.data.as_ref())
             .map_err(|e| anyhow::anyhow!("Decryption failed: {:?}", e))?;
 
         self.data = plaintext;
@@ -172,7 +176,7 @@ impl SecureDataSlice {
             let actual = self.compute_checksum();
             actual == expected
         } else {
-            true  // No checksum to verify
+            true // No checksum to verify
         }
     }
 
@@ -210,7 +214,8 @@ impl KeyManager {
         let argon2 = Argon2::default();
 
         // Derive master key from passphrase
-        let password_hash = argon2.hash_password(passphrase.as_bytes(), &salt)
+        let password_hash = argon2
+            .hash_password(passphrase.as_bytes(), &salt)
             .map_err(|e| anyhow::anyhow!("Key derivation failed: {:?}", e))?;
 
         let mut master_key = [0u8; 32];
@@ -238,7 +243,7 @@ impl KeyManager {
 
     /// Derive classification-specific DEK from master key
     fn derive_dek(&self, classification: DataClassification) -> [u8; 32] {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
 
         let mut hasher = Sha256::new();
         hasher.update(&self.master_key);
@@ -285,20 +290,16 @@ pub trait VendorPlugin<T>: Send + Sync {
     fn required_classification(&self) -> DataClassification;
 
     /// Execute the plugin's analytics
-    fn execute(
-        &self,
-        ctx: &Arc<CudaDevice>,
-        input: SecureDataSlice,
-    ) -> Result<T>;
+    fn execute(&self, ctx: &Arc<CudaDevice>, input: SecureDataSlice) -> Result<T>;
 
     /// Estimated GPU memory requirement (MB)
     fn estimated_gpu_memory_mb(&self) -> usize {
-        256  // Default 256MB
+        256 // Default 256MB
     }
 
     /// Maximum execution time
     fn max_execution_time(&self) -> Duration {
-        Duration::from_secs(5)  // Default 5 seconds
+        Duration::from_secs(5) // Default 5 seconds
     }
 }
 
@@ -379,9 +380,9 @@ impl ResourceQuota {
     pub fn new(vendor_id: String) -> Self {
         Self {
             vendor_id,
-            max_gpu_memory_mb: 1024,  // 1GB default
+            max_gpu_memory_mb: 1024, // 1GB default
             max_executions_per_hour: 1000,
-            max_execution_time_seconds: 60,  // 60 seconds per hour
+            max_execution_time_seconds: 60, // 60 seconds per hour
 
             current_gpu_memory_mb: 0,
             executions_this_hour: 0,
@@ -400,19 +401,29 @@ impl ResourceQuota {
 
         // Check limits
         if self.current_gpu_memory_mb + memory_mb > self.max_gpu_memory_mb {
-            bail!("GPU memory quota exceeded: {} + {} > {} MB",
-                self.current_gpu_memory_mb, memory_mb, self.max_gpu_memory_mb);
+            bail!(
+                "GPU memory quota exceeded: {} + {} > {} MB",
+                self.current_gpu_memory_mb,
+                memory_mb,
+                self.max_gpu_memory_mb
+            );
         }
 
         if self.executions_this_hour >= self.max_executions_per_hour {
-            bail!("Execution quota exceeded: {} >= {}/hour",
-                self.executions_this_hour, self.max_executions_per_hour);
+            bail!(
+                "Execution quota exceeded: {} >= {}/hour",
+                self.executions_this_hour,
+                self.max_executions_per_hour
+            );
         }
 
         let new_total_time_ms = self.total_execution_time_ms + execution_time.as_millis();
         if new_total_time_ms > (self.max_execution_time_seconds * 1000) as u128 {
-            bail!("Execution time quota exceeded: {}ms > {}s",
-                new_total_time_ms, self.max_execution_time_seconds);
+            bail!(
+                "Execution time quota exceeded: {}ms > {}s",
+                new_total_time_ms,
+                self.max_execution_time_seconds
+            );
         }
 
         // Update usage
@@ -492,7 +503,11 @@ impl AuditLogger {
             classification: data.classification,
             size_bytes: data.size_bytes,
             execution_time_ms: execution_time.map(|d| d.as_millis()),
-            result: if success { "SUCCESS".to_string() } else { "FAILED".to_string() },
+            result: if success {
+                "SUCCESS".to_string()
+            } else {
+                "FAILED".to_string()
+            },
         };
 
         let mut entries = self.entries.lock().unwrap();
@@ -500,7 +515,7 @@ impl AuditLogger {
 
         // Rotate log if too large
         if entries.len() > self.max_entries {
-            entries.drain(0..1000);  // Remove oldest 1000 entries
+            entries.drain(0..1000); // Remove oldest 1000 entries
         }
     }
 
@@ -508,7 +523,8 @@ impl AuditLogger {
         let entries = self.entries.lock().unwrap();
 
         let filtered: Vec<_> = if let Some(vid) = vendor_id {
-            entries.iter()
+            entries
+                .iter()
                 .filter(|e| e.vendor_id == vid)
                 .cloned()
                 .collect()
@@ -516,10 +532,7 @@ impl AuditLogger {
             entries.clone()
         };
 
-        filtered.into_iter()
-            .rev()
-            .take(limit)
-            .collect()
+        filtered.into_iter().rev().take(limit).collect()
     }
 
     pub fn export_compliance_report(&self) -> String {
@@ -532,7 +545,8 @@ impl AuditLogger {
         // Summary by vendor
         let mut vendor_stats: HashMap<String, (usize, u128)> = HashMap::new();
         for entry in entries.iter() {
-            let stats = vendor_stats.entry(entry.vendor_id.clone())
+            let stats = vendor_stats
+                .entry(entry.vendor_id.clone())
                 .or_insert((0, 0));
             stats.0 += 1;
             if let Some(time) = entry.execution_time_ms {
@@ -551,7 +565,8 @@ impl AuditLogger {
         report.push_str("\nCLASSIFICATION BREAKDOWN:\n");
         let mut class_counts: HashMap<String, usize> = HashMap::new();
         for entry in entries.iter() {
-            *class_counts.entry(format!("{:?}", entry.classification))
+            *class_counts
+                .entry(format!("{:?}", entry.classification))
                 .or_insert(0) += 1;
         }
         for (class, count) in class_counts {
@@ -579,8 +594,8 @@ impl VendorSandbox {
     /// Create a new sandbox for a vendor with isolated GPU context
     pub fn new(vendor_id: String, gpu_device_id: usize) -> Result<Self> {
         // Create isolated GPU context for this vendor
-        let gpu_context = CudaDevice::new(gpu_device_id)
-            .context("Failed to create isolated GPU context")?;
+        let gpu_context =
+            CudaDevice::new(gpu_device_id).context("Failed to create isolated GPU context")?;
 
         Ok(Self {
             vendor_id: vendor_id.clone(),
@@ -614,7 +629,8 @@ impl VendorSandbox {
 
         // Check and reserve resources
         let memory_mb = plugin.estimated_gpu_memory_mb();
-        self.quota.check_and_update(memory_mb, Duration::from_secs(0))?;
+        self.quota
+            .check_and_update(memory_mb, Duration::from_secs(0))?;
 
         // Execute in isolated environment
         let result = plugin.execute(&self.gpu_context, input.clone());
@@ -636,8 +652,11 @@ impl VendorSandbox {
 
         // Check execution time limit
         if execution_time > plugin.max_execution_time() {
-            bail!("Plugin execution exceeded time limit: {:?} > {:?}",
-                execution_time, plugin.max_execution_time());
+            bail!(
+                "Plugin execution exceeded time limit: {:?} > {:?}",
+                execution_time,
+                plugin.max_execution_time()
+            );
         }
 
         result
@@ -666,15 +685,21 @@ impl VendorSandbox {
 
         // Check plugin classification requirement
         if plugin.required_classification() > input.classification {
-            bail!("Plugin requires {:?} but data is {:?}",
-                plugin.required_classification(), input.classification);
+            bail!(
+                "Plugin requires {:?} but data is {:?}",
+                plugin.required_classification(),
+                input.classification
+            );
         }
 
         // Check data size limit
         let size_mb = input.size_bytes / (1024 * 1024);
         if size_mb > self.policy.max_data_size_mb {
-            bail!("Data size {}MB exceeds limit {}MB",
-                size_mb, self.policy.max_data_size_mb);
+            bail!(
+                "Data size {}MB exceeds limit {}MB",
+                size_mb,
+                self.policy.max_data_size_mb
+            );
         }
 
         Ok(())
@@ -718,11 +743,7 @@ impl MultiVendorOrchestrator {
     }
 
     /// Register a new vendor
-    pub fn register_vendor(
-        &mut self,
-        vendor_id: String,
-        gpu_device_id: usize,
-    ) -> Result<()> {
+    pub fn register_vendor(&mut self, vendor_id: String, gpu_device_id: usize) -> Result<()> {
         if self.sandboxes.len() >= self.max_vendors {
             bail!("Maximum vendor limit reached: {}", self.max_vendors);
         }
@@ -734,10 +755,8 @@ impl MultiVendorOrchestrator {
         let mut sandbox = VendorSandbox::new(vendor_id.clone(), gpu_device_id)?;
         sandbox.audit_logger = Arc::clone(&self.global_audit);
 
-        self.sandboxes.insert(
-            vendor_id,
-            Arc::new(Mutex::new(sandbox))
-        );
+        self.sandboxes
+            .insert(vendor_id, Arc::new(Mutex::new(sandbox)));
 
         Ok(())
     }
@@ -749,7 +768,9 @@ impl MultiVendorOrchestrator {
         plugin: &dyn VendorPlugin<T>,
         input: SecureDataSlice,
     ) -> Result<T> {
-        let sandbox = self.sandboxes.get(vendor_id)
+        let sandbox = self
+            .sandboxes
+            .get(vendor_id)
             .ok_or_else(|| anyhow::anyhow!("Vendor {} not registered", vendor_id))?;
 
         let mut sandbox = sandbox.lock().unwrap();
@@ -757,12 +778,10 @@ impl MultiVendorOrchestrator {
     }
 
     /// Update vendor policy
-    pub fn update_vendor_policy(
-        &self,
-        vendor_id: &str,
-        policy: ZeroTrustPolicy,
-    ) -> Result<()> {
-        let sandbox = self.sandboxes.get(vendor_id)
+    pub fn update_vendor_policy(&self, vendor_id: &str, policy: ZeroTrustPolicy) -> Result<()> {
+        let sandbox = self
+            .sandboxes
+            .get(vendor_id)
             .ok_or_else(|| anyhow::anyhow!("Vendor {} not registered", vendor_id))?;
 
         let mut sandbox = sandbox.lock().unwrap();
@@ -795,18 +814,20 @@ mod tests {
     struct TestPlugin;
 
     impl VendorPlugin<f64> for TestPlugin {
-        fn plugin_id(&self) -> &str { "test_v1" }
-        fn plugin_name(&self) -> &str { "Test Analytics" }
-        fn vendor_name(&self) -> &str { "TestVendor" }
+        fn plugin_id(&self) -> &str {
+            "test_v1"
+        }
+        fn plugin_name(&self) -> &str {
+            "Test Analytics"
+        }
+        fn vendor_name(&self) -> &str {
+            "TestVendor"
+        }
         fn required_classification(&self) -> DataClassification {
             DataClassification::Unclassified
         }
 
-        fn execute(
-            &self,
-            _ctx: &Arc<CudaDevice>,
-            _input: SecureDataSlice,
-        ) -> Result<f64> {
+        fn execute(&self, _ctx: &Arc<CudaDevice>, _input: SecureDataSlice) -> Result<f64> {
             Ok(42.0)
         }
     }
@@ -835,6 +856,6 @@ mod tests {
         assert!(result.is_ok());
 
         let result = quota.check_and_update(600, Duration::from_secs(1));
-        assert!(result.is_err());  // Exceeds 1GB limit
+        assert!(result.is_err()); // Exceeds 1GB limit
     }
 }

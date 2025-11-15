@@ -7,8 +7,8 @@
 //! Theory: Spike synchronization = agreement
 //! Novel: No prior spike-based LLM consensus exists
 
-use std::collections::HashMap;
 use anyhow::Result;
+use std::collections::HashMap;
 
 /// Neuromorphic Spike Consensus
 ///
@@ -25,12 +25,10 @@ impl NeuromorphicSpikeConsensus {
     /// Consensus via spike synchronization
     ///
     /// Theory: Synchronized spikes = agreement
-    pub fn spike_consensus(
-        &self,
-        llm_responses: &[String],
-    ) -> Result<SpikeConsensusResult> {
+    pub fn spike_consensus(&self, llm_responses: &[String]) -> Result<SpikeConsensusResult> {
         // 1. Convert each LLM response to spike train
-        let spike_trains: Vec<SpikeTrain> = llm_responses.iter()
+        let spike_trains: Vec<SpikeTrain> = llm_responses
+            .iter()
             .map(|r| self.text_to_spikes(r))
             .collect();
 
@@ -64,7 +62,7 @@ impl NeuromorphicSpikeConsensus {
         let mut sync = HashMap::new();
 
         for i in 0..trains.len() {
-            for j in (i+1)..trains.len() {
+            for j in (i + 1)..trains.len() {
                 let sync_ij = self.cross_correlation(&trains[i], &trains[j]);
                 sync.insert((i, j), sync_ij);
             }

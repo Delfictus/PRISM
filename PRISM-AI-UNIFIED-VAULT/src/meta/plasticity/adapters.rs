@@ -159,8 +159,12 @@ impl RepresentationSnapshot {
         if self.concepts.is_empty() {
             output.push_str("No concepts tracked yet.\n");
         } else {
-            output.push_str("| Concept | Status | Cosine | Magnitude Ratio | ΔL2 | Observations | Anchor |\n");
-            output.push_str("|---------|--------|--------|-----------------|-----|-------------|--------|\n");
+            output.push_str(
+                "| Concept | Status | Cosine | Magnitude Ratio | ΔL2 | Observations | Anchor |\n",
+            );
+            output.push_str(
+                "|---------|--------|--------|-----------------|-----|-------------|--------|\n",
+            );
             for concept in &self.concepts {
                 output.push_str(&format!(
                     "| `{}` | {} | {:.3} | {:.3} | {:.3} | {} | {} |\n",
@@ -365,7 +369,11 @@ impl RepresentationAdapter {
     }
 
     /// Adapt a concept embedding and record drift metrics.
-    pub fn adapt(&mut self, concept_id: &str, embedding: &[f32]) -> Result<AdaptationEvent, AdapterError> {
+    pub fn adapt(
+        &mut self,
+        concept_id: &str,
+        embedding: &[f32],
+    ) -> Result<AdaptationEvent, AdapterError> {
         self.adapt_with_metadata(concept_id, embedding, AdaptationMetadata::default())
     }
 

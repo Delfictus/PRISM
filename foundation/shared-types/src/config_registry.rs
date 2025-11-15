@@ -1,31 +1,30 @@
 // Universal Configuration Registry
 // This provides runtime access to ALL parameters with verification
 
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 /// Global configuration registry accessible from anywhere
-pub static CONFIG_REGISTRY: Lazy<Arc<ConfigRegistry>> = Lazy::new(|| {
-    Arc::new(ConfigRegistry::new())
-});
+pub static CONFIG_REGISTRY: Lazy<Arc<ConfigRegistry>> =
+    Lazy::new(|| Arc::new(ConfigRegistry::new()));
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParameterMetadata {
     pub name: String,
-    pub path: String,           // e.g., "thermo.replicas"
-    pub value_type: String,      // "usize", "f64", "bool"
+    pub path: String,       // e.g., "thermo.replicas"
+    pub value_type: String, // "usize", "f64", "bool"
     pub default: Value,
     pub current: Value,
     pub min: Option<Value>,
     pub max: Option<Value>,
     pub description: String,
-    pub category: String,        // "gpu", "thermo", "quantum", etc.
+    pub category: String, // "gpu", "thermo", "quantum", etc.
     pub affects_gpu: bool,
     pub requires_restart: bool,
-    pub access_count: usize,     // For verification
+    pub access_count: usize, // For verification
 }
 
 pub struct ConfigRegistry {
@@ -90,9 +89,9 @@ impl ConfigRegistry {
             let params = self.parameters.read().unwrap();
 
             // Return current value
-            params.get(path).and_then(|p| {
-                serde_json::from_value(p.current.clone()).ok()
-            })
+            params
+                .get(path)
+                .and_then(|p| serde_json::from_value(p.current.clone()).ok())
         } else {
             None
         }
@@ -105,7 +104,10 @@ impl ConfigRegistry {
         if let Some(param) = params.get_mut(path) {
             // Validate type
             if !Self::validate_type(&value, &param.value_type) {
-                return Err(format!("Type mismatch for {}: expected {}", path, param.value_type));
+                return Err(format!(
+                    "Type mismatch for {}: expected {}",
+                    path, param.value_type
+                ));
             }
 
             // Validate bounds
@@ -143,8 +145,8 @@ impl ConfigRegistry {
 
     /// Load from TOML file with layered merging
     pub fn load_toml(&self, content: &str) -> Result<(), String> {
-        let toml_value: toml::Value = toml::from_str(content)
-            .map_err(|e| format!("TOML parse error: {}", e))?;
+        let toml_value: toml::Value =
+            toml::from_str(content).map_err(|e| format!("TOML parse error: {}", e))?;
 
         self.apply_toml_recursive(&toml_value, "")
     }
@@ -169,7 +171,7 @@ impl ConfigRegistry {
                 }
                 Ok(())
             }
-            _ => Ok(())
+            _ => Ok(()),
         }
     }
 
@@ -215,17 +217,29 @@ impl ConfigRegistry {
             "f32" | "f64" => value.is_f64() || value.is_i64() || value.is_u64(),
             "bool" => value.is_boolean(),
             "String" | "&str" => value.is_string(),
-            _ => true
+            _ => true,
         }
     }
 
     fn validate_bound(value: &Value, bound: &Value, is_min: bool) -> bool {
         if let (Some(v), Some(b)) = (value.as_f64(), bound.as_f64()) {
-            if is_min { v >= b } else { v <= b }
+            if is_min {
+                v >= b
+            } else {
+                v <= b
+            }
         } else if let (Some(v), Some(b)) = (value.as_u64(), bound.as_u64()) {
-            if is_min { v >= b } else { v <= b }
+            if is_min {
+                v >= b
+            } else {
+                v <= b
+            }
         } else if let (Some(v), Some(b)) = (value.as_i64(), bound.as_i64()) {
-            if is_min { v >= b } else { v <= b }
+            if is_min {
+                v >= b
+            } else {
+                v <= b
+            }
         } else {
             true
         }
@@ -243,9 +257,7 @@ impl ConfigRegistry {
                 }
             }
             toml::Value::Boolean(b) => Value::Bool(*b),
-            toml::Value::Array(arr) => {
-                Value::Array(arr.iter().map(Self::toml_to_json).collect())
-            }
+            toml::Value::Array(arr) => Value::Array(arr.iter().map(Self::toml_to_json).collect()),
             toml::Value::Table(table) => {
                 let map: serde_json::Map<String, Value> = table
                     .iter()
@@ -281,7 +293,8 @@ macro_rules! config_get {
     ($path:expr, $type:ty, $default:expr, $module:expr) => {{
         use $crate::config_registry::CONFIG_REGISTRY;
 
-        CONFIG_REGISTRY.get::<$type>($path, $module)
+        CONFIG_REGISTRY
+            .get::<$type>($path, $module)
             .unwrap_or_else(|| {
                 // Auto-register on first access
                 let meta = $crate::config_registry::ParameterMetadata {

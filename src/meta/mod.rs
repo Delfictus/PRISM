@@ -19,9 +19,8 @@ pub use orchestrator::{
 };
 pub use plasticity::{
     explainability_report, AdaptationEvent, AdaptationMetadata, AdapterError, AdapterMode,
-    ConceptManifest, DriftError, DriftEvaluation, DriftMetrics, DriftStatus,
-    RepresentationAdapter, RepresentationDataset, RepresentationManifest,
-    RepresentationSnapshot, SemanticDriftDetector,
+    ConceptManifest, DriftError, DriftEvaluation, DriftMetrics, DriftStatus, RepresentationAdapter,
+    RepresentationDataset, RepresentationManifest, RepresentationSnapshot, SemanticDriftDetector,
 };
 pub use reflexive::{GovernanceMode, ReflexiveConfig, ReflexiveController, ReflexiveSnapshot};
 pub use registry::{RegistryError, SelectionReport};

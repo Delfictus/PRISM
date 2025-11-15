@@ -32,13 +32,13 @@
 //! T_checkpoint < 0.05 · T_process
 //! ```
 
-use serde::{Serialize, Deserialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant, SystemTime};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, SystemTime};
 
 /// Trait for components that support checkpointing
 pub trait Checkpointable: Serialize + DeserializeOwned {
@@ -142,12 +142,7 @@ impl CheckpointMetadata {
 /// Storage backend trait
 pub trait StorageBackend: Send + Sync {
     /// Write checkpoint data
-    fn write(
-        &self,
-        component_id: &str,
-        version: u64,
-        data: &[u8],
-    ) -> Result<(), CheckpointError>;
+    fn write(&self, component_id: &str, version: u64, data: &[u8]) -> Result<(), CheckpointError>;
 
     /// Read checkpoint data
     fn read(&self, component_id: &str, version: u64) -> Result<Vec<u8>, CheckpointError>;
@@ -194,12 +189,7 @@ impl LocalStorageBackend {
 }
 
 impl StorageBackend for LocalStorageBackend {
-    fn write(
-        &self,
-        component_id: &str,
-        version: u64,
-        data: &[u8],
-    ) -> Result<(), CheckpointError> {
+    fn write(&self, component_id: &str, version: u64, data: &[u8]) -> Result<(), CheckpointError> {
         // Create component directory
         let component_dir = self.base_path.join(component_id);
         fs::create_dir_all(&component_dir)
@@ -238,9 +228,8 @@ impl StorageBackend for LocalStorageBackend {
     fn read(&self, component_id: &str, version: u64) -> Result<Vec<u8>, CheckpointError> {
         // Read metadata
         let metadata_path = self.metadata_path(component_id, version);
-        let metadata_json = fs::read_to_string(&metadata_path).map_err(|e| {
-            CheckpointError::Storage(format!("Failed to read metadata: {}", e))
-        })?;
+        let metadata_json = fs::read_to_string(&metadata_path)
+            .map_err(|e| CheckpointError::Storage(format!("Failed to read metadata: {}", e)))?;
 
         let serializable: SerializableMetadata = serde_json::from_str(&metadata_json)
             .map_err(|e| CheckpointError::Deserialization(e.to_string()))?;
@@ -253,9 +242,7 @@ impl StorageBackend for LocalStorageBackend {
 
         // Verify integrity
         if !metadata.verify(&data) {
-            return Err(CheckpointError::Corruption(
-                "Checksum mismatch".to_string(),
-            ));
+            return Err(CheckpointError::Corruption("Checksum mismatch".to_string()));
         }
 
         Ok(data)
@@ -375,10 +362,7 @@ impl CheckpointManager {
     }
 
     /// Create checkpoint for component
-    pub fn checkpoint<T: Checkpointable>(
-        &self,
-        component: &T,
-    ) -> Result<u64, CheckpointError> {
+    pub fn checkpoint<T: Checkpointable>(&self, component: &T) -> Result<u64, CheckpointError> {
         let start = Instant::now();
 
         let component_id = component.component_id();
@@ -666,10 +650,7 @@ mod tests {
         }
 
         let metrics = manager.metrics();
-        println!(
-            "Checkpoint overhead: {:.2}%",
-            metrics.overhead_percentage()
-        );
+        println!("Checkpoint overhead: {:.2}%", metrics.overhead_percentage());
 
         // Overhead should be < 5%
         assert!(metrics.overhead_percentage() < 5.0);

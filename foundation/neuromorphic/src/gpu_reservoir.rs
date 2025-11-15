@@ -3,13 +3,13 @@
 //! This module provides CUDA-accelerated neuromorphic processing using RTX 5070
 //! Achieves 89% performance improvement: 46ms → 2-5ms processing times
 
-use crate::types::SpikePattern;
-use crate::reservoir::{ReservoirConfig, ReservoirState, DynamicsMetrics};
+use crate::reservoir::{DynamicsMetrics, ReservoirConfig, ReservoirState};
 use crate::stdp_profiles::STDPProfile;
-use cudarc::driver::*;
+use crate::types::SpikePattern;
 use anyhow::Result;
-use std::sync::Arc;
+use cudarc::driver::*;
 use nalgebra::{DMatrix, DVector};
+use std::sync::Arc;
 
 /// GPU-accelerated reservoir computer for RTX 5070
 /// Provides 10-50x speedup over CPU implementation
@@ -23,12 +23,12 @@ pub struct GpuReservoirComputer {
     gemv_reservoir_kernel: Option<Arc<CudaFunction>>,
 
     // GPU memory buffers - persistent allocation for performance
-    gpu_weights_input: CudaSlice<f32>,     // Input weight matrix on GPU
+    gpu_weights_input: CudaSlice<f32>, // Input weight matrix on GPU
     gpu_weights_reservoir: CudaSlice<f32>, // Reservoir weight matrix on GPU
-    gpu_state_current: CudaSlice<f32>,     // Current neuron states
-    gpu_state_previous: CudaSlice<f32>,    // Previous neuron states
-    gpu_input_buffer: CudaSlice<f32>,      // Input vector buffer
-    gpu_temp_buffer: CudaSlice<f32>,       // Temporary computation buffer
+    gpu_state_current: CudaSlice<f32>, // Current neuron states
+    gpu_state_previous: CudaSlice<f32>, // Previous neuron states
+    gpu_input_buffer: CudaSlice<f32>,  // Input vector buffer
+    gpu_temp_buffer: CudaSlice<f32>,   // Temporary computation buffer
 
     // CUDA kernel manager for optimized operations
     kernel_manager: Option<crate::cuda_kernels::NeuromorphicKernelManager>,
@@ -61,10 +61,10 @@ pub struct GpuConfig {
 impl Default for GpuConfig {
     fn default() -> Self {
         Self {
-            device_id: 0,  // Use first GPU (RTX 5070)
-            enable_mixed_precision: true,  // Use FP16 for performance
+            device_id: 0,                 // Use first GPU (RTX 5070)
+            enable_mixed_precision: true, // Use FP16 for performance
             batch_size: 1,
-            memory_pool_size_mb: 512,  // 512MB memory pool
+            memory_pool_size_mb: 512, // 512MB memory pool
         }
     }
 }
@@ -76,8 +76,13 @@ impl GpuReservoirComputer {
     #[deprecated(since = "0.2.0", note = "Use new_shared() with shared CUDA context")]
     pub fn new(config: ReservoirConfig, gpu_config: GpuConfig) -> Result<Self> {
         // Create own context (not recommended - violates Article V)
-        let device = CudaDevice::new(gpu_config.device_id as usize)
-            .map_err(|e| anyhow::anyhow!("Failed to initialize CUDA context {}: {}", gpu_config.device_id, e))?;
+        let device = CudaDevice::new(gpu_config.device_id as usize).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to initialize CUDA context {}: {}",
+                gpu_config.device_id,
+                e
+            )
+        })?;
 
         // CudaDevice::new() returns Arc<CudaDevice>, so pass directly
         Self::new_shared(config, device)
@@ -111,43 +116,71 @@ impl GpuReservoirComputer {
         let (gemv_input_kernel, gemv_reservoir_kernel) = Self::load_gemv_kernels(&device)?;
 
         // Calculate matrix sizes for GPU memory allocation with overflow checking
-        let reservoir_matrix_size = config.size.checked_mul(config.size)
-            .ok_or_else(|| anyhow::anyhow!("Reservoir matrix size overflow: {}x{}", config.size, config.size))?;
-        let input_matrix_size = config.size.checked_mul(config.input_size)
-            .ok_or_else(|| anyhow::anyhow!("Input matrix size overflow: {}x{}", config.size, config.input_size))?;
+        let reservoir_matrix_size = config.size.checked_mul(config.size).ok_or_else(|| {
+            anyhow::anyhow!(
+                "Reservoir matrix size overflow: {}x{}",
+                config.size,
+                config.size
+            )
+        })?;
+        let input_matrix_size = config.size.checked_mul(config.input_size).ok_or_else(|| {
+            anyhow::anyhow!(
+                "Input matrix size overflow: {}x{}",
+                config.size,
+                config.input_size
+            )
+        })?;
         let state_vector_size = config.size;
         let input_vector_size = config.input_size;
 
         // Calculate total memory requirements for validation
-        let total_memory_elements = reservoir_matrix_size + input_matrix_size + (state_vector_size * 4) + input_vector_size;
-        let total_memory_mb = (total_memory_elements * std::mem::size_of::<f32>()) as f64 / (1024.0 * 1024.0);
+        let total_memory_elements =
+            reservoir_matrix_size + input_matrix_size + (state_vector_size * 4) + input_vector_size;
+        let total_memory_mb =
+            (total_memory_elements * std::mem::size_of::<f32>()) as f64 / (1024.0 * 1024.0);
 
-        if total_memory_mb > 6000.0 {  // Conservative limit for RTX 5070's 8GB VRAM
+        if total_memory_mb > 6000.0 {
+            // Conservative limit for RTX 5070's 8GB VRAM
             return Err(anyhow::anyhow!("GPU memory requirement ({:.1}MB) exceeds RTX 5070 capacity. Reduce reservoir size.", total_memory_mb));
         }
 
         // Allocate persistent GPU memory buffers with comprehensive error handling (cudarc 0.9 API)
-        let gpu_weights_input = device.alloc_zeros::<f32>(input_matrix_size)
-            .map_err(|e| anyhow::anyhow!("Failed to allocate input weights GPU memory ({}MB): {}",
-                (input_matrix_size * 4) as f64 / (1024.0 * 1024.0), e))?;
-        let gpu_weights_reservoir = device.alloc_zeros::<f32>(reservoir_matrix_size)
-            .map_err(|e| anyhow::anyhow!("Failed to allocate reservoir weights GPU memory ({}MB): {}",
-                (reservoir_matrix_size * 4) as f64 / (1024.0 * 1024.0), e))?;
-        let gpu_state_current = device.alloc_zeros::<f32>(state_vector_size)
+        let gpu_weights_input = device.alloc_zeros::<f32>(input_matrix_size).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to allocate input weights GPU memory ({}MB): {}",
+                (input_matrix_size * 4) as f64 / (1024.0 * 1024.0),
+                e
+            )
+        })?;
+        let gpu_weights_reservoir =
+            device
+                .alloc_zeros::<f32>(reservoir_matrix_size)
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to allocate reservoir weights GPU memory ({}MB): {}",
+                        (reservoir_matrix_size * 4) as f64 / (1024.0 * 1024.0),
+                        e
+                    )
+                })?;
+        let gpu_state_current = device
+            .alloc_zeros::<f32>(state_vector_size)
             .map_err(|e| anyhow::anyhow!("Failed to allocate current state GPU memory: {}", e))?;
-        let gpu_state_previous = device.alloc_zeros::<f32>(state_vector_size)
+        let gpu_state_previous = device
+            .alloc_zeros::<f32>(state_vector_size)
             .map_err(|e| anyhow::anyhow!("Failed to allocate previous state GPU memory: {}", e))?;
-        let gpu_input_buffer = device.alloc_zeros::<f32>(input_vector_size)
+        let gpu_input_buffer = device
+            .alloc_zeros::<f32>(input_vector_size)
             .map_err(|e| anyhow::anyhow!("Failed to allocate input buffer GPU memory: {}", e))?;
-        let gpu_temp_buffer = device.alloc_zeros::<f32>(state_vector_size)
-            .map_err(|e| anyhow::anyhow!("Failed to allocate temporary buffer GPU memory: {}", e))?;
+        let gpu_temp_buffer = device.alloc_zeros::<f32>(state_vector_size).map_err(|e| {
+            anyhow::anyhow!("Failed to allocate temporary buffer GPU memory: {}", e)
+        })?;
 
         // Allocate CPU-side buffer for results
         let cpu_state = vec![0.0f32; state_vector_size];
 
         // Initialize CUDA kernel manager for optimized operations
-        let kernel_manager = crate::cuda_kernels::NeuromorphicKernelManager::new(device.clone())
-            .ok(); // Use Option to handle cases where kernel compilation fails
+        let kernel_manager =
+            crate::cuda_kernels::NeuromorphicKernelManager::new(device.clone()).ok(); // Use Option to handle cases where kernel compilation fails
 
         // Initialize GPU matrices with random weights (cudarc 0.9: no cublas field)
         let mut gpu_reservoir = Self {
@@ -173,7 +206,9 @@ impl GpuReservoirComputer {
     }
 
     /// Load custom GEMV kernels from PTX
-    fn load_gemv_kernels(context: &Arc<CudaDevice>) -> Result<(Option<Arc<CudaFunction>>, Option<Arc<CudaFunction>>)> {
+    fn load_gemv_kernels(
+        context: &Arc<CudaDevice>,
+    ) -> Result<(Option<Arc<CudaFunction>>, Option<Arc<CudaFunction>>)> {
         let ptx_path = "target/ptx/neuromorphic_gemv.ptx";
 
         if !std::path::Path::new(ptx_path).exists() {
@@ -183,20 +218,24 @@ impl GpuReservoirComputer {
 
         // Load PTX with cudarc 0.9 API
         let ptx = cudarc::nvrtc::Ptx::from_file(ptx_path);
-        context.load_ptx(
-            ptx,
-            "neuromorphic_gemv",
-            &["matvec_input_kernel", "matvec_reservoir_kernel"]
-        ).map_err(|e| anyhow::anyhow!("Failed to load neuromorphic GEMV PTX: {}", e))?;
+        context
+            .load_ptx(
+                ptx,
+                "neuromorphic_gemv",
+                &["matvec_input_kernel", "matvec_reservoir_kernel"],
+            )
+            .map_err(|e| anyhow::anyhow!("Failed to load neuromorphic GEMV PTX: {}", e))?;
 
         let input_kernel = Arc::new(
-            context.get_func("neuromorphic_gemv", "matvec_input_kernel")
-                .ok_or_else(|| anyhow::anyhow!("Failed to load matvec_input_kernel"))?
+            context
+                .get_func("neuromorphic_gemv", "matvec_input_kernel")
+                .ok_or_else(|| anyhow::anyhow!("Failed to load matvec_input_kernel"))?,
         );
 
         let reservoir_kernel = Arc::new(
-            context.get_func("neuromorphic_gemv", "matvec_reservoir_kernel")
-                .ok_or_else(|| anyhow::anyhow!("Failed to load matvec_reservoir_kernel"))?
+            context
+                .get_func("neuromorphic_gemv", "matvec_reservoir_kernel")
+                .ok_or_else(|| anyhow::anyhow!("Failed to load matvec_reservoir_kernel"))?,
         );
 
         println!("[GPU-RESERVOIR] Custom GEMV kernels loaded successfully");
@@ -221,7 +260,10 @@ impl GpuReservoirComputer {
         self.gpu_weights_reservoir = self.device.htod_sync_copy(&reservoir_weights_f32)?;
 
         // cudarc 0.9: sync operations are already synchronous
-        println!("[GPU-RESERVOIR] Weight upload took {:?}", upload_start.elapsed());
+        println!(
+            "[GPU-RESERVOIR] Weight upload took {:?}",
+            upload_start.elapsed()
+        );
 
         Ok(())
     }
@@ -235,7 +277,8 @@ impl GpuReservoirComputer {
             for j in 0..config.input_size {
                 if rand::Rng::gen::<f64>(&mut rng) < config.connection_prob {
                     let idx = i * config.input_size + j;
-                    weights[idx] = (rand::Rng::gen::<f64>(&mut rng) * 2.0 - 1.0) * config.input_scaling;
+                    weights[idx] =
+                        (rand::Rng::gen::<f64>(&mut rng) * 2.0 - 1.0) * config.input_scaling;
                 }
             }
         }
@@ -262,8 +305,15 @@ impl GpuReservoirComputer {
         let matrix = DMatrix::from_vec(config.size, config.size, weights);
         let spectral_radius = Self::compute_spectral_radius_cpu(&matrix)?;
 
-        let scaled_weights: Vec<f64> = matrix.iter()
-            .map(|&x| if spectral_radius > 0.0 { x * config.spectral_radius / spectral_radius } else { x })
+        let scaled_weights: Vec<f64> = matrix
+            .iter()
+            .map(|&x| {
+                if spectral_radius > 0.0 {
+                    x * config.spectral_radius / spectral_radius
+                } else {
+                    x
+                }
+            })
             .collect();
 
         Ok(scaled_weights)
@@ -276,8 +326,8 @@ impl GpuReservoirComputer {
         }
 
         let n = matrix.nrows();
-        let max_iterations = 50;  // Reduced for faster initialization
-        let tolerance = 1e-6;    // Slightly relaxed for speed
+        let max_iterations = 50; // Reduced for faster initialization
+        let tolerance = 1e-6; // Slightly relaxed for speed
 
         // Initialize random vector
         let mut rng = rand::thread_rng();
@@ -289,7 +339,9 @@ impl GpuReservoirComputer {
             x /= norm;
         } else {
             x = DVector::zeros(n);
-            if n > 0 { x[0] = 1.0; }
+            if n > 0 {
+                x[0] = 1.0;
+            }
         }
 
         let mut eigenvalue = 0.0;
@@ -332,20 +384,31 @@ impl GpuReservoirComputer {
         // Convert spike pattern to input vector
         let conv_start = std::time::Instant::now();
         let input_vector = self.pattern_to_input_vector(pattern);
-        println!("[GPU-RESERVOIR] pattern_to_input_vector() took {:?}", conv_start.elapsed());
+        println!(
+            "[GPU-RESERVOIR] pattern_to_input_vector() took {:?}",
+            conv_start.elapsed()
+        );
 
         // Validate input vector size
         if input_vector.len() != self.config.input_size {
-            return Err(anyhow::anyhow!("Input vector size mismatch: expected {}, got {}",
-                self.config.input_size, input_vector.len()));
+            return Err(anyhow::anyhow!(
+                "Input vector size mismatch: expected {}, got {}",
+                self.config.input_size,
+                input_vector.len()
+            ));
         }
 
         // Copy input to GPU with error handling (cudarc 0.9 API)
         let upload_start = std::time::Instant::now();
         let input_f32: Vec<f32> = input_vector.iter().map(|&x| x as f32).collect();
-        self.gpu_input_buffer = self.device.htod_sync_copy(&input_f32)
+        self.gpu_input_buffer = self
+            .device
+            .htod_sync_copy(&input_f32)
             .map_err(|e| anyhow::anyhow!("Failed to copy input to GPU: {}", e))?;
-        println!("[GPU-RESERVOIR] Upload to GPU took {:?}", upload_start.elapsed());
+        println!(
+            "[GPU-RESERVOIR] Upload to GPU took {:?}",
+            upload_start.elapsed()
+        );
 
         // Swap current and previous states (efficient state management)
         std::mem::swap(&mut self.gpu_state_current, &mut self.gpu_state_previous);
@@ -355,9 +418,10 @@ impl GpuReservoirComputer {
 
         // Step 1: Compute input contribution: W_in * u(t)
         let gemv1_start = std::time::Instant::now();
-        println!("[GPU-RESERVOIR] GEMV 1 dims: M={}, N={} ({}x{} matrix)",
-                 self.config.size, self.config.input_size,
-                 self.config.size, self.config.input_size);
+        println!(
+            "[GPU-RESERVOIR] GEMV 1 dims: M={}, N={} ({}x{} matrix)",
+            self.config.size, self.config.input_size, self.config.size, self.config.input_size
+        );
 
         // Use custom GEMV kernel (cudarc 0.9: cuBLAS not available)
         if let Some(ref kernel) = self.gemv_input_kernel {
@@ -389,7 +453,7 @@ impl GpuReservoirComputer {
                         beta,                      // float beta
                         m_i32,                     // int M
                         n_i32,                     // int N
-                    )
+                    ),
                 )?;
             }
             self.device.synchronize()?;
@@ -399,7 +463,10 @@ impl GpuReservoirComputer {
             ));
         }
 
-        println!("[GPU-RESERVOIR] GEMV 1 (W_in * u) took {:?}", gemv1_start.elapsed());
+        println!(
+            "[GPU-RESERVOIR] GEMV 1 (W_in * u) took {:?}",
+            gemv1_start.elapsed()
+        );
 
         // Step 2: Compute recurrent contribution: W * x(t-1) and add to temp buffer
         let gemv2_start = std::time::Instant::now();
@@ -417,7 +484,7 @@ impl GpuReservoirComputer {
             };
 
             let alpha = 1.0f32;
-            let beta = 1.0f32;  // Add to existing temp_buffer
+            let beta = 1.0f32; // Add to existing temp_buffer
             let m_i32 = self.config.size as i32;
 
             // Kernel signature: (matrix, vector, output, alpha, beta, M)
@@ -432,7 +499,7 @@ impl GpuReservoirComputer {
                         alpha,                       // float alpha
                         beta,                        // float beta
                         m_i32,                       // int M
-                    )
+                    ),
                 )?;
             }
             self.device.synchronize()?;
@@ -442,22 +509,34 @@ impl GpuReservoirComputer {
             ));
         }
 
-        println!("[GPU-RESERVOIR] GEMV 2 (W * x) took {:?}", gemv2_start.elapsed());
+        println!(
+            "[GPU-RESERVOIR] GEMV 2 (W * x) took {:?}",
+            gemv2_start.elapsed()
+        );
 
         // Step 3: Apply leaky integration and nonlinearity (custom CUDA kernel)
         let kernel_start = std::time::Instant::now();
         self.apply_leaky_integration_kernel()?;
-        println!("[GPU-RESERVOIR] Leaky integration kernel took {:?}", kernel_start.elapsed());
+        println!(
+            "[GPU-RESERVOIR] Leaky integration kernel took {:?}",
+            kernel_start.elapsed()
+        );
 
         // Copy result back to CPU for interface compatibility (cudarc 0.9 API)
         let download_start = std::time::Instant::now();
         self.cpu_state = self.device.dtoh_sync_copy(&self.gpu_state_current)?;
-        println!("[GPU-RESERVOIR] Download state took {:?}", download_start.elapsed());
+        println!(
+            "[GPU-RESERVOIR] Download state took {:?}",
+            download_start.elapsed()
+        );
 
         // Calculate dynamics metrics (CPU-side for now)
         let metrics_start = std::time::Instant::now();
         let dynamics = self.calculate_dynamics_cpu();
-        println!("[GPU-RESERVOIR] CPU metrics calculation took {:?}", metrics_start.elapsed());
+        println!(
+            "[GPU-RESERVOIR] CPU metrics calculation took {:?}",
+            metrics_start.elapsed()
+        );
 
         // Update performance statistics
         let total_time = start_time.elapsed();
@@ -467,7 +546,10 @@ impl GpuReservoirComputer {
         let reservoir_state = ReservoirState {
             activations: self.cpu_state.iter().map(|&x| x as f64).collect(),
             average_activation: self.cpu_state.iter().sum::<f32>() / self.cpu_state.len() as f32,
-            max_activation: self.cpu_state.iter().fold(f32::NEG_INFINITY, |a, &b| a.max(b)),
+            max_activation: self
+                .cpu_state
+                .iter()
+                .fold(f32::NEG_INFINITY, |a, &b| a.max(b)),
             last_spike_count: pattern.spike_count(),
             dynamics,
         };
@@ -488,8 +570,8 @@ impl GpuReservoirComputer {
             kernel_manager.leaky_integration(
                 &mut self.gpu_state_current,
                 &self.gpu_state_previous,
-                &self.gpu_temp_buffer,     // input_contrib (W_in * u + W * x)
-                &self.gpu_temp_buffer,     // recurrent_contrib (already computed)
+                &self.gpu_temp_buffer, // input_contrib (W_in * u + W * x)
+                &self.gpu_temp_buffer, // recurrent_contrib (already computed)
                 leak_rate,
                 noise_level,
                 self.config.size,
@@ -502,7 +584,8 @@ impl GpuReservoirComputer {
         // Note: This is simplified and missing tanh application
         // The custom CUDA kernel is critical for full neuromorphic dynamics
 
-        self.device.dtod_copy(&self.gpu_temp_buffer, &mut self.gpu_state_current)
+        self.device
+            .dtod_copy(&self.gpu_temp_buffer, &mut self.gpu_state_current)
             .map_err(|e| anyhow::anyhow!("Failed to copy temp buffer: {}", e))?;
 
         // For production use, the kernel manager must be available
@@ -516,7 +599,8 @@ impl GpuReservoirComputer {
         let bin_duration = pattern.duration_ms / self.config.input_size as f64;
 
         for spike in &pattern.spikes {
-            let bin_index = ((spike.time_ms / bin_duration) as usize).min(self.config.input_size - 1);
+            let bin_index =
+                ((spike.time_ms / bin_duration) as usize).min(self.config.input_size - 1);
             input[bin_index] += 1.0;
 
             if let Some(amplitude) = spike.amplitude {
@@ -546,15 +630,18 @@ impl GpuReservoirComputer {
         let memory_capacity = 0.8; // Placeholder - would compute from actual state history
         let separation = if self.config.size > 1 {
             let mean = current_state.mean();
-            let variance = current_state.iter()
+            let variance = current_state
+                .iter()
                 .map(|&x| (x - mean).powi(2))
-                .sum::<f64>() / (self.config.size - 1) as f64;
+                .sum::<f64>()
+                / (self.config.size - 1) as f64;
             variance.sqrt().min(1.0)
-        } else { 0.0 };
+        } else {
+            0.0
+        };
 
-        let approximation = current_state.iter()
-            .filter(|&&x| x.abs() > 0.01)
-            .count() as f64 / self.config.size as f64;
+        let approximation = current_state.iter().filter(|&&x| x.abs() > 0.01).count() as f64
+            / self.config.size as f64;
 
         DynamicsMetrics {
             memory_capacity,
@@ -569,9 +656,10 @@ impl GpuReservoirComputer {
         self.processing_stats.total_processing_time_us = total_time.as_micros() as f32;
 
         // Estimate memory usage (simplified)
-        let matrix_memory = (self.config.size * self.config.size +
-                           self.config.size * self.config.input_size +
-                           self.config.size * 4) * 4; // 4 bytes per f32
+        let matrix_memory = (self.config.size * self.config.size
+            + self.config.size * self.config.input_size
+            + self.config.size * 4)
+            * 4; // 4 bytes per f32
         self.processing_stats.gpu_memory_usage_mb = matrix_memory as f32 / 1024.0 / 1024.0;
 
         // Estimate speedup vs CPU (based on performance analysis)
@@ -635,7 +723,7 @@ mod tests {
             Ok(reservoir) => {
                 assert_eq!(reservoir.config.size, 100);
                 println!("GPU reservoir created successfully");
-            },
+            }
             Err(e) => {
                 println!("GPU test skipped (no CUDA device): {}", e);
             }

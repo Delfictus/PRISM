@@ -3,8 +3,8 @@
 //! Implements high-performance graph coloring on NVIDIA GPUs using cudarc.
 //! Accelerates adjacency matrix construction, conflict detection, and DSATUR heuristic.
 
-use anyhow::{Result, Context, anyhow};
-use cudarc::driver::{CudaDevice, CudaSlice, LaunchConfig, LaunchAsync};
+use anyhow::{anyhow, Context, Result};
+use cudarc::driver::{CudaDevice, CudaSlice, LaunchAsync, LaunchConfig};
 use cudarc::nvrtc::Ptx;
 use ndarray::Array2;
 use num_complex::Complex64;
@@ -29,17 +29,10 @@ pub struct GpuChromaticColoring {
 
 impl GpuChromaticColoring {
     /// Create new GPU-accelerated chromatic coloring
-    pub fn new_adaptive(
-        coupling_matrix: &Array2<Complex64>,
-        target_colors: usize,
-    ) -> Result<Self> {
+    pub fn new_adaptive(coupling_matrix: &Array2<Complex64>, target_colors: usize) -> Result<Self> {
         let device = CudaDevice::new(0).context("Failed to initialize CUDA device")?;
 
-        let threshold = Self::find_optimal_threshold_gpu(
-            &device,
-            coupling_matrix,
-            target_colors,
-        )?;
+        let threshold = Self::find_optimal_threshold_gpu(&device, coupling_matrix, target_colors)?;
 
         Self::new(coupling_matrix, target_colors, threshold, device)
     }
@@ -94,7 +87,8 @@ impl GpuChromaticColoring {
         if n != coupling_matrix.ncols() {
             return Err(anyhow!(
                 "Coupling matrix must be square: got {}x{}",
-                n, coupling_matrix.ncols()
+                n,
+                coupling_matrix.ncols()
             ));
         }
 
@@ -113,7 +107,9 @@ impl GpuChromaticColoring {
                 if !strength.is_finite() {
                     return Err(anyhow!(
                         "Invalid coupling strength at ({}, {}): {}",
-                        i, j, strength
+                        i,
+                        j,
+                        strength
                     ));
                 }
                 coupling_flat.push(strength as f32);
@@ -121,14 +117,17 @@ impl GpuChromaticColoring {
         }
 
         // Upload coupling matrix to GPU using cudarc 0.9 API
-        let mut gpu_coupling = device.alloc_zeros::<f32>(coupling_flat.len())
+        let mut gpu_coupling = device
+            .alloc_zeros::<f32>(coupling_flat.len())
             .context("Failed to allocate GPU coupling matrix")?;
-        device.htod_sync_copy_into(&coupling_flat, &mut gpu_coupling)
+        device
+            .htod_sync_copy_into(&coupling_flat, &mut gpu_coupling)
             .context("Failed to upload coupling matrix to GPU")?;
 
         // Allocate adjacency matrix on GPU (packed as bits in u8 for efficiency)
         let adjacency_bytes = (n * n + 7) / 8;
-        let mut gpu_adjacency = device.alloc_zeros::<u8>(adjacency_bytes)
+        let mut gpu_adjacency = device
+            .alloc_zeros::<u8>(adjacency_bytes)
             .context("Failed to allocate GPU adjacency matrix")?;
 
         // Load PTX kernel - try OUT_DIR first, then fallback to target/ptx/
@@ -140,14 +139,24 @@ impl GpuChromaticColoring {
             } else {
                 // Fallback to runtime location
                 let runtime_path = std::path::Path::new("target/ptx/graph_coloring.ptx");
-                std::fs::read_to_string(runtime_path)
-                    .map_err(|e| anyhow!("Failed to load PTX from {:?}: {}. Run: cargo build --release", runtime_path, e))?
+                std::fs::read_to_string(runtime_path).map_err(|e| {
+                    anyhow!(
+                        "Failed to load PTX from {:?}: {}. Run: cargo build --release",
+                        runtime_path,
+                        e
+                    )
+                })?
             }
         } else {
             // Runtime: use known location
             let runtime_path = std::path::Path::new("target/ptx/graph_coloring.ptx");
-            std::fs::read_to_string(runtime_path)
-                .map_err(|e| anyhow!("Failed to load PTX from {:?}: {}. Run: cargo build --release", runtime_path, e))?
+            std::fs::read_to_string(runtime_path).map_err(|e| {
+                anyhow!(
+                    "Failed to load PTX from {:?}: {}. Run: cargo build --release",
+                    runtime_path,
+                    e
+                )
+            })?
         };
 
         if ptx.is_empty() || !ptx.contains("build_adjacency") {
@@ -158,10 +167,12 @@ impl GpuChromaticColoring {
 
         // Load PTX module using cudarc 0.9 API
         let ptx_parsed = Ptx::from_src(&ptx);
-        device.load_ptx(ptx_parsed, "graph_coloring", &["build_adjacency"])
+        device
+            .load_ptx(ptx_parsed, "graph_coloring", &["build_adjacency"])
             .context("Failed to load graph_coloring PTX module - check PTX and CUDA driver")?;
 
-        let build_adjacency = device.get_func("graph_coloring", "build_adjacency")
+        let build_adjacency = device
+            .get_func("graph_coloring", "build_adjacency")
             .context("Failed to get build_adjacency kernel function")?;
 
         let cfg = LaunchConfig::for_num_elems((n * n) as u32);
@@ -171,11 +182,16 @@ impl GpuChromaticColoring {
 
         // Launch kernel using cudarc 0.9 API
         unsafe {
-            build_adjacency.launch(cfg, (&gpu_coupling, threshold_f32, &mut gpu_adjacency, n_u32))
+            build_adjacency
+                .launch(
+                    cfg,
+                    (&gpu_coupling, threshold_f32, &mut gpu_adjacency, n_u32),
+                )
                 .context("GPU kernel launch failed - check CUDA runtime")?;
         }
 
-        device.synchronize()
+        device
+            .synchronize()
             .context("GPU synchronization failed after adjacency construction")?;
 
         Ok(gpu_adjacency)
@@ -191,13 +207,15 @@ impl GpuChromaticColoring {
         let adjacency_bytes = (n * n + 7) / 8;
 
         let mut packed = vec![0u8; adjacency_bytes];
-        device.dtoh_sync_copy_into(gpu_adjacency, &mut packed)
+        device
+            .dtoh_sync_copy_into(gpu_adjacency, &mut packed)
             .context("Failed to download adjacency matrix from GPU")?;
 
         if packed.len() != adjacency_bytes {
             return Err(anyhow!(
                 "Adjacency buffer size mismatch: expected {} bytes, got {}",
-                adjacency_bytes, packed.len()
+                adjacency_bytes,
+                packed.len()
             ));
         }
 
@@ -206,7 +224,8 @@ impl GpuChromaticColoring {
         // PRODUCTION: Unpack bits from GPU byte array
         // Note: CUDA kernel writes to 32-bit words, so we need to read accordingly
         // Convert byte array to 32-bit words for correct bit extraction
-        let words: Vec<u32> = packed.chunks(4)
+        let words: Vec<u32> = packed
+            .chunks(4)
             .map(|chunk| {
                 let mut bytes = [0u8; 4];
                 for (i, &b) in chunk.iter().enumerate() {
@@ -231,7 +250,7 @@ impl GpuChromaticColoring {
         // PRODUCTION: Enforce symmetry for undirected graphs
         // GPU kernel should set both (i,j) and (j,i), but ensure consistency
         for i in 0..n {
-            for j in (i+1)..n {
+            for j in (i + 1)..n {
                 if adjacency[[i, j]] != adjacency[[j, i]] {
                     // Make symmetric by taking logical OR
                     let has_edge = adjacency[[i, j]] || adjacency[[j, i]];
@@ -259,8 +278,13 @@ impl GpuChromaticColoring {
         let ptx = if let Ok(out_dir) = std::env::var("OUT_DIR") {
             let ptx_path = std::path::Path::new(&out_dir).join("parallel_coloring.ptx");
             if ptx_path.exists() {
-                std::fs::read_to_string(&ptx_path)
-                    .map_err(|e| anyhow!("Failed to load parallel_coloring PTX from {:?}: {}", ptx_path, e))?
+                std::fs::read_to_string(&ptx_path).map_err(|e| {
+                    anyhow!(
+                        "Failed to load parallel_coloring PTX from {:?}: {}",
+                        ptx_path,
+                        e
+                    )
+                })?
             } else {
                 let runtime_path = std::path::Path::new("target/ptx/parallel_coloring.ptx");
                 std::fs::read_to_string(runtime_path)
@@ -274,21 +298,31 @@ impl GpuChromaticColoring {
 
         // Load PTX module using cudarc 0.9 API
         let ptx_parsed = Ptx::from_src(&ptx);
-        device.load_ptx(ptx_parsed, "parallel_coloring", &[
-            "init_priorities",
-            "find_independent_set",
-            "color_independent_set",
-            "count_uncolored"
-        ]).context("Failed to load parallel coloring PTX module")?;
+        device
+            .load_ptx(
+                ptx_parsed,
+                "parallel_coloring",
+                &[
+                    "init_priorities",
+                    "find_independent_set",
+                    "color_independent_set",
+                    "count_uncolored",
+                ],
+            )
+            .context("Failed to load parallel coloring PTX module")?;
 
         // Allocate GPU buffers
-        let mut gpu_priorities = device.alloc_zeros::<f32>(n)
+        let mut gpu_priorities = device
+            .alloc_zeros::<f32>(n)
             .context("Failed to allocate priorities buffer")?;
-        let mut gpu_colors = device.alloc_zeros::<u32>(n)
+        let mut gpu_colors = device
+            .alloc_zeros::<u32>(n)
             .context("Failed to allocate colors buffer")?;
-        let mut gpu_can_color = device.alloc_zeros::<u32>(n)
+        let mut gpu_can_color = device
+            .alloc_zeros::<u32>(n)
             .context("Failed to allocate can_color buffer")?;
-        let mut gpu_uncolored_count = device.alloc_zeros::<u32>(1)
+        let mut gpu_uncolored_count = device
+            .alloc_zeros::<u32>(1)
             .context("Failed to allocate uncolored_count buffer")?;
 
         let cfg = LaunchConfig::for_num_elems(n as u32);
@@ -298,25 +332,36 @@ impl GpuChromaticColoring {
             .as_secs();
 
         // Initialize priorities and colors
-        let init_priorities = device.get_func("parallel_coloring", "init_priorities")
+        let init_priorities = device
+            .get_func("parallel_coloring", "init_priorities")
             .context("Failed to get init_priorities kernel")?;
 
         let n_u32 = n as u32;
         let seed_u64 = seed as u64;
 
         unsafe {
-            init_priorities.launch(cfg, (&mut gpu_priorities, &mut gpu_colors, n_u32, seed_u64))
+            init_priorities
+                .launch(cfg, (&mut gpu_priorities, &mut gpu_colors, n_u32, seed_u64))
                 .context("Failed to launch init_priorities kernel")?;
         }
         device.synchronize()?;
 
         // Load kernel functions once before loop (wrap in Arc for reuse)
-        let find_independent_set = Arc::new(device.get_func("parallel_coloring", "find_independent_set")
-            .context("Failed to get find_independent_set kernel")?);
-        let color_independent_set = Arc::new(device.get_func("parallel_coloring", "color_independent_set")
-            .context("Failed to get color_independent_set kernel")?);
-        let count_uncolored = Arc::new(device.get_func("parallel_coloring", "count_uncolored")
-            .context("Failed to get count_uncolored kernel")?);
+        let find_independent_set = Arc::new(
+            device
+                .get_func("parallel_coloring", "find_independent_set")
+                .context("Failed to get find_independent_set kernel")?,
+        );
+        let color_independent_set = Arc::new(
+            device
+                .get_func("parallel_coloring", "color_independent_set")
+                .context("Failed to get color_independent_set kernel")?,
+        );
+        let count_uncolored = Arc::new(
+            device
+                .get_func("parallel_coloring", "count_uncolored")
+                .context("Failed to get count_uncolored kernel")?,
+        );
 
         // Jones-Plassmann algorithm: iteratively color independent sets
         let max_iterations = n; // At most n iterations needed
@@ -325,7 +370,18 @@ impl GpuChromaticColoring {
             let n_u32 = n as u32;
 
             unsafe {
-                (*find_independent_set).clone().launch(cfg, (gpu_adjacency, &gpu_priorities, &gpu_colors, &mut gpu_can_color, n_u32))
+                (*find_independent_set)
+                    .clone()
+                    .launch(
+                        cfg,
+                        (
+                            gpu_adjacency,
+                            &gpu_priorities,
+                            &gpu_colors,
+                            &mut gpu_can_color,
+                            n_u32,
+                        ),
+                    )
                     .context("Failed to launch find_independent_set kernel")?;
             }
             device.synchronize()?;
@@ -342,7 +398,18 @@ impl GpuChromaticColoring {
             let max_colors_u32 = max_colors as u32;
 
             unsafe {
-                (*color_independent_set).clone().launch(cfg_with_shared, (gpu_adjacency, &gpu_can_color, &mut gpu_colors, n_u32, max_colors_u32))
+                (*color_independent_set)
+                    .clone()
+                    .launch(
+                        cfg_with_shared,
+                        (
+                            gpu_adjacency,
+                            &gpu_can_color,
+                            &mut gpu_colors,
+                            n_u32,
+                            max_colors_u32,
+                        ),
+                    )
                     .context("Failed to launch color_independent_set kernel")?;
             }
             device.synchronize()?;
@@ -352,7 +419,9 @@ impl GpuChromaticColoring {
             device.htod_sync_copy_into(&[zero], &mut gpu_uncolored_count)?;
 
             unsafe {
-                (*count_uncolored).clone().launch(cfg, (&gpu_colors, &mut gpu_uncolored_count, n_u32))
+                (*count_uncolored)
+                    .clone()
+                    .launch(cfg, (&gpu_colors, &mut gpu_uncolored_count, n_u32))
                     .context("Failed to launch count_uncolored kernel")?;
             }
             device.synchronize()?;
@@ -367,11 +436,13 @@ impl GpuChromaticColoring {
 
         // Download coloring from GPU
         let mut gpu_coloring = vec![0u32; n];
-        device.dtoh_sync_copy_into(&gpu_colors, &mut gpu_coloring)
+        device
+            .dtoh_sync_copy_into(&gpu_colors, &mut gpu_coloring)
             .context("Failed to download coloring from GPU")?;
 
         // Convert to usize and validate
-        let coloring: Vec<usize> = gpu_coloring.iter()
+        let coloring: Vec<usize> = gpu_coloring
+            .iter()
             .map(|&c| {
                 if c == 0xFFFFFFFF {
                     return Err(anyhow!("Some vertices remain uncolored"));
@@ -457,13 +528,12 @@ impl GpuChromaticColoring {
                 .len();
 
             // Degree: count total neighbors (excluding self)
-            let degree = (0..n)
-                .filter(|&u| u != v && adjacency[[v, u]])
-                .count();
+            let degree = (0..n).filter(|&u| u != v && adjacency[[v, u]]).count();
 
             // DSATUR: Select vertex with highest saturation
             // Break ties by highest degree
-            if saturation > max_saturation || (saturation == max_saturation && degree > max_degree) {
+            if saturation > max_saturation || (saturation == max_saturation && degree > max_degree)
+            {
                 max_saturation = saturation;
                 max_degree = degree;
                 best_vertex = v;
@@ -481,7 +551,9 @@ impl GpuChromaticColoring {
         if n != adjacency.nrows() || n != adjacency.ncols() {
             return Err(anyhow!(
                 "Dimension mismatch: coloring has {} vertices but adjacency is {}x{}",
-                n, adjacency.nrows(), adjacency.ncols()
+                n,
+                adjacency.nrows(),
+                adjacency.ncols()
             ));
         }
 
@@ -495,7 +567,7 @@ impl GpuChromaticColoring {
         // Check for conflicts (adjacent vertices with same color)
         let mut conflicts = Vec::new();
         for i in 0..n {
-            for j in (i+1)..n {
+            for j in (i + 1)..n {
                 if adjacency[[i, j]] && coloring[i] == coloring[j] {
                     conflicts.push((i, j, coloring[i]));
                 }
@@ -503,8 +575,9 @@ impl GpuChromaticColoring {
         }
 
         if !conflicts.is_empty() {
-            let conflict_list: Vec<String> = conflicts.iter()
-                .take(5)  // Show first 5 conflicts
+            let conflict_list: Vec<String> = conflicts
+                .iter()
+                .take(5) // Show first 5 conflicts
                 .map(|(i, j, c)| format!("({}-{}: color {})", i, j, c))
                 .collect();
 
@@ -518,11 +591,12 @@ impl GpuChromaticColoring {
 
         // Verify adjacency matrix is symmetric (for undirected graphs)
         for i in 0..n {
-            for j in (i+1)..n {
+            for j in (i + 1)..n {
                 if adjacency[[i, j]] != adjacency[[j, i]] {
                     return Err(anyhow!(
                         "Adjacency matrix is not symmetric at ({}, {})",
-                        i, j
+                        i,
+                        j
                     ));
                 }
             }
@@ -545,7 +619,8 @@ impl GpuChromaticColoring {
         // Upload coloring to GPU
         let coloring_u32: Vec<u32> = self.coloring.iter().map(|&c| c as u32).collect();
         let mut gpu_coloring = self.device.alloc_zeros::<u32>(n)?;
-        self.device.htod_sync_copy_into(&coloring_u32, &mut gpu_coloring)?;
+        self.device
+            .htod_sync_copy_into(&coloring_u32, &mut gpu_coloring)?;
 
         // Allocate output buffer for conflicts
         let mut gpu_conflicts = self.device.alloc_zeros::<u32>(1)?;
@@ -568,24 +643,36 @@ impl GpuChromaticColoring {
         };
 
         let ptx_parsed = Ptx::from_src(&ptx);
-        self.device.load_ptx(ptx_parsed, "graph_coloring_conflicts", &["count_conflicts"])
+        self.device
+            .load_ptx(ptx_parsed, "graph_coloring_conflicts", &["count_conflicts"])
             .context("Failed to load graph_coloring PTX for count_conflicts")?;
 
-        let count_conflicts = self.device.get_func("graph_coloring_conflicts", "count_conflicts")
+        let count_conflicts = self
+            .device
+            .get_func("graph_coloring_conflicts", "count_conflicts")
             .context("Failed to get count_conflicts kernel")?;
 
         let cfg = LaunchConfig::for_num_elems((n * n) as u32);
         let n_u32 = n as u32;
 
         unsafe {
-            count_conflicts.launch(cfg, (&self.gpu_adjacency, &gpu_coloring, &mut gpu_conflicts, n_u32))?;
+            count_conflicts.launch(
+                cfg,
+                (
+                    &self.gpu_adjacency,
+                    &gpu_coloring,
+                    &mut gpu_conflicts,
+                    n_u32,
+                ),
+            )?;
         }
 
         self.device.synchronize()?;
 
         // Download result
         let mut conflicts = vec![0u32; 1];
-        self.device.dtoh_sync_copy_into(&gpu_conflicts, &mut conflicts)?;
+        self.device
+            .dtoh_sync_copy_into(&gpu_conflicts, &mut conflicts)?;
         Ok(conflicts[0] as usize)
     }
 

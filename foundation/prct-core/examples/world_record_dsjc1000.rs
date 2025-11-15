@@ -13,7 +13,6 @@
 ///! Target: 83 colors (world record)
 ///! Current best: 115 colors
 ///! Gap: 32 colors (27.8%)
-
 use anyhow::Result;
 use std::sync::Arc;
 
@@ -54,7 +53,7 @@ fn load_dsjc1000() -> Result<Graph> {
             }
             "e" => {
                 if parts.len() >= 3 {
-                    let u: usize = parts[1].parse::<usize>()? - 1;  // DIMACS is 1-indexed
+                    let u: usize = parts[1].parse::<usize>()? - 1; // DIMACS is 1-indexed
                     let v: usize = parts[2].parse::<usize>()? - 1;
                     edges.push((u, v, 1.0));
                 }
@@ -92,7 +91,8 @@ fn main() -> Result<()> {
     println!("📊 Loading DSJC1000.5...");
     let graph = load_dsjc1000()?;
 
-    let density = (graph.num_edges as f64 * 2.0) / (graph.num_vertices as f64 * (graph.num_vertices as f64 - 1.0));
+    let density = (graph.num_edges as f64 * 2.0)
+        / (graph.num_vertices as f64 * (graph.num_vertices as f64 - 1.0));
 
     println!("✅ Graph loaded:");
     println!("   Vertices: {}", graph.num_vertices);
@@ -132,11 +132,16 @@ fn main() -> Result<()> {
         mean_phase: 0.0,
     };
 
-    println!("✅ Kuramoto initialized with {} oscillators", graph.num_vertices);
+    println!(
+        "✅ Kuramoto initialized with {} oscillators",
+        graph.num_vertices
+    );
     println!();
 
     // Load world record pipeline configuration from file
-    let cfg_path = std::env::args().nth(1).unwrap_or_else(|| "configs/world_record.v1.toml".to_string());
+    let cfg_path = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "configs/world_record.v1.toml".to_string());
     println!("📂 Loading configuration from: {}", cfg_path);
     let config = WorldRecordConfig::from_file(&cfg_path)?;
     println!("✅ Configuration loaded and validated");
@@ -146,13 +151,62 @@ fn main() -> Result<()> {
     println!("   Target: {} colors", config.target_chromatic);
     println!("   Max Runtime: {:.1} hours", config.max_runtime_hours);
     println!("   Workers: {}", config.num_workers);
-    println!("   GPU Reservoir: {}", if config.use_reservoir_prediction { "✅" } else { "❌" });
-    println!("   Active Inference: {}", if config.use_active_inference { "✅" } else { "❌" });
-    println!("   ADP Q-Learning: {}", if config.use_adp_learning { "✅" } else { "❌" });
-    println!("   Thermodynamic: {}", if config.use_thermodynamic_equilibration { "✅" } else { "❌" });
-    println!("   Quantum-Classical: {}", if config.use_quantum_classical_hybrid { "✅" } else { "❌" });
-    println!("   Multi-Scale: {}", if config.use_multiscale_analysis { "✅" } else { "❌" });
-    println!("   Ensemble Consensus: {}", if config.use_ensemble_consensus { "✅" } else { "❌" });
+    println!(
+        "   GPU Reservoir: {}",
+        if config.use_reservoir_prediction {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "   Active Inference: {}",
+        if config.use_active_inference {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "   ADP Q-Learning: {}",
+        if config.use_adp_learning {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "   Thermodynamic: {}",
+        if config.use_thermodynamic_equilibration {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "   Quantum-Classical: {}",
+        if config.use_quantum_classical_hybrid {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "   Multi-Scale: {}",
+        if config.use_multiscale_analysis {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "   Ensemble Consensus: {}",
+        if config.use_ensemble_consensus {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
     println!("   Adaptive Loopback: ✅");
     println!();
 
@@ -180,7 +234,10 @@ fn main() -> Result<()> {
     println!("   Chromatic Number: {} colors", result.chromatic_number);
     println!("   Conflicts: {}", result.conflicts);
     println!("   Quality Score: {:.4}", result.quality_score);
-    println!("   Computation Time: {:.2}s", result.computation_time_ms / 1000.0);
+    println!(
+        "   Computation Time: {:.2}s",
+        result.computation_time_ms / 1000.0
+    );
     println!("   Total Elapsed: {:.2}s", elapsed.as_secs_f64());
     println!();
 
@@ -193,7 +250,11 @@ fn main() -> Result<()> {
         if gap <= 0 {
             println!("   Status: 🏆 WORLD RECORD MATCHED/BEATEN!");
         } else {
-            println!("   Gap: +{} colors ({:.1}%)", gap, (gap as f64 / 83.0) * 100.0);
+            println!(
+                "   Gap: +{} colors ({:.1}%)",
+                gap,
+                (gap as f64 / 83.0) * 100.0
+            );
 
             if result.chromatic_number <= 90 {
                 println!("   Status: ✨ EXCELLENT (within 10% of WR)");
@@ -204,7 +265,10 @@ fn main() -> Result<()> {
             }
         }
     } else {
-        println!("   Status: ⚠️  Invalid coloring ({} conflicts)", result.conflicts);
+        println!(
+            "   Status: ⚠️  Invalid coloring ({} conflicts)",
+            result.conflicts
+        );
     }
 
     println!();
@@ -218,6 +282,8 @@ fn main() -> Result<()> {
 #[cfg(not(feature = "cuda"))]
 fn main() -> Result<()> {
     println!("❌ This benchmark requires CUDA support.");
-    println!("   Rebuild with: cargo run --release --features cuda --example world_record_dsjc1000");
+    println!(
+        "   Rebuild with: cargo run --release --features cuda --example world_record_dsjc1000"
+    );
     Ok(())
 }

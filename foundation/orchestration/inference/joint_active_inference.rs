@@ -6,8 +6,8 @@
 
 use crate::orchestration::OrchestrationError;
 use nalgebra::{DMatrix, DVector};
-use std::collections::{HashMap, VecDeque};
 use ordered_float::OrderedFloat;
+use std::collections::{HashMap, VecDeque};
 
 /// Joint active inference system for multi-agent coordination
 pub struct JointActiveInference {
@@ -455,7 +455,7 @@ impl JointActiveInference {
     pub fn new(n_agents: usize, state_dim: usize) -> Result<Self, OrchestrationError> {
         if n_agents == 0 {
             return Err(OrchestrationError::InvalidConfiguration(
-                "n_agents: 0 - Need at least one agent".to_string()
+                "n_agents: 0 - Need at least one agent".to_string(),
             ));
         }
 
@@ -529,11 +529,16 @@ impl JointActiveInference {
     }
 
     /// Perform joint inference step
-    pub fn joint_inference_step(&mut self, observations: &[DVector<f64>]) -> Result<JointInferenceResult, OrchestrationError> {
+    pub fn joint_inference_step(
+        &mut self,
+        observations: &[DVector<f64>],
+    ) -> Result<JointInferenceResult, OrchestrationError> {
         if observations.len() != self.agents.len() {
-            return Err(OrchestrationError::DimensionMismatch(
-                format!("Expected {}, got {}", self.agents.len(), observations.len())
-            ));
+            return Err(OrchestrationError::DimensionMismatch(format!(
+                "Expected {}, got {}",
+                self.agents.len(),
+                observations.len()
+            )));
         }
 
         // Phase 1: Local inference for each agent
@@ -586,7 +591,7 @@ impl JointActiveInference {
                     to: recipient,
                     msg_type: MessageType::BeliefUpdate,
                     content: MessageContent::Belief(agent.beliefs.mu.clone()),
-                    timestamp: 0.0,  // Would use actual time
+                    timestamp: 0.0, // Would use actual time
                 };
 
                 messages_to_send.push(message);
@@ -602,7 +607,9 @@ impl JointActiveInference {
                 // Add delay
                 let delay = match self.communication.bandwidth.delay_dist {
                     DelayDistribution::Constant(d) => d,
-                    DelayDistribution::Uniform(min, max) => min + rand::random::<f64>() * (max - min),
+                    DelayDistribution::Uniform(min, max) => {
+                        min + rand::random::<f64>() * (max - min)
+                    }
                     DelayDistribution::Exponential(lambda) => -lambda * rand::random::<f64>().ln(),
                 };
 
@@ -630,9 +637,7 @@ impl JointActiveInference {
         let n = self.agents.len();
 
         let recipients = match self.communication.topology {
-            CommunicationTopology::FullyConnected => {
-                (0..n).filter(|&i| i != sender).collect()
-            }
+            CommunicationTopology::FullyConnected => (0..n).filter(|&i| i != sender).collect(),
             CommunicationTopology::Ring => {
                 vec![(sender + 1) % n]
             }
@@ -663,14 +668,15 @@ impl JointActiveInference {
             CommunicationTopology::SmallWorld => {
                 // Regular connections plus random long-range
                 let mut recip = vec![(sender + 1) % n];
-                if rand::random::<f64>() < 0.1 {  // 10% chance of long-range
+                if rand::random::<f64>() < 0.1 {
+                    // 10% chance of long-range
                     recip.push(rand::random::<usize>() % n);
                 }
                 recip
             }
             CommunicationTopology::Dynamic => {
                 // Dynamically determined based on belief similarity
-                self.get_similar_agents(sender, 3)?  // Top 3 most similar
+                self.get_similar_agents(sender, 3)? // Top 3 most similar
             }
         };
 
@@ -678,7 +684,11 @@ impl JointActiveInference {
     }
 
     /// Find agents with similar beliefs
-    fn get_similar_agents(&self, agent_idx: usize, k: usize) -> Result<Vec<usize>, OrchestrationError> {
+    fn get_similar_agents(
+        &self,
+        agent_idx: usize,
+        k: usize,
+    ) -> Result<Vec<usize>, OrchestrationError> {
         let agent_belief = &self.agents[agent_idx].beliefs.mu;
         let mut similarities = Vec::new();
 
@@ -737,8 +747,9 @@ impl JointActiveInference {
 
         // Update each agent towards average
         for agent in &mut self.agents {
-            let consensus_rate = 0.1;  // How fast to converge
-            agent.beliefs.mu = &agent.beliefs.mu * (1.0 - consensus_rate) + &avg_belief * consensus_rate;
+            let consensus_rate = 0.1; // How fast to converge
+            agent.beliefs.mu =
+                &agent.beliefs.mu * (1.0 - consensus_rate) + &avg_belief * consensus_rate;
         }
 
         Ok(())
@@ -753,12 +764,12 @@ impl JointActiveInference {
         let f = (n - 1) / 3;
 
         // Phase 1: Each agent broadcasts its value
-        let mut proposals: Vec<DVector<f64>> = self.agents.iter()
-            .map(|a| a.beliefs.mu.clone())
-            .collect();
+        let mut proposals: Vec<DVector<f64>> =
+            self.agents.iter().map(|a| a.beliefs.mu.clone()).collect();
 
         // Phase 2: Each agent collects proposals and takes median
-        for _ in 0..f + 1 {  // f+1 rounds
+        for _ in 0..f + 1 {
+            // f+1 rounds
             let mut new_proposals = Vec::new();
 
             for i in 0..n {
@@ -805,7 +816,8 @@ impl JointActiveInference {
             }
 
             // Find majority vote
-            let majority = votes.into_iter()
+            let majority = votes
+                .into_iter()
                 .max_by_key(|(_, count)| *count)
                 .map(|(value, _)| value)
                 .unwrap_or(0);
@@ -843,7 +855,7 @@ impl JointActiveInference {
 
         let n = self.agents.len();
         let f = (n - 1) / 3;
-        let primary = 0;  // Fixed primary for simplicity
+        let primary = 0; // Fixed primary for simplicity
 
         // Pre-prepare: primary broadcasts proposal
         let proposal = self.agents[primary].beliefs.mu.clone();
@@ -890,15 +902,17 @@ impl JointActiveInference {
         self.collective_belief.consensus = 1.0 / (1.0 + self.collective_belief.divergence);
 
         // Compute collective free energy
-        self.collective_belief.collective_F = self.agents.iter()
-            .map(|a| a.beliefs.F)
-            .sum::<f64>() / n as f64;
+        self.collective_belief.collective_F =
+            self.agents.iter().map(|a| a.beliefs.F).sum::<f64>() / n as f64;
 
         // Update shared attention
         for i in 0..dim {
-            let variance = self.agents.iter()
+            let variance = self
+                .agents
+                .iter()
                 .map(|a| (a.beliefs.mu[i] - self.collective_belief.aggregate[i]).powi(2))
-                .sum::<f64>() / n as f64;
+                .sum::<f64>()
+                / n as f64;
 
             self.collective_belief.shared_attention[i] = 1.0 / (1.0 + variance);
         }
@@ -924,9 +938,9 @@ impl JointActiveInference {
             }
         }
 
-        best_policy.ok_or_else(|| OrchestrationError::NoSolution(
-            "No viable joint policy found".to_string()
-        ))
+        best_policy.ok_or_else(|| {
+            OrchestrationError::NoSolution("No viable joint policy found".to_string())
+        })
     }
 
     /// Generate candidate joint policies
@@ -954,12 +968,16 @@ impl JointActiveInference {
     }
 
     /// Generate policy for individual agent
-    fn generate_agent_policy(&self, agent: &ActiveInferenceAgent) -> Result<AgentPolicy, OrchestrationError> {
-        let action_dim = 5;  // Simplified
+    fn generate_agent_policy(
+        &self,
+        agent: &ActiveInferenceAgent,
+    ) -> Result<AgentPolicy, OrchestrationError> {
+        let action_dim = 5; // Simplified
 
         // Sample action from agent's preferences
         let mut actions = Vec::new();
-        for _ in 0..3 {  // 3 time steps
+        for _ in 0..3 {
+            // 3 time steps
             let mut action = DVector::zeros(action_dim);
             for i in 0..action_dim {
                 action[i] = rand::random::<f64>() * agent.preferences[i % agent.preferences.len()];
@@ -1026,13 +1044,20 @@ impl JointActiveInference {
     }
 
     /// Check coordination constraint
-    fn check_constraint(&self, constraint: &CoordinationConstraint, policies: &[AgentPolicy]) -> bool {
+    fn check_constraint(
+        &self,
+        constraint: &CoordinationConstraint,
+        policies: &[AgentPolicy],
+    ) -> bool {
         // Simplified constraint checking
-        true  // Would implement actual constraint function
+        true // Would implement actual constraint function
     }
 
     /// Coordinate actions
-    fn coordinate_actions(&mut self, policy: &JointPolicy) -> Result<Vec<DVector<f64>>, OrchestrationError> {
+    fn coordinate_actions(
+        &mut self,
+        policy: &JointPolicy,
+    ) -> Result<Vec<DVector<f64>>, OrchestrationError> {
         match self.coordination.conflict_resolution {
             ConflictResolution::Priority => self.priority_coordination(policy),
             ConflictResolution::Negotiation => self.negotiation_coordination(policy),
@@ -1042,9 +1067,14 @@ impl JointActiveInference {
     }
 
     /// Priority-based coordination
-    fn priority_coordination(&self, policy: &JointPolicy) -> Result<Vec<DVector<f64>>, OrchestrationError> {
+    fn priority_coordination(
+        &self,
+        policy: &JointPolicy,
+    ) -> Result<Vec<DVector<f64>>, OrchestrationError> {
         // Assign priorities based on confidence
-        let mut priorities: Vec<(usize, f64)> = self.agents.iter()
+        let mut priorities: Vec<(usize, f64)> = self
+            .agents
+            .iter()
             .enumerate()
             .map(|(i, a)| (i, a.beliefs.confidence))
             .collect();
@@ -1064,13 +1094,25 @@ impl JointActiveInference {
     }
 
     /// Negotiation-based coordination
-    fn negotiation_coordination(&mut self, policy: &JointPolicy) -> Result<Vec<DVector<f64>>, OrchestrationError> {
+    fn negotiation_coordination(
+        &mut self,
+        policy: &JointPolicy,
+    ) -> Result<Vec<DVector<f64>>, OrchestrationError> {
         // Multi-round negotiation
-        let mut proposals = policy.agent_policies.iter()
-            .map(|p| if !p.actions.is_empty() { p.actions[0].clone() } else { DVector::zeros(5) })
+        let mut proposals = policy
+            .agent_policies
+            .iter()
+            .map(|p| {
+                if !p.actions.is_empty() {
+                    p.actions[0].clone()
+                } else {
+                    DVector::zeros(5)
+                }
+            })
             .collect::<Vec<_>>();
 
-        for _ in 0..3 {  // 3 negotiation rounds
+        for _ in 0..3 {
+            // 3 negotiation rounds
             let mut new_proposals = Vec::new();
 
             for i in 0..self.agents.len() {
@@ -1094,9 +1136,14 @@ impl JointActiveInference {
     }
 
     /// Arbitration-based coordination
-    fn arbitration_coordination(&self, policy: &JointPolicy) -> Result<Vec<DVector<f64>>, OrchestrationError> {
+    fn arbitration_coordination(
+        &self,
+        policy: &JointPolicy,
+    ) -> Result<Vec<DVector<f64>>, OrchestrationError> {
         // Select arbitrator (agent with highest confidence)
-        let arbitrator = self.agents.iter()
+        let arbitrator = self
+            .agents
+            .iter()
             .enumerate()
             .max_by_key(|(_, a)| OrderedFloat(a.beliefs.confidence))
             .map(|(i, _)| i)
@@ -1113,8 +1160,13 @@ impl JointActiveInference {
     }
 
     /// Random coordination
-    fn random_coordination(&self, policy: &JointPolicy) -> Result<Vec<DVector<f64>>, OrchestrationError> {
-        policy.agent_policies.iter()
+    fn random_coordination(
+        &self,
+        policy: &JointPolicy,
+    ) -> Result<Vec<DVector<f64>>, OrchestrationError> {
+        policy
+            .agent_policies
+            .iter()
             .map(|p| {
                 if !p.actions.is_empty() {
                     Ok(p.actions[0].clone())
@@ -1133,7 +1185,8 @@ impl JointActiveInference {
         for i in 0..n {
             for j in 0..n {
                 if i != j {
-                    let similarity = 1.0 / (1.0 + (&self.agents[i].beliefs.mu - &self.agents[j].beliefs.mu).norm());
+                    let similarity = 1.0
+                        / (1.0 + (&self.agents[i].beliefs.mu - &self.agents[j].beliefs.mu).norm());
                     self.shared_model.coupling.W[(i, j)] =
                         self.shared_model.coupling.W[(i, j)] * 0.9 + similarity * 0.1;
                 }
@@ -1214,11 +1267,11 @@ impl JointActiveInference {
         let n = self.agents.len();
 
         for agent in &self.agents {
-            let p = 1.0 / n as f64;  // Simplified
+            let p = 1.0 / n as f64; // Simplified
             entropy -= p * p.log2();
         }
 
-        entropy / (n as f64).log2()  // Normalize
+        entropy / (n as f64).log2() // Normalize
     }
 
     /// Compute coherence measure
@@ -1233,7 +1286,7 @@ impl JointActiveInference {
         let mut count = 0;
 
         for i in 0..n {
-            for j in i+1..n {
+            for j in i + 1..n {
                 let corr = self.compute_belief_correlation(&self.agents[i], &self.agents[j]);
                 total_correlation += corr;
                 count += 1;
@@ -1248,7 +1301,11 @@ impl JointActiveInference {
     }
 
     /// Compute correlation between agent beliefs
-    fn compute_belief_correlation(&self, agent1: &ActiveInferenceAgent, agent2: &ActiveInferenceAgent) -> f64 {
+    fn compute_belief_correlation(
+        &self,
+        agent1: &ActiveInferenceAgent,
+        agent2: &ActiveInferenceAgent,
+    ) -> f64 {
         let dot = agent1.beliefs.mu.dot(&agent2.beliefs.mu);
         let norm1 = agent1.beliefs.mu.norm();
         let norm2 = agent2.beliefs.mu.norm();
@@ -1344,7 +1401,10 @@ impl JointActiveInference {
     }
 
     /// Process LLM responses using joint active inference
-    pub fn process_llm_responses(&mut self, responses: &[String]) -> Result<LLMConsensusResult, OrchestrationError> {
+    pub fn process_llm_responses(
+        &mut self,
+        responses: &[String],
+    ) -> Result<LLMConsensusResult, OrchestrationError> {
         // Encode responses as observations
         let observations = self.encode_responses(responses)?;
 
@@ -1363,8 +1423,12 @@ impl JointActiveInference {
     }
 
     /// Encode LLM responses
-    fn encode_responses(&self, responses: &[String]) -> Result<Vec<DVector<f64>>, OrchestrationError> {
-        responses.iter()
+    fn encode_responses(
+        &self,
+        responses: &[String],
+    ) -> Result<Vec<DVector<f64>>, OrchestrationError> {
+        responses
+            .iter()
             .map(|r| {
                 let dim = self.agents[0].beliefs.mu.len();
                 let mut encoding = DVector::zeros(dim);
@@ -1379,7 +1443,10 @@ impl JointActiveInference {
     }
 
     /// Extract consensus from inference result
-    fn extract_consensus(&self, result: &JointInferenceResult) -> Result<String, OrchestrationError> {
+    fn extract_consensus(
+        &self,
+        result: &JointInferenceResult,
+    ) -> Result<String, OrchestrationError> {
         // Decode collective belief to response
         let mut consensus = String::new();
 
@@ -1395,9 +1462,7 @@ impl JointActiveInference {
 
     /// Get individual agent contributions
     fn get_individual_contributions(&self) -> Vec<f64> {
-        self.agents.iter()
-            .map(|a| a.beliefs.confidence)
-            .collect()
+        self.agents.iter().map(|a| a.beliefs.confidence).collect()
     }
 }
 
@@ -1464,7 +1529,7 @@ impl ActiveInferenceAgent {
             match message.content {
                 MessageContent::Belief(other_belief) => {
                     // Integrate other's belief
-                    let weight = 0.1;  // Integration weight
+                    let weight = 0.1; // Integration weight
                     self.beliefs.mu = &self.beliefs.mu * (1.0 - weight) + &other_belief * weight;
                 }
                 _ => {}
@@ -1483,7 +1548,7 @@ impl SharedGenerativeModel {
                 T: DMatrix::identity(state_dim * n_agents, state_dim * n_agents) * 0.9,
                 I: DMatrix::from_element(state_dim * n_agents, state_dim * n_agents, 0.1),
                 nonlinear: NonlinearCoupling {
-                    f: |x, y| x + y * 0.1,  // Simple coupling
+                    f: |x, y| x + y * 0.1, // Simple coupling
                     J: DMatrix::identity(state_dim, state_dim),
                 },
             },

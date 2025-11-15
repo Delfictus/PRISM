@@ -22,18 +22,21 @@ fn test_te_kernel_compiled() {
         }
     }
 
-    let ptx_path = ptx_path.expect("Transfer entropy kernel PTX not found in any expected location");
+    let ptx_path =
+        ptx_path.expect("Transfer entropy kernel PTX not found in any expected location");
 
     // Read PTX and verify our fixed kernel is present
-    let ptx_content = std::fs::read_to_string(ptx_path)
-        .expect("Failed to read PTX file");
+    let ptx_content = std::fs::read_to_string(ptx_path).expect("Failed to read PTX file");
 
     assert!(
         ptx_content.contains("compute_te_matrix_batched_kernel"),
         "Batched TE kernel not found in PTX"
     );
 
-    println!("SUCCESS: Transfer entropy kernel compiled with fixes at {}", ptx_path);
+    println!(
+        "SUCCESS: Transfer entropy kernel compiled with fixes at {}",
+        ptx_path
+    );
 }
 
 #[test]
@@ -50,7 +53,10 @@ fn test_histogram_bins_clamped_to_8() {
     let histogram_bins_requested = 128; // User requests 128 bins
     let n_bins_actual = 8; // FIXED: Must match kernel's shared memory
 
-    assert_eq!(n_bins_actual, 8, "n_bins must be 8 to match kernel shared memory");
+    assert_eq!(
+        n_bins_actual, 8,
+        "n_bins must be 8 to match kernel shared memory"
+    );
 
     // Kernel shared memory sizes (from transfer_entropy.cu:355-360):
     // hist_3d[512]      = 8^3 bins
@@ -69,7 +75,10 @@ fn test_histogram_bins_clamped_to_8() {
     println!("SUCCESS: Histogram bin sizes correctly configured");
     println!("  Requested bins: {}", histogram_bins_requested);
     println!("  Actual bins (fixed): {}", n_bins_actual);
-    println!("  Shared memory: 3D={}, 2D={}, 1D={}", expected_3d_size, expected_2d_size, expected_1d_size);
+    println!(
+        "  Shared memory: 3D={}, 2D={}, 1D={}",
+        expected_3d_size, expected_2d_size, expected_1d_size
+    );
 }
 
 #[test]
@@ -114,5 +123,9 @@ fn test_output_indexing_fix() {
 
     println!("SUCCESS: Output indexing bounds verified");
     println!("  Grid: {}x{} = {} blocks", grid_dim_x, grid_dim_y, n * n);
-    println!("  Max output index: {} (buffer size: {})", max_output_idx, n * n);
+    println!(
+        "  Max output index: {} (buffer size: {})",
+        max_output_idx,
+        n * n
+    );
 }

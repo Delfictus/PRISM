@@ -10,8 +10,8 @@
 //! - Bayesian belief updating with generative model
 //! - Finite free energy guaranteed
 
+use anyhow::{Context, Result};
 use ndarray::{Array1, Array2};
-use anyhow::{Result, Context};
 use std::collections::VecDeque;
 use std::sync::Arc;
 
@@ -287,8 +287,7 @@ pub struct ActiveInferenceClassifier {
 impl ActiveInferenceClassifier {
     /// Create new classifier with pre-trained model
     pub fn new(model_path: &str) -> Result<Self> {
-        let device = Device::cuda_if_available(0)
-            .context("Failed to initialize device")?;
+        let device = Device::cuda_if_available(0).context("Failed to initialize device")?;
 
         let recognition_network = RecognitionNetwork::load(model_path, &device)?;
 
@@ -325,9 +324,7 @@ impl ActiveInferenceClassifier {
 
         // Convert back to ndarray
         let posterior_vec = posterior_probs.to_vec2()?;
-        let posterior = Array1::from_vec(
-            posterior_vec[0].iter().map(|&x| x as f64).collect()
-        );
+        let posterior = Array1::from_vec(posterior_vec[0].iter().map(|&x| x as f64).collect());
 
         // Compute free energy
         let free_energy = self.compute_free_energy(&posterior, features)?;
@@ -347,7 +344,8 @@ impl ActiveInferenceClassifier {
         }
 
         // Determine expected class
-        let expected_idx = beliefs.iter()
+        let expected_idx = beliefs
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(i, _)| i)
@@ -383,7 +381,7 @@ impl ActiveInferenceClassifier {
         }
 
         // For now, assume uniform log-likelihood (can be enhanced with generative model)
-        let log_likelihood = 0.0;  // Neutral assumption
+        let log_likelihood = 0.0; // Neutral assumption
 
         let free_energy = kl_divergence - log_likelihood;
 
@@ -412,11 +410,11 @@ impl ActiveInferenceClassifier {
     pub fn update_prior(&mut self, historical_distribution: Array1<f64>) {
         // Adapt prior based on observed threat distribution
         // Uses exponential moving average
-        let alpha = 0.1;  // Learning rate
+        let alpha = 0.1; // Learning rate
 
         for i in 0..self.prior_beliefs.len() {
-            self.prior_beliefs[i] = (1.0 - alpha) * self.prior_beliefs[i]
-                                   + alpha * historical_distribution[i];
+            self.prior_beliefs[i] =
+                (1.0 - alpha) * self.prior_beliefs[i] + alpha * historical_distribution[i];
         }
 
         // Renormalize
@@ -429,10 +427,10 @@ impl ActiveInferenceClassifier {
 
 /// Recognition network (neural network for Q(class|observations))
 pub struct RecognitionNetwork {
-    fc1: Linear,  // 100 → 64
-    fc2: Linear,  // 64 → 32
-    fc3: Linear,  // 32 → 16
-    fc4: Linear,  // 16 → 5 (5 threat classes)
+    fc1: Linear, // 100 → 64
+    fc2: Linear, // 64 → 32
+    fc3: Linear, // 32 → 16
+    fc4: Linear, // 16 → 5 (5 threat classes)
     dropout: f64,
     device: Device,
 }
@@ -497,30 +495,30 @@ impl ThreatTrainingExample {
         // Generate features based on class characteristics
         match class {
             ThreatClass::NoThreat => {
-                features[6] = rng.gen_range(0.0..0.2);   // Low velocity
-                features[7] = rng.gen_range(0.0..0.2);   // Low acceleration
-                features[11] = rng.gen_range(0.0..0.3);  // Low thermal
-            },
+                features[6] = rng.gen_range(0.0..0.2); // Low velocity
+                features[7] = rng.gen_range(0.0..0.2); // Low acceleration
+                features[11] = rng.gen_range(0.0..0.3); // Low thermal
+            }
             ThreatClass::Aircraft => {
-                features[6] = rng.gen_range(0.2..0.35);  // Moderate velocity
-                features[7] = rng.gen_range(0.1..0.3);   // Moderate accel
-                features[11] = rng.gen_range(0.2..0.5);  // Moderate thermal
-            },
+                features[6] = rng.gen_range(0.2..0.35); // Moderate velocity
+                features[7] = rng.gen_range(0.1..0.3); // Moderate accel
+                features[11] = rng.gen_range(0.2..0.5); // Moderate thermal
+            }
             ThreatClass::CruiseMissile => {
-                features[6] = rng.gen_range(0.3..0.55);  // High velocity
-                features[7] = rng.gen_range(0.2..0.5);   // Variable accel
-                features[11] = rng.gen_range(0.4..0.7);  // High thermal
-            },
+                features[6] = rng.gen_range(0.3..0.55); // High velocity
+                features[7] = rng.gen_range(0.2..0.5); // Variable accel
+                features[11] = rng.gen_range(0.4..0.7); // High thermal
+            }
             ThreatClass::BallisticMissile => {
-                features[6] = rng.gen_range(0.6..0.85);  // Very high velocity
+                features[6] = rng.gen_range(0.6..0.85); // Very high velocity
                 features[7] = rng.gen_range(0.05..0.25); // Low accel (ballistic)
                 features[11] = rng.gen_range(0.7..0.95); // Very high thermal
-            },
+            }
             ThreatClass::Hypersonic => {
-                features[6] = rng.gen_range(0.55..0.9);  // Very high velocity
+                features[6] = rng.gen_range(0.55..0.9); // Very high velocity
                 features[7] = rng.gen_range(0.45..0.85); // High accel (maneuvering)
-                features[11] = rng.gen_range(0.8..1.0);  // Maximum thermal
-            },
+                features[11] = rng.gen_range(0.8..1.0); // Maximum thermal
+            }
         }
 
         // Add noise to other features
@@ -533,7 +531,7 @@ impl ThreatTrainingExample {
         Self {
             features,
             label: class,
-            confidence: 1.0,  // Synthetic data has full confidence
+            confidence: 1.0, // Synthetic data has full confidence
         }
     }
 
@@ -598,22 +596,32 @@ impl ClassifierTrainer {
     /// Train the recognition network
     pub fn train(&mut self, training_data: &[ThreatTrainingExample]) -> Result<TrainingStats> {
         // Split into train/validation
-        let split_idx = (training_data.len() as f64 * (1.0 - self.config.validation_split)) as usize;
+        let split_idx =
+            (training_data.len() as f64 * (1.0 - self.config.validation_split)) as usize;
         let train_set = &training_data[..split_idx];
         let val_set = &training_data[split_idx..];
 
         let mut best_val_loss = f32::INFINITY;
         let mut patience_counter = 0;
 
-        println!("Training with {} samples ({} train, {} val)",
-            training_data.len(), train_set.len(), val_set.len());
+        println!(
+            "Training with {} samples ({} train, {} val)",
+            training_data.len(),
+            train_set.len(),
+            val_set.len()
+        );
 
         for epoch in 0..self.config.epochs {
             let epoch_loss = self.train_epoch(train_set)?;
             let val_loss = self.validate_epoch(val_set)?;
 
-            println!("Epoch {}/{}: train_loss={:.4}, val_loss={:.4}",
-                epoch + 1, self.config.epochs, epoch_loss, val_loss);
+            println!(
+                "Epoch {}/{}: train_loss={:.4}, val_loss={:.4}",
+                epoch + 1,
+                self.config.epochs,
+                epoch_loss,
+                val_loss
+            );
 
             // Early stopping
             if val_loss < best_val_loss {
@@ -630,7 +638,7 @@ impl ClassifierTrainer {
         }
 
         Ok(TrainingStats {
-            final_train_loss: 0.0,  // Would track properly
+            final_train_loss: 0.0, // Would track properly
             final_val_loss: best_val_loss,
             epochs_trained: self.config.epochs,
         })
@@ -684,25 +692,17 @@ impl ClassifierTrainer {
 
     fn prepare_batch(&self, batch: &[ThreatTrainingExample]) -> Result<(Tensor, Tensor)> {
         // Collect features and labels
-        let features_vec: Vec<f32> = batch.iter()
+        let features_vec: Vec<f32> = batch
+            .iter()
             .flat_map(|ex| ex.features.iter().map(|&x| x as f32))
             .collect();
 
-        let labels_vec: Vec<u32> = batch.iter()
-            .map(|ex| ex.label as u32)
-            .collect();
+        let labels_vec: Vec<u32> = batch.iter().map(|ex| ex.label as u32).collect();
 
-        let features_tensor = Tensor::from_vec(
-            features_vec,
-            (batch.len(), 100),
-            &self.model.device,
-        )?;
+        let features_tensor =
+            Tensor::from_vec(features_vec, (batch.len(), 100), &self.model.device)?;
 
-        let labels_tensor = Tensor::from_vec_1d(
-            labels_vec,
-            (batch.len(),),
-            &self.model.device,
-        )?;
+        let labels_tensor = Tensor::from_vec_1d(labels_vec, (batch.len(),), &self.model.device)?;
 
         Ok((features_tensor, labels_tensor))
     }
@@ -745,7 +745,7 @@ mod tests {
     fn test_synthetic_data_generation() {
         let dataset = ThreatTrainingExample::generate_dataset(100);
 
-        assert_eq!(dataset.len(), 500);  // 100 per class × 5 classes
+        assert_eq!(dataset.len(), 500); // 100 per class × 5 classes
 
         // Verify all classes represented
         let mut class_counts = vec![0; 5];

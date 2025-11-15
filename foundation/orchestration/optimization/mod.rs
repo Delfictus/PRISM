@@ -6,9 +6,9 @@
 //! - Quantum prompt search
 //! - Geometric manifold optimization
 
+pub mod geometric_manifold;
 pub mod mdl_prompt_optimizer;
 pub mod quantum_prompt_search;
-pub mod geometric_manifold;
 
 pub use mdl_prompt_optimizer::{MDLPromptOptimizer, OptimizedPrompt, QueryType};
-pub use quantum_prompt_search::{QuantumPromptSearch, InformationBottleneckCompressor};
+pub use quantum_prompt_search::{InformationBottleneckCompressor, QuantumPromptSearch};

@@ -12,12 +12,12 @@
 //! - Article IV: Active inference for threat classification
 //! - Article V: Shared GPU context
 
-use crate::foundation::integration::unified_platform::UnifiedPlatform;
 use crate::foundation::information_theory::transfer_entropy::TransferEntropy;
+use crate::foundation::integration::unified_platform::UnifiedPlatform;
+use anyhow::{bail, Context, Result};
 use ndarray::{Array1, Array2};
-use anyhow::{Result, Context, bail};
-use std::time::{SystemTime, Instant};
 use std::collections::VecDeque;
+use std::time::{Instant, SystemTime};
 
 //=============================================================================
 // TRANSPORT LAYER ADAPTER
@@ -42,12 +42,12 @@ impl TransportLayerAdapter {
     /// # Arguments
     /// * `n_dimensions` - Feature vector dimensionality (recommended: 900 for GPU efficiency)
     pub fn new_tranche1(n_dimensions: usize) -> Result<Self> {
-        let platform = UnifiedPlatform::new(n_dimensions)
-            .context("Failed to initialize UnifiedPlatform")?;
+        let platform =
+            UnifiedPlatform::new(n_dimensions).context("Failed to initialize UnifiedPlatform")?;
 
         Ok(Self {
             platform,
-            oct_data_rate_gbps: 10.0,  // OCT Standard target
+            oct_data_rate_gbps: 10.0, // OCT Standard target
             mesh_topology: MeshTopology::tranche1_config(),
             n_dimensions,
         })
@@ -90,7 +90,9 @@ impl TransportLayerAdapter {
             0.01,
         );
 
-        let output = self.platform.process(input)
+        let output = self
+            .platform
+            .process(input)
             .context("Neuromorphic encoding failed")?;
 
         // Return the processed features
@@ -105,11 +107,11 @@ impl TransportLayerAdapter {
         let mut features = Array1::zeros(100);
 
         // Primary telemetry channels (5 core parameters)
-        features[0] = telem.optical_power_dbm / 30.0;           // Range: [-30, 30] dBm
-        features[1] = telem.bit_error_rate.log10() / -10.0;     // Range: [1e-12, 1e-2]
-        features[2] = telem.pointing_error_urad / 100.0;        // Range: [0, 100] microrad
-        features[3] = telem.data_rate_gbps / 10.0;              // Range: [0, 10] Gbps
-        features[4] = telem.temperature_c / 100.0;              // Range: [-50, 150]  degC
+        features[0] = telem.optical_power_dbm / 30.0; // Range: [-30, 30] dBm
+        features[1] = telem.bit_error_rate.log10() / -10.0; // Range: [1e-12, 1e-2]
+        features[2] = telem.pointing_error_urad / 100.0; // Range: [0, 100] microrad
+        features[3] = telem.data_rate_gbps / 10.0; // Range: [0, 10] Gbps
+        features[4] = telem.temperature_c / 100.0; // Range: [-50, 150]  degC
 
         // Derived features (health indicators)
         features[5] = self.compute_link_quality(telem);
@@ -117,8 +119,8 @@ impl TransportLayerAdapter {
         features[7] = self.compute_thermal_status(telem);
 
         // Temporal features (rate of change)
-        features[8] = 0.0;  // dPower/dt (requires history buffer)
-        features[9] = 0.0;  // dBER/dt
+        features[8] = 0.0; // dPower/dt (requires history buffer)
+        features[9] = 0.0; // dBER/dt
         features[10] = 0.0; // dPointing/dt
 
         // Mesh topology features (network health)
@@ -133,8 +135,8 @@ impl TransportLayerAdapter {
 
     fn compute_link_quality(&self, telem: &OctTelemetry) -> f64 {
         // Heuristic: good power + low BER + low pointing error = high quality
-        let power_score = (telem.optical_power_dbm + 30.0) / 60.0;  // Normalize [-30,30]   [0,1]
-        let ber_score = (-telem.bit_error_rate.log10()) / 10.0;     // Lower is better
+        let power_score = (telem.optical_power_dbm + 30.0) / 60.0; // Normalize [-30,30]   [0,1]
+        let ber_score = (-telem.bit_error_rate.log10()) / 10.0; // Lower is better
         let pointing_score = 1.0 - (telem.pointing_error_urad / 100.0);
 
         (power_score + ber_score + pointing_score) / 3.0
@@ -142,7 +144,7 @@ impl TransportLayerAdapter {
 
     fn compute_signal_margin(&self, telem: &OctTelemetry) -> f64 {
         // How much headroom before link fails?
-        let power_margin = (telem.optical_power_dbm + 20.0) / 10.0;  // -20 dBm threshold
+        let power_margin = (telem.optical_power_dbm + 20.0) / 10.0; // -20 dBm threshold
         let ber_margin = (-telem.bit_error_rate.log10() - 6.0) / 4.0; // 1e-6 threshold
 
         power_margin.min(ber_margin).max(0.0).min(1.0)
@@ -151,7 +153,7 @@ impl TransportLayerAdapter {
     fn compute_thermal_status(&self, telem: &OctTelemetry) -> f64 {
         // Thermal health: optimal at 20 degC, degraded outside [-20, 60] degC
         let temp_deviation = (telem.temperature_c - 20.0).abs();
-        let health = 1.0 - (temp_deviation / 80.0);  // Full degradation at  80 degC
+        let health = 1.0 - (temp_deviation / 80.0); // Full degradation at  80 degC
         health.max(0.0).min(1.0)
     }
 }
@@ -187,10 +189,10 @@ impl TrackingLayerAdapter {
 
         Ok(Self {
             platform,
-            sensor_fov_deg: 120.0,   // Full Earth disk from LEO
-            frame_rate_hz: 10.0,     // 10 Hz target
+            sensor_fov_deg: 120.0, // Full Earth disk from LEO
+            frame_rate_hz: 10.0,   // 10 Hz target
             n_dimensions,
-            ml_classifier: None,  // v1.0: Use heuristic
+            ml_classifier: None, // v1.0: Use heuristic
         })
     }
 
@@ -204,8 +206,9 @@ impl TrackingLayerAdapter {
     pub fn new_tranche1_ml(n_dimensions: usize, model_path: &str) -> Result<Self> {
         let platform = UnifiedPlatform::new(n_dimensions)?;
 
-        let ml_classifier = crate::pwsa::active_inference_classifier::ActiveInferenceClassifier::new(model_path)
-            .ok();  // Graceful fallback if model not available
+        let ml_classifier =
+            crate::pwsa::active_inference_classifier::ActiveInferenceClassifier::new(model_path)
+                .ok(); // Graceful fallback if model not available
 
         Ok(Self {
             platform,
@@ -271,26 +274,26 @@ impl TrackingLayerAdapter {
         let mut features = Array1::zeros(100);
 
         // === SPATIAL FEATURES (hotspot detection) ===
-        features[0] = frame.max_intensity / frame.background_level;  // Contrast ratio
-        features[1] = frame.hotspot_count as f64 / 100.0;           // Normalized count
-        features[2] = frame.centroid_x / frame.width as f64;        // X position [0,1]
-        features[3] = frame.centroid_y / frame.height as f64;       // Y position [0,1]
+        features[0] = frame.max_intensity / frame.background_level; // Contrast ratio
+        features[1] = frame.hotspot_count as f64 / 100.0; // Normalized count
+        features[2] = frame.centroid_x / frame.width as f64; // X position [0,1]
+        features[3] = frame.centroid_y / frame.height as f64; // Y position [0,1]
 
         // Hotspot distribution (clustered vs. dispersed)
         features[4] = self.compute_hotspot_clustering(frame);
         features[5] = self.compute_spatial_entropy(frame);
 
         // === TEMPORAL FEATURES (motion analysis) ===
-        features[6] = frame.velocity_estimate_mps / 3000.0;    // Hypersonic: up to Mach 8+
-        features[7] = frame.acceleration_estimate / 100.0;      // High-G maneuvers
+        features[6] = frame.velocity_estimate_mps / 3000.0; // Hypersonic: up to Mach 8+
+        features[7] = frame.acceleration_estimate / 100.0; // High-G maneuvers
 
         // Trajectory classification
         features[8] = self.classify_trajectory_type(frame);
         features[9] = self.compute_motion_consistency(frame);
 
         // === SPECTRAL FEATURES (target discrimination) ===
-        features[10] = frame.swir_band_ratio;                  // SWIR/MWIR ratio
-        features[11] = frame.thermal_signature;                // Plume signature
+        features[10] = frame.swir_band_ratio; // SWIR/MWIR ratio
+        features[11] = frame.thermal_signature; // Plume signature
 
         // Spectral matching (known threat signatures)
         features[12] = self.match_icbm_signature(frame);
@@ -351,16 +354,16 @@ impl TrackingLayerAdapter {
     /// Uses hotspot count as proxy for spatial distribution
     fn approximate_entropy_from_metadata(&self, frame: &IrSensorFrame) -> f64 {
         if frame.hotspot_count == 0 {
-            return 0.5;  // Neutral (no clear signal)
+            return 0.5; // Neutral (no clear signal)
         }
 
         if frame.hotspot_count == 1 {
-            return 0.2;  // Low entropy (concentrated threat)
+            return 0.2; // Low entropy (concentrated threat)
         }
 
         // Multiple hotspots: Higher entropy (more dispersed)
         let normalized_count = (frame.hotspot_count as f64 / 10.0).min(1.0);
-        0.2 + normalized_count * 0.6  // Range: 0.2-0.8
+        0.2 + normalized_count * 0.6 // Range: 0.2-0.8
     }
 
     //=========================================================================
@@ -450,8 +453,10 @@ impl TrackingLayerAdapter {
             }
 
             // Compute cluster centroid
-            let centroid_x = cluster_pixels.iter().map(|(x, _)| x).sum::<f64>() / cluster_pixels.len() as f64;
-            let centroid_y = cluster_pixels.iter().map(|(_, y)| y).sum::<f64>() / cluster_pixels.len() as f64;
+            let centroid_x =
+                cluster_pixels.iter().map(|(x, _)| x).sum::<f64>() / cluster_pixels.len() as f64;
+            let centroid_y =
+                cluster_pixels.iter().map(|(_, y)| y).sum::<f64>() / cluster_pixels.len() as f64;
 
             clusters.push((centroid_x, centroid_y));
         }
@@ -524,7 +529,7 @@ impl TrackingLayerAdapter {
         let max_entropy = (histogram.len() as f64).log2();
 
         if max_entropy > 0.0 {
-            entropy / max_entropy  // Returns [0, 1]
+            entropy / max_entropy // Returns [0, 1]
         } else {
             0.0
         }
@@ -600,7 +605,8 @@ impl IrSensorFrame {
         let (centroid_x, centroid_y) = TrackingLayerAdapter::compute_weighted_centroid(&pixels);
         let intensity_histogram = TrackingLayerAdapter::compute_intensity_histogram(&pixels, 16);
         let spatial_entropy = TrackingLayerAdapter::compute_shannon_entropy(&intensity_histogram);
-        let thermal_signature = TrackingLayerAdapter::estimate_thermal_signature(&pixels, background_level);
+        let thermal_signature =
+            TrackingLayerAdapter::estimate_thermal_signature(&pixels, background_level);
 
         Ok(Self {
             sv_id,
@@ -618,7 +624,7 @@ impl IrSensorFrame {
             centroid_y,
             velocity_estimate_mps,
             acceleration_estimate,
-            swir_band_ratio: 1.0,  // Default (would need multi-band data)
+            swir_band_ratio: 1.0, // Default (would need multi-band data)
             thermal_signature,
             geolocation,
         })
@@ -632,11 +638,11 @@ impl TrackingLayerAdapter {
         // - Cruise: low acceleration (0.5)
         // - Maneuvering: high acceleration (1.0)
         if frame.acceleration_estimate > 50.0 {
-            1.0  // Highly maneuverable (hypersonic glide vehicle)
+            1.0 // Highly maneuverable (hypersonic glide vehicle)
         } else if frame.acceleration_estimate > 10.0 {
-            0.5  // Cruise missile
+            0.5 // Cruise missile
         } else {
-            0.0  // Ballistic
+            0.0 // Ballistic
         }
     }
 
@@ -647,25 +653,53 @@ impl TrackingLayerAdapter {
 
     fn match_icbm_signature(&self, frame: &IrSensorFrame) -> f64 {
         // ICBM signature: high thermal, high velocity, ballistic trajectory
-        let thermal_match = if frame.thermal_signature > 0.8 { 1.0 } else { 0.0 };
-        let velocity_match = if frame.velocity_estimate_mps > 2000.0 { 1.0 } else { 0.0 };
-        let trajectory_match = if frame.acceleration_estimate < 20.0 { 1.0 } else { 0.0 };
+        let thermal_match = if frame.thermal_signature > 0.8 {
+            1.0
+        } else {
+            0.0
+        };
+        let velocity_match = if frame.velocity_estimate_mps > 2000.0 {
+            1.0
+        } else {
+            0.0
+        };
+        let trajectory_match = if frame.acceleration_estimate < 20.0 {
+            1.0
+        } else {
+            0.0
+        };
 
         (thermal_match + velocity_match + trajectory_match) / 3.0
     }
 
     fn match_hypersonic_signature(&self, frame: &IrSensorFrame) -> f64 {
         // Hypersonic glide vehicle: very high velocity, high maneuverability
-        let velocity_match = if frame.velocity_estimate_mps > 1700.0 { 1.0 } else { 0.0 };  // Mach 5+
-        let maneuver_match = if frame.acceleration_estimate > 40.0 { 1.0 } else { 0.0 };
+        let velocity_match = if frame.velocity_estimate_mps > 1700.0 {
+            1.0
+        } else {
+            0.0
+        }; // Mach 5+
+        let maneuver_match = if frame.acceleration_estimate > 40.0 {
+            1.0
+        } else {
+            0.0
+        };
 
         (velocity_match + maneuver_match) / 2.0
     }
 
     fn match_aircraft_signature(&self, frame: &IrSensorFrame) -> f64 {
         // Aircraft: moderate thermal, subsonic/supersonic, sustained flight
-        let velocity_match = if frame.velocity_estimate_mps < 700.0 { 1.0 } else { 0.0 };  // < Mach 2
-        let thermal_match = if frame.thermal_signature < 0.5 { 1.0 } else { 0.0 };
+        let velocity_match = if frame.velocity_estimate_mps < 700.0 {
+            1.0
+        } else {
+            0.0
+        }; // < Mach 2
+        let thermal_match = if frame.thermal_signature < 0.5 {
+            1.0
+        } else {
+            0.0
+        };
 
         (velocity_match + thermal_match) / 2.0
     }
@@ -679,13 +713,13 @@ impl TrackingLayerAdapter {
         // Russia/China border: (40-50 degN, 115-135 degE)
 
         if (33.0..=43.0).contains(&lat) && (124.0..=132.0).contains(&lon) {
-            1.0  // Korean peninsula
+            1.0 // Korean peninsula
         } else if (22.0..=26.0).contains(&lat) && (118.0..=122.0).contains(&lon) {
-            1.0  // Taiwan Strait
+            1.0 // Taiwan Strait
         } else if (40.0..=50.0).contains(&lat) && (115.0..=135.0).contains(&lon) {
-            0.8  // Russia/China border
+            0.8 // Russia/China border
         } else {
-            0.3  // Baseline threat
+            0.3 // Baseline threat
         }
     }
 
@@ -705,22 +739,22 @@ impl TrackingLayerAdapter {
         let mut probs = Array1::zeros(5);
 
         // Check key threat indicators
-        let velocity_indicator = features[6];  // Normalized velocity
-        let thermal_indicator = features[11];   // Thermal signature
-        let maneuver_indicator = features[7];   // Acceleration
+        let velocity_indicator = features[6]; // Normalized velocity
+        let thermal_indicator = features[11]; // Thermal signature
+        let maneuver_indicator = features[7]; // Acceleration
 
         if velocity_indicator < 0.2 && thermal_indicator < 0.3 {
-            probs[0] = 0.9;  // No threat
+            probs[0] = 0.9; // No threat
         } else if velocity_indicator < 0.3 && thermal_indicator < 0.5 {
-            probs[1] = 0.7;  // Aircraft
+            probs[1] = 0.7; // Aircraft
         } else if velocity_indicator < 0.5 && maneuver_indicator < 0.5 {
-            probs[2] = 0.6;  // Cruise missile
+            probs[2] = 0.6; // Cruise missile
         } else if velocity_indicator > 0.6 && maneuver_indicator < 0.3 {
-            probs[3] = 0.8;  // Ballistic missile
+            probs[3] = 0.8; // Ballistic missile
         } else if velocity_indicator > 0.5 && maneuver_indicator > 0.4 {
-            probs[4] = 0.9;  // Hypersonic threat
+            probs[4] = 0.9; // Hypersonic threat
         } else {
-            probs[0] = 0.5;  // Uncertain
+            probs[0] = 0.5; // Uncertain
         }
 
         // Normalize to sum to 1.0
@@ -776,9 +810,9 @@ impl GroundLayerAdapter {
     fn normalize_ground_data(&self, data: &GroundStationData) -> Result<Array1<f64>> {
         let mut features = Array1::zeros(100);
 
-        features[0] = data.uplink_power_dbm / 60.0;        // Range: [30, 60] dBm
-        features[1] = data.downlink_snr_db / 30.0;         // Range: [0, 30] dB
-        features[2] = data.command_queue_depth as f64 / 100.0;  // Normalized queue
+        features[0] = data.uplink_power_dbm / 60.0; // Range: [30, 60] dBm
+        features[1] = data.downlink_snr_db / 30.0; // Range: [0, 30] dB
+        features[2] = data.command_queue_depth as f64 / 100.0; // Normalized queue
 
         Ok(features)
     }
@@ -815,12 +849,7 @@ impl TimeSeriesBuffer {
     }
 
     /// Add new sample to all three histories
-    fn add_sample(
-        &mut self,
-        transport: Array1<f64>,
-        tracking: Array1<f64>,
-        ground: Array1<f64>,
-    ) {
+    fn add_sample(&mut self, transport: Array1<f64>, tracking: Array1<f64>, ground: Array1<f64>) {
         // Add new samples
         self.transport_history.push_back(transport);
         self.tracking_history.push_back(tracking);
@@ -850,9 +879,10 @@ impl TimeSeriesBuffer {
         };
 
         Array1::from_vec(
-            history.iter()
+            history
+                .iter()
                 .map(|features| features[feature_idx])
-                .collect()
+                .collect(),
         )
     }
 }
@@ -887,13 +917,13 @@ impl PwsaFusionPlatform {
             transport: TransportLayerAdapter::new_tranche1(900)?,
             tracking: TrackingLayerAdapter::new_tranche1(900)?,
             ground: GroundLayerAdapter::new(900)?,
-            history_buffer: TimeSeriesBuffer::new(100),  // 100 samples = 10s at 10Hz
+            history_buffer: TimeSeriesBuffer::new(100), // 100 samples = 10s at 10Hz
             te_calculator: TransferEntropy::new(
-                3,  // source_embedding: use past 3 samples
-                3,  // target_embedding: use past 3 samples
-                1,  // time_lag: 1 sample (100ms at 10Hz)
+                3, // source_embedding: use past 3 samples
+                3, // target_embedding: use past 3 samples
+                1, // time_lag: 1 sample (100ms at 10Hz)
             ),
-            fusion_window: Vec::with_capacity(100),  // Legacy - to be removed
+            fusion_window: Vec::with_capacity(100), // Legacy - to be removed
             fusion_horizon: 10,
         })
     }
@@ -922,15 +952,13 @@ impl PwsaFusionPlatform {
             transport_telem,
         )?;
 
-        let threat_detection = self.tracking.ingest_ir_frame(
-            tracking_frame.sv_id,
-            tracking_frame,
-        )?;
+        let threat_detection = self
+            .tracking
+            .ingest_ir_frame(tracking_frame.sv_id, tracking_frame)?;
 
-        let ground_features = self.ground.ingest_ground_data(
-            ground_data.station_id,
-            ground_data,
-        )?;
+        let ground_features = self
+            .ground
+            .ingest_ground_data(ground_data.station_id, ground_data)?;
 
         // Store in history buffer for transfer entropy computation
         self.history_buffer.add_sample(
@@ -956,7 +984,10 @@ impl PwsaFusionPlatform {
         // Verify latency requirement
         let latency = start.elapsed();
         if latency.as_millis() > 5 {
-            eprintln!("WARNING: Fusion latency {}ms exceeds 5ms target", latency.as_millis());
+            eprintln!(
+                "WARNING: Fusion latency {}ms exceeds 5ms target",
+                latency.as_millis()
+            );
         }
 
         Ok(awareness)
@@ -1030,12 +1061,12 @@ impl PwsaFusionPlatform {
         let mut coupling = Array2::zeros((3, 3));
 
         // Use heuristic values as conservative estimates
-        coupling[[0, 1]] = 0.15;  // Transport → Tracking (weak)
-        coupling[[1, 0]] = 0.20;  // Tracking → Transport (weak)
-        coupling[[0, 2]] = 0.50;  // Transport → Ground (strong: telemetry flow)
-        coupling[[2, 0]] = 0.40;  // Ground → Transport (strong: command flow)
-        coupling[[1, 2]] = 0.60;  // Tracking → Ground (strong: alert flow)
-        coupling[[2, 1]] = 0.20;  // Ground → Tracking (weak: sensor cueing)
+        coupling[[0, 1]] = 0.15; // Transport → Tracking (weak)
+        coupling[[1, 0]] = 0.20; // Tracking → Transport (weak)
+        coupling[[0, 2]] = 0.50; // Transport → Ground (strong: telemetry flow)
+        coupling[[2, 0]] = 0.40; // Ground → Transport (strong: command flow)
+        coupling[[1, 2]] = 0.60; // Tracking → Ground (strong: alert flow)
+        coupling[[2, 1]] = 0.20; // Ground → Tracking (weak: sensor cueing)
 
         Ok(coupling)
     }
@@ -1045,11 +1076,11 @@ impl PwsaFusionPlatform {
         // Based on link quality indicators in feature vector
 
         if features.len() < 10 {
-            return 0.5;  // Insufficient data
+            return 0.5; // Insufficient data
         }
 
         // Average of key health indicators
-        let health_indicators = &features.slice(ndarray::s![5..8]);  // Features 5-7 are health scores
+        let health_indicators = &features.slice(ndarray::s![5..8]); // Features 5-7 are health scores
         health_indicators.mean().unwrap_or(0.5)
     }
 
@@ -1062,7 +1093,7 @@ impl PwsaFusionPlatform {
 
         let uplink_health = features[0];
         let downlink_health = features[1];
-        let queue_health = 1.0 - features[2];  // Lower queue = healthier
+        let queue_health = 1.0 - features[2]; // Lower queue = healthier
 
         (uplink_health + downlink_health + queue_health) / 3.0
     }
@@ -1077,7 +1108,9 @@ impl PwsaFusionPlatform {
         // High threat detected?
         let threat_max = threat.threat_level.iter().cloned().fold(0.0_f64, f64::max);
         if threat_max > 0.7 {
-            let threat_class = threat.threat_level.iter()
+            let threat_class = threat
+                .threat_level
+                .iter()
                 .position(|&p| p == threat_max)
                 .unwrap_or(0);
 
@@ -1099,7 +1132,8 @@ impl PwsaFusionPlatform {
 
             if threat_class == 4 {
                 actions.push("IMMEDIATE ACTION: Alert INDOPACOM and NORTHCOM".to_string());
-                actions.push("Increase Transport Layer data rate for continuous tracking".to_string());
+                actions
+                    .push("Increase Transport Layer data rate for continuous tracking".to_string());
             }
         }
 
@@ -1188,7 +1222,7 @@ pub struct IrSensorFrame {
     pub acceleration_estimate: f64,
     pub swir_band_ratio: f64,
     pub thermal_signature: f64,
-    pub geolocation: (f64, f64),  // (lat, lon)
+    pub geolocation: (f64, f64), // (lat, lon)
 }
 
 /// Ground station data structure
@@ -1206,7 +1240,7 @@ pub struct GroundStationData {
 pub struct ThreatDetection {
     pub sv_id: u32,
     pub timestamp: SystemTime,
-    pub threat_level: Array1<f64>,  // [No threat, Aircraft, Cruise, Ballistic, Hypersonic]
+    pub threat_level: Array1<f64>, // [No threat, Aircraft, Cruise, Ballistic, Hypersonic]
     pub confidence: f64,
     pub location: (f64, f64),
 }
@@ -1215,11 +1249,11 @@ pub struct ThreatDetection {
 #[derive(Debug, Clone)]
 pub struct MissionAwareness {
     pub timestamp: SystemTime,
-    pub transport_health: f64,              // [0, 1] overall Transport Layer health
-    pub threat_status: Array1<f64>,         // Multi-class threat probabilities
-    pub ground_connectivity: f64,           // [0, 1] Ground Layer health
-    pub cross_layer_coupling: Array2<f64>,  // Transfer entropy matrix (3x3)
-    pub recommended_actions: Vec<String>,   // Actionable recommendations
+    pub transport_health: f64,      // [0, 1] overall Transport Layer health
+    pub threat_status: Array1<f64>, // Multi-class threat probabilities
+    pub ground_connectivity: f64,   // [0, 1] Ground Layer health
+    pub cross_layer_coupling: Array2<f64>, // Transfer entropy matrix (3x3)
+    pub recommended_actions: Vec<String>, // Actionable recommendations
 }
 
 /// Mesh topology configuration

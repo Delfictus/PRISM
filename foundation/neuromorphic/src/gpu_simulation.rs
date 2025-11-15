@@ -3,11 +3,11 @@
 //! Provides GPU acceleration simulation for performance testing and validation
 //! Simulates RTX 5070 performance improvements for the neuromorphic platform
 
+use crate::reservoir::{ReservoirComputer, ReservoirConfig, ReservoirState};
 use crate::types::SpikePattern;
-use crate::reservoir::{ReservoirComputer, ReservoirState, ReservoirConfig};
 use anyhow::Result;
-use std::time::{Duration, Instant};
 use rayon::prelude::*;
+use std::time::{Duration, Instant};
 
 /// Simulated GPU statistics for RTX 5070 performance
 #[derive(Debug, Default, Clone)]
@@ -40,10 +40,10 @@ impl GpuReservoirComputer {
 
         // Simulate RTX 5070 speedup based on reservoir size
         let simulation_speedup = match config.size {
-            1..=100 => 5.0,      // Modest improvement for small reservoirs
-            101..=500 => 12.0,   // Better improvement for medium reservoirs
-            501..=1000 => 18.0,  // Excellent improvement for large reservoirs
-            _ => 25.0,           // Maximum improvement for very large reservoirs
+            1..=100 => 5.0,     // Modest improvement for small reservoirs
+            101..=500 => 12.0,  // Better improvement for medium reservoirs
+            501..=1000 => 18.0, // Excellent improvement for large reservoirs
+            _ => 25.0,          // Maximum improvement for very large reservoirs
         };
 
         Ok(Self {
@@ -64,19 +64,21 @@ impl GpuReservoirComputer {
 
         // Simulate GPU acceleration by artificially reducing reported time
         let simulated_gpu_time = Duration::from_nanos(
-            (cpu_time.as_nanos() as f64 / self.simulation_speedup as f64) as u64
+            (cpu_time.as_nanos() as f64 / self.simulation_speedup as f64) as u64,
         );
 
         // Update simulated GPU statistics
         self.processing_stats.total_gpu_operations += 1;
         self.processing_stats.total_processing_time_us = simulated_gpu_time.as_micros() as f32;
         self.processing_stats.cuda_kernel_time_us = (simulated_gpu_time.as_micros() as f32) * 0.8; // 80% kernel time
-        self.processing_stats.memory_transfer_time_us = (simulated_gpu_time.as_micros() as f32) * 0.2; // 20% transfer time
+        self.processing_stats.memory_transfer_time_us =
+            (simulated_gpu_time.as_micros() as f32) * 0.2; // 20% transfer time
         self.processing_stats.speedup_vs_cpu = self.simulation_speedup;
 
         // Estimate memory usage (simplified model)
         let matrix_size = self.cpu_reservoir.get_config().size;
-        self.processing_stats.gpu_memory_usage_mb = (matrix_size * matrix_size * 4) as f32 / 1024.0 / 1024.0;
+        self.processing_stats.gpu_memory_usage_mb =
+            (matrix_size * matrix_size * 4) as f32 / 1024.0 / 1024.0;
 
         Ok(result)
     }
@@ -124,7 +126,7 @@ impl AcceleratedReservoirComputer {
         }
 
         // Calculate expected speedup from parallelization
-        let parallel_speedup = (n_parallel as f32).min(8.0).sqrt();  // Assume 8 cores max
+        let parallel_speedup = (n_parallel as f32).min(8.0).sqrt(); // Assume 8 cores max
 
         Ok(Self {
             reservoirs,
@@ -215,7 +217,11 @@ pub struct NeuromorphicGpuMemoryManager {
 }
 
 impl NeuromorphicGpuMemoryManager {
-    pub fn new(_device: std::sync::Arc<()>, reservoir_size: usize, input_size: usize) -> Result<Self> {
+    pub fn new(
+        _device: std::sync::Arc<()>,
+        reservoir_size: usize,
+        input_size: usize,
+    ) -> Result<Self> {
         // Simulate memory allocation
         let matrix_memory_mb = (reservoir_size * reservoir_size * 4) as f32 / 1024.0 / 1024.0;
         let vector_memory_mb = (reservoir_size * 4) as f32 / 1024.0 / 1024.0;
@@ -282,13 +288,15 @@ mod tests {
 
         let mut accelerated = AcceleratedReservoirComputer::new(config, 4).unwrap();
 
-        let patterns: Vec<_> = (0..5).map(|i| {
-            let spikes = vec![
-                Spike::new(0, i as f64 * 10.0),
-                Spike::new(1, i as f64 * 15.0),
-            ];
-            SpikePattern::new(spikes, 100.0)
-        }).collect();
+        let patterns: Vec<_> = (0..5)
+            .map(|i| {
+                let spikes = vec![
+                    Spike::new(0, i as f64 * 10.0),
+                    Spike::new(1, i as f64 * 15.0),
+                ];
+                SpikePattern::new(spikes, 100.0)
+            })
+            .collect();
 
         let results = accelerated.process_batch(&patterns).unwrap();
         assert_eq!(results.len(), 5);

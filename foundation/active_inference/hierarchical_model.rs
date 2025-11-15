@@ -17,30 +17,30 @@ use std::f64::consts::PI;
 
 /// Physical constants
 pub mod constants {
-    pub const K_B: f64 = 1.380649e-23;  // Boltzmann constant (J/K)
-    pub const HBAR: f64 = 1.054571817e-34;  // Reduced Planck constant (J·s)
-    pub const SPEED_OF_LIGHT: f64 = 299792458.0;  // m/s
+    pub const K_B: f64 = 1.380649e-23; // Boltzmann constant (J/K)
+    pub const HBAR: f64 = 1.054571817e-34; // Reduced Planck constant (J·s)
+    pub const SPEED_OF_LIGHT: f64 = 299792458.0; // m/s
 
     // Adaptive optics parameters
-    pub const N_WINDOWS: usize = 900;  // 30×30 window array
-    pub const WINDOW_SIZE: f64 = 1.0;  // meters
-    pub const WAVELENGTH: f64 = 550e-9;  // Green light (meters)
+    pub const N_WINDOWS: usize = 900; // 30×30 window array
+    pub const WINDOW_SIZE: f64 = 1.0; // meters
+    pub const WAVELENGTH: f64 = 550e-9; // Green light (meters)
 }
 
 /// Timescale hierarchy for multi-rate dynamics
 #[derive(Debug, Clone, Copy)]
 pub enum Timescale {
-    Fast = 10,      // Level 1: Window phases (10 ms)
-    Medium = 1000,  // Level 2: Atmospheric turbulence (1 s)
-    Slow = 60000,   // Level 3: Satellite motion (60 s)
+    Fast = 10,     // Level 1: Window phases (10 ms)
+    Medium = 1000, // Level 2: Atmospheric turbulence (1 s)
+    Slow = 60000,  // Level 3: Satellite motion (60 s)
 }
 
 /// State space level in hierarchical model
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StateSpaceLevel {
-    WindowPhases = 1,    // Fast: Optical phases at windows
-    Atmosphere = 2,      // Medium: Turbulence field
-    Satellite = 3,       // Slow: Orbital dynamics
+    WindowPhases = 1, // Fast: Optical phases at windows
+    Atmosphere = 2,   // Medium: Turbulence field
+    Satellite = 3,    // Slow: Orbital dynamics
 }
 
 /// Gaussian belief (sufficient statistics for variational inference)
@@ -92,7 +92,10 @@ impl GaussianBelief {
 
         let n = self.mean.len() as f64;
         let trace_term = (&self.variance * &other.precision).sum();
-        let log_det_term = other.variance.iter().zip(self.variance.iter())
+        let log_det_term = other
+            .variance
+            .iter()
+            .zip(self.variance.iter())
             .map(|(v_p, v_q)| (v_p / v_q).ln())
             .sum::<f64>();
         let mean_diff = &self.mean - &other.mean;
@@ -250,7 +253,7 @@ pub struct AtmosphericLevel {
     /// Fried parameter r₀ (atmospheric coherence length, meters)
     pub fried_parameter: f64,
     /// Wind velocity (m/s)
-    pub wind_velocity: [f64; 2],  // [v_x, v_y]
+    pub wind_velocity: [f64; 2], // [v_x, v_y]
     /// Turbulent diffusivity (m²/s)
     pub diffusivity: f64,
     /// Current belief state
@@ -328,14 +331,18 @@ impl SatelliteLevel {
         // Initialize at circular orbit
         let orbital_velocity = (mu / orbit_radius).sqrt();
         let mean = Array1::from_vec(vec![
-            orbit_radius, 0.0, 0.0,  // Position
-            0.0, orbital_velocity, 0.0,  // Velocity
+            orbit_radius,
+            0.0,
+            0.0, // Position
+            0.0,
+            orbital_velocity,
+            0.0, // Velocity
         ]);
 
         // Small uncertainty in position/velocity
         let variance = Array1::from_vec(vec![
-            100.0, 100.0, 100.0,  // ±10m position uncertainty
-            1.0, 1.0, 1.0,        // ±1m/s velocity uncertainty
+            100.0, 100.0, 100.0, // ±10m position uncertainty
+            1.0, 1.0, 1.0, // ±1m/s velocity uncertainty
         ]);
 
         let belief = GaussianBelief::new(mean, variance);
@@ -411,7 +418,7 @@ impl HierarchicalModel {
         let complexity = self.level1.belief.kl_divergence(&GaussianBelief::isotropic(
             self.level1.belief.mean.len(),
             0.0,
-            1.0
+            1.0,
         ));
 
         // Free energy = Accuracy cost + Complexity cost
@@ -497,8 +504,16 @@ mod tests {
         // Typical Fried parameter is ~5-20 cm
         // r₀ = (0.423·k²·C_n²·L)^(-3/5)
         // For C_n² = 1e-14 (strong turbulence): r₀ ~ 0.005-0.02m
-        assert!(level.fried_parameter > 0.001, "r₀ too small: {}", level.fried_parameter);
-        assert!(level.fried_parameter < 1.0, "r₀ too large: {}", level.fried_parameter);
+        assert!(
+            level.fried_parameter > 0.001,
+            "r₀ too small: {}",
+            level.fried_parameter
+        );
+        assert!(
+            level.fried_parameter < 1.0,
+            "r₀ too large: {}",
+            level.fried_parameter
+        );
     }
 
     #[test]
