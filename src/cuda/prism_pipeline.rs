@@ -1,3 +1,6 @@
+use anyhow::{anyhow, Result};
+use cudarc::driver::{CudaDevice, CudaSlice, LaunchConfig};
+use cudarc::nvrtc::Ptx;
 ///! Full PRISM-AI GPU Pipeline for Graph Coloring
 ///!
 ///! Integrates all 7 GPU-accelerated steps:
@@ -10,12 +13,8 @@
 ///! 7. GPU Parallel Coloring (adaptive kernels)
 ///!
 ///! GPU-ONLY: ZERO CPU fallbacks, all computation on CUDA
-
 use ndarray::{Array1, Array2};
-use cudarc::driver::{CudaDevice, CudaSlice, LaunchConfig};
-use cudarc::nvrtc::Ptx;
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
 
 // TODO: Transfer entropy not yet integrated
 // use crate::cma::transfer_entropy_gpu::GpuKSGEstimator;
@@ -49,7 +48,12 @@ impl GpuKSGEstimator {
     pub fn new(_device: Arc<CudaDevice>) -> Result<Self> {
         Err(anyhow!("GPU KSG estimator not yet integrated"))
     }
-    pub fn compute_te_gpu(&self, _source: &TimeSeries, _target: &TimeSeries, _k: usize) -> Result<f64> {
+    pub fn compute_te_gpu(
+        &self,
+        _source: &TimeSeries,
+        _target: &TimeSeries,
+        _k: usize,
+    ) -> Result<f64> {
         Err(anyhow!("GPU KSG estimator not yet integrated"))
     }
 }
@@ -57,7 +61,10 @@ impl GpuKSGEstimator {
 // Stub for GPU reservoir
 pub struct GpuReservoirComputer;
 impl GpuReservoirComputer {
-    pub fn new_shared(_config: neuromorphic_engine::reservoir::ReservoirConfig, _device: Arc<CudaDevice>) -> Result<Self> {
+    pub fn new_shared(
+        _config: neuromorphic_engine::reservoir::ReservoirConfig,
+        _device: Arc<CudaDevice>,
+    ) -> Result<Self> {
         Err(anyhow!("GPU Reservoir not yet integrated"))
     }
     pub fn process_gpu(&mut self, _input: &Array1<f32>) -> Result<Array1<f32>> {
@@ -65,12 +72,12 @@ impl GpuReservoirComputer {
     }
 }
 
+use crate::cma::neural::coloring_gnn::{compute_node_features, ColoringGNN};
+use crate::cuda::ensemble_generation::{Ensemble, GpuEnsembleGenerator};
+use crate::cuda::GpuColoringResult;
 use neuromorphic_engine::reservoir::ReservoirConfig;
 use neuromorphic_engine::stdp_profiles::STDPProfile;
 use neuromorphic_engine::types::{Spike, SpikePattern};
-use crate::cma::neural::coloring_gnn::{ColoringGNN, compute_node_features};
-use crate::cuda::GpuColoringResult;
-use crate::cuda::ensemble_generation::{GpuEnsembleGenerator, Ensemble};
 
 /// Full PRISM-AI coherence matrices (all GPU-resident)
 #[derive(Debug, Clone)]
@@ -128,8 +135,8 @@ impl Default for PrismConfig {
             use_transfer_entropy: true,
             use_tda: true,
             use_neuromorphic: true,
-            use_gnn: false,  // Off by default (requires trained model)
-            fusion_weights: [0.3, 0.3, 0.2, 0.2],  // Balanced
+            use_gnn: false, // Off by default (requires trained model)
+            fusion_weights: [0.3, 0.3, 0.2, 0.2], // Balanced
             ensemble_size: 10,
             ensemble_temperature: 1.0,
             reservoir_size: 500,
@@ -178,26 +185,34 @@ impl PrismPipeline {
 
         // Load coherence fusion kernels
         let ptx_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/ptx/adaptive_coloring.ptx"));
-        let ptx = Ptx::from_src(std::str::from_utf8(ptx_bytes)
-            .map_err(|e| anyhow!("Invalid PTX UTF-8: {}", e))?);
+        let ptx = Ptx::from_src(
+            std::str::from_utf8(ptx_bytes).map_err(|e| anyhow!("Invalid PTX UTF-8: {}", e))?,
+        );
 
-        device.load_ptx(
-            ptx,
-            "adaptive_coloring",
-            &[
-                "_Z23fuse_coherence_matricesPKfS0_S0_S0_Pfiffff",
-                "_Z22init_uniform_coherencePfif"
-            ]
-        ).map_err(|e| anyhow!("Failed to load PTX module: {:?}", e))?;
+        device
+            .load_ptx(
+                ptx,
+                "adaptive_coloring",
+                &[
+                    "_Z23fuse_coherence_matricesPKfS0_S0_S0_Pfiffff",
+                    "_Z22init_uniform_coherencePfif",
+                ],
+            )
+            .map_err(|e| anyhow!("Failed to load PTX module: {:?}", e))?;
 
         let fusion_kernel = Arc::new(
-            device.get_func("adaptive_coloring", "_Z23fuse_coherence_matricesPKfS0_S0_S0_Pfiffff")
-                .ok_or_else(|| anyhow!("Failed to load fuse_coherence_matrices"))?
+            device
+                .get_func(
+                    "adaptive_coloring",
+                    "_Z23fuse_coherence_matricesPKfS0_S0_S0_Pfiffff",
+                )
+                .ok_or_else(|| anyhow!("Failed to load fuse_coherence_matrices"))?,
         );
 
         let init_kernel = Arc::new(
-            device.get_func("adaptive_coloring", "_Z22init_uniform_coherencePfif")
-                .ok_or_else(|| anyhow!("Failed to load init_uniform_coherence"))?
+            device
+                .get_func("adaptive_coloring", "_Z22init_uniform_coherencePfif")
+                .ok_or_else(|| anyhow!("Failed to load init_uniform_coherence"))?,
         );
 
         println!("[PRISM-AI] ✅ Coherence fusion kernels loaded (mangled names)");
@@ -262,7 +277,10 @@ impl PrismPipeline {
 
             match GpuReservoirComputer::new_shared(reservoir_config, device.clone()) {
                 Ok(res) => {
-                    println!("[PRISM-AI] ✅ Neuromorphic Reservoir (GPU) initialized ({} neurons)", config.reservoir_size);
+                    println!(
+                        "[PRISM-AI] ✅ Neuromorphic Reservoir (GPU) initialized ({} neurons)",
+                        config.reservoir_size
+                    );
                     Some(res)
                 }
                 Err(e) => {
@@ -296,11 +314,42 @@ impl PrismPipeline {
         };
 
         println!("[PRISM-AI] ✅ Full pipeline initialized");
-        println!("[PRISM-AI]   - Ensemble Generation: {}", if ensemble_generator.is_some() { "ENABLED" } else { "DISABLED" });
-        println!("[PRISM-AI]   - Transfer Entropy: {}", if te_estimator.is_some() { "ENABLED" } else { "DISABLED" });
-        println!("[PRISM-AI]   - TDA: {}", if tda_engine.is_some() { "ENABLED" } else { "DISABLED" });
-        println!("[PRISM-AI]   - Neuromorphic: {}", if reservoir.is_some() { "ENABLED" } else { "DISABLED" });
-        println!("[PRISM-AI]   - GNN: {}", if gnn.is_some() { "ENABLED" } else { "DISABLED" });
+        println!(
+            "[PRISM-AI]   - Ensemble Generation: {}",
+            if ensemble_generator.is_some() {
+                "ENABLED"
+            } else {
+                "DISABLED"
+            }
+        );
+        println!(
+            "[PRISM-AI]   - Transfer Entropy: {}",
+            if te_estimator.is_some() {
+                "ENABLED"
+            } else {
+                "DISABLED"
+            }
+        );
+        println!(
+            "[PRISM-AI]   - TDA: {}",
+            if tda_engine.is_some() {
+                "ENABLED"
+            } else {
+                "DISABLED"
+            }
+        );
+        println!(
+            "[PRISM-AI]   - Neuromorphic: {}",
+            if reservoir.is_some() {
+                "ENABLED"
+            } else {
+                "DISABLED"
+            }
+        );
+        println!(
+            "[PRISM-AI]   - GNN: {}",
+            if gnn.is_some() { "ENABLED" } else { "DISABLED" }
+        );
 
         Ok(Self {
             device,
@@ -380,13 +429,7 @@ impl PrismPipeline {
 
         // STEP 6: Coherence Fusion (GPU Kernel)
         println!("[PRISM-AI] STEP 6: Fusing coherence matrices on GPU...");
-        let enhanced = self.fuse_coherence_gpu(
-            &topological,
-            &causal,
-            &neuromorphic,
-            &gnn,
-            n,
-        )?;
+        let enhanced = self.fuse_coherence_gpu(&topological, &causal, &neuromorphic, &gnn, n)?;
         println!("[PRISM-AI]   ✅ Enhanced coherence fused on GPU");
 
         Ok(PrismCoherence {
@@ -418,7 +461,7 @@ impl PrismPipeline {
             .collect();
 
         // Compute pairwise transfer entropy (sample for performance)
-        let sample_size = n.min(20);  // Limit for performance
+        let sample_size = n.min(20); // Limit for performance
         for i in 0..sample_size {
             for j in 0..sample_size {
                 if i != j {
@@ -427,7 +470,7 @@ impl PrismPipeline {
                             coherence[i * n + j] = te_value as f32;
                         }
                         Err(_) => {
-                            coherence[i * n + j] = 0.5;  // Neutral if TE fails
+                            coherence[i * n + j] = 0.5; // Neutral if TE fails
                         }
                     }
                 }
@@ -477,7 +520,8 @@ impl PrismPipeline {
         let mut coherence = vec![1.0f32; n * n];
 
         // Convert adjacency to spike patterns
-        for i in 0..n.min(50) {  // Limit for performance
+        for i in 0..n.min(50) {
+            // Limit for performance
             // Create spike pattern from vertex neighborhood
             let mut spikes = Vec::new();
             for j in 0..n {
@@ -511,17 +555,15 @@ impl PrismPipeline {
     }
 
     /// STEP 5: Compute GNN coherence from attention
-    fn compute_gnn_coherence(
-        adjacency: &Array2<bool>,
-        gnn: &ColoringGNN,
-    ) -> Result<Vec<f32>> {
+    fn compute_gnn_coherence(adjacency: &Array2<bool>, gnn: &ColoringGNN) -> Result<Vec<f32>> {
         let n = adjacency.nrows();
 
         // Compute node features
         let node_features = compute_node_features(adjacency);
 
         // Run GNN prediction
-        let prediction = gnn.predict(adjacency, &node_features)
+        let prediction = gnn
+            .predict(adjacency, &node_features)
             .map_err(|e| anyhow!("GNN prediction failed: {}", e))?;
 
         // Use color logits as coherence
@@ -535,9 +577,7 @@ impl PrismPipeline {
                     let color_j = prediction.node_color_logits.row(j);
 
                     // Cosine similarity
-                    let dot: f32 = color_i.iter().zip(color_j.iter())
-                        .map(|(a, b)| a * b)
-                        .sum();
+                    let dot: f32 = color_i.iter().zip(color_j.iter()).map(|(a, b)| a * b).sum();
                     let norm_i: f32 = color_i.iter().map(|x| x * x).sum::<f32>().sqrt();
                     let norm_j: f32 = color_j.iter().map(|x| x * x).sum::<f32>().sqrt();
 
@@ -600,7 +640,7 @@ impl PrismPipeline {
                     beta,
                     gamma,
                     delta,
-                )
+                ),
             )?;
         }
 
@@ -617,7 +657,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore]  // Requires GPU
+    #[ignore] // Requires GPU
     fn test_prism_pipeline_creation() {
         let config = PrismConfig::default();
         let result = PrismPipeline::new(config);
@@ -633,7 +673,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]  // Requires GPU
+    #[ignore] // Requires GPU
     fn test_coherence_computation() {
         let config = PrismConfig::default();
         let mut pipeline = PrismPipeline::new(config).expect("GPU required");
@@ -647,9 +687,11 @@ mod tests {
         adj[[0, 2]] = true;
         adj[[2, 0]] = true;
 
-        let coherence = pipeline.compute_coherence(&adj).expect("Coherence computation failed");
+        let coherence = pipeline
+            .compute_coherence(&adj)
+            .expect("Coherence computation failed");
 
-        assert_eq!(coherence.enhanced.len(), 9);  // 3x3
+        assert_eq!(coherence.enhanced.len(), 9); // 3x3
         println!("✅ Enhanced coherence: {:?}", coherence.enhanced);
     }
 }

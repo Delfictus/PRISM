@@ -28,7 +28,8 @@ mod tests {
             .iter()
             .map(|&c| {
                 let phase = (c as f32 / target_chromatic as f32) * 2.0 * std::f32::consts::PI;
-                let normalized = (phase.rem_euclid(2.0 * std::f32::consts::PI)) / (2.0 * std::f32::consts::PI);
+                let normalized =
+                    (phase.rem_euclid(2.0 * std::f32::consts::PI)) / (2.0 * std::f32::consts::PI);
                 (normalized * target_chromatic as f32).floor() as usize % target_chromatic
             })
             .collect();
@@ -49,7 +50,8 @@ mod tests {
             .iter()
             .map(|&c| {
                 let phase = (c as f32 / color_range as f32) * 2.0 * std::f32::consts::PI;
-                let normalized = (phase.rem_euclid(2.0 * std::f32::consts::PI)) / (2.0 * std::f32::consts::PI);
+                let normalized =
+                    (phase.rem_euclid(2.0 * std::f32::consts::PI)) / (2.0 * std::f32::consts::PI);
                 (normalized * color_range as f32).floor() as usize % color_range
             })
             .collect();
@@ -86,7 +88,10 @@ mod tests {
         println!("[TEST] Buggy chromatic: {}", buggy_chromatic);
         println!("[TEST] Fixed chromatic: {}", fixed_chromatic);
         println!("[TEST] Color range: {}", color_range);
-        println!("[TEST] Compaction ratio: {:.3}", fixed_chromatic as f64 / color_range as f64);
+        println!(
+            "[TEST] Compaction ratio: {:.3}",
+            fixed_chromatic as f64 / color_range as f64
+        );
     }
 
     #[test]
@@ -110,7 +115,10 @@ mod tests {
 
         // Should have 4 unique colors (0, 5, 10, 20, 25 -> 5 unique -> wait, let me recount)
         // Unique: {0, 5, 10, 20, 25} = 5 colors
-        assert_eq!(next_color, 5, "Should have 5 unique colors after compaction");
+        assert_eq!(
+            next_color, 5,
+            "Should have 5 unique colors after compaction"
+        );
 
         // Verify sequential [0..5)
         let mut unique: Vec<usize> = compacted.iter().copied().collect();

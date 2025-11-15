@@ -56,10 +56,7 @@ impl QuantumDialect {
             syntax: "!quantum.complex<f64>",
             description: "Complex number with double precision",
             storage: TypeStorage::Composite {
-                fields: vec![
-                    ("real", PrimitiveType::F64),
-                    ("imag", PrimitiveType::F64),
-                ],
+                fields: vec![("real", PrimitiveType::F64), ("imag", PrimitiveType::F64)],
             },
             gpu_mapping: GpuType::CudaComplex64,
         });
@@ -105,12 +102,14 @@ impl QuantumDialect {
         self.operations.push(OpDefinition {
             name: "hadamard",
             syntax: "%result = quantum.hadamard %qubit : !quantum.qreg<1>",
-            operands: vec![
-                OperandDef { name: "qubit", type_name: "qreg" },
-            ],
-            results: vec![
-                ResultDef { name: "result", type_name: "qreg" },
-            ],
+            operands: vec![OperandDef {
+                name: "qubit",
+                type_name: "qreg",
+            }],
+            results: vec![ResultDef {
+                name: "result",
+                type_name: "qreg",
+            }],
             attributes: vec![],
             traits: vec![OpTrait::Unitary, OpTrait::SingleQubit],
             gpu_kernel: Some("hadamard_kernel"),
@@ -125,12 +124,19 @@ impl QuantumDialect {
             name: "cnot",
             syntax: "%result = quantum.cnot %control, %target : !quantum.qreg<2>",
             operands: vec![
-                OperandDef { name: "control", type_name: "qreg" },
-                OperandDef { name: "target", type_name: "qreg" },
+                OperandDef {
+                    name: "control",
+                    type_name: "qreg",
+                },
+                OperandDef {
+                    name: "target",
+                    type_name: "qreg",
+                },
             ],
-            results: vec![
-                ResultDef { name: "result", type_name: "qreg" },
-            ],
+            results: vec![ResultDef {
+                name: "result",
+                type_name: "qreg",
+            }],
             attributes: vec![],
             traits: vec![OpTrait::Unitary, OpTrait::TwoQubit, OpTrait::Entangling],
             gpu_kernel: Some("cnot_kernel"),
@@ -173,19 +179,19 @@ impl QuantumDialect {
         self.operations.push(OpDefinition {
             name: "measure",
             syntax: "%result = quantum.measure %qubit : !quantum.qreg<1> -> i1",
-            operands: vec![
-                OperandDef { name: "qubit", type_name: "qreg" },
-            ],
-            results: vec![
-                ResultDef { name: "result", type_name: "i1" },
-            ],
-            attributes: vec![
-                AttributeDef {
-                    name: "basis",
-                    type_name: AttributeType::String,
-                    default: Some("computational"),
-                },
-            ],
+            operands: vec![OperandDef {
+                name: "qubit",
+                type_name: "qreg",
+            }],
+            results: vec![ResultDef {
+                name: "result",
+                type_name: "i1",
+            }],
+            attributes: vec![AttributeDef {
+                name: "basis",
+                type_name: AttributeType::String,
+                default: Some("computational"),
+            }],
             traits: vec![OpTrait::NonUnitary, OpTrait::Probabilistic],
             gpu_kernel: Some("measure_kernel"),
             verification: None,
@@ -195,19 +201,19 @@ impl QuantumDialect {
         self.operations.push(OpDefinition {
             name: "qft",
             syntax: "%result = quantum.qft %qreg : !quantum.qreg<n>",
-            operands: vec![
-                OperandDef { name: "qreg", type_name: "qreg" },
-            ],
-            results: vec![
-                ResultDef { name: "result", type_name: "qreg" },
-            ],
-            attributes: vec![
-                AttributeDef {
-                    name: "inverse",
-                    type_name: AttributeType::Bool,
-                    default: Some("false"),
-                },
-            ],
+            operands: vec![OperandDef {
+                name: "qreg",
+                type_name: "qreg",
+            }],
+            results: vec![ResultDef {
+                name: "result",
+                type_name: "qreg",
+            }],
+            attributes: vec![AttributeDef {
+                name: "inverse",
+                type_name: AttributeType::Bool,
+                default: Some("false"),
+            }],
             traits: vec![OpTrait::Unitary, OpTrait::MultiQubit],
             gpu_kernel: Some("qft_kernel"),
             verification: None,
@@ -217,12 +223,14 @@ impl QuantumDialect {
         self.operations.push(OpDefinition {
             name: "vqe_ansatz",
             syntax: "%result = quantum.vqe_ansatz %params : tensor<f64>",
-            operands: vec![
-                OperandDef { name: "params", type_name: "tensor" },
-            ],
-            results: vec![
-                ResultDef { name: "result", type_name: "state" },
-            ],
+            operands: vec![OperandDef {
+                name: "params",
+                type_name: "tensor",
+            }],
+            results: vec![ResultDef {
+                name: "result",
+                type_name: "state",
+            }],
             attributes: vec![
                 AttributeDef {
                     name: "layers",
@@ -284,9 +292,18 @@ pub struct TypeDefinition {
 #[derive(Clone)]
 pub enum TypeStorage {
     Primitive(PrimitiveType),
-    Composite { fields: Vec<(&'static str, PrimitiveType)> },
-    Vector { element: Box<TypeDefinition>, size: TypeSize },
-    Matrix { element: Box<TypeDefinition>, rows: TypeSize, cols: TypeSize },
+    Composite {
+        fields: Vec<(&'static str, PrimitiveType)>,
+    },
+    Vector {
+        element: Box<TypeDefinition>,
+        size: TypeSize,
+    },
+    Matrix {
+        element: Box<TypeDefinition>,
+        rows: TypeSize,
+        cols: TypeSize,
+    },
     Custom,
 }
 

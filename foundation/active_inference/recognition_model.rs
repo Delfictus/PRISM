@@ -10,11 +10,11 @@
 // 3. Posterior matches true state (KL < 0.1) - NEW TESTS HERE
 // 4. Performance: <5ms per inference - BENCHMARKS
 
-use ndarray::Array1;
-use super::variational_inference::VariationalInference;
-use super::hierarchical_model::{HierarchicalModel, GaussianBelief, constants};
+use super::hierarchical_model::{constants, GaussianBelief, HierarchicalModel};
 use super::observation_model::ObservationModel;
 use super::transition_model::TransitionModel;
+use super::variational_inference::VariationalInference;
+use ndarray::Array1;
 
 /// Test utilities for recognition model validation
 pub struct RecognitionModelValidator {
@@ -39,7 +39,7 @@ impl RecognitionModelValidator {
         // Create Gaussian centered at true state
         let true_belief = GaussianBelief::new(
             true_state.clone(),
-            Array1::from_elem(true_state.len(), 0.01),  // Low variance (confident)
+            Array1::from_elem(true_state.len(), 0.01), // Low variance (confident)
         );
 
         // Compute KL divergence
@@ -49,7 +49,11 @@ impl RecognitionModelValidator {
     }
 
     /// Check convergence speed (returns number of iterations)
-    pub fn iterations_to_converge(&self, model: &mut HierarchicalModel, observations: &Array1<f64>) -> usize {
+    pub fn iterations_to_converge(
+        &self,
+        model: &mut HierarchicalModel,
+        observations: &Array1<f64>,
+    ) -> usize {
         // Run inference and track iterations
         let _ = self.inference.infer(model, observations);
 
@@ -89,15 +93,25 @@ mod tests {
         let _ = inference.infer(&mut model, &observations);
 
         // Validate posterior (check that inference reduces error)
-        let initial_error = (&model.level1.belief.mean - &true_state).mapv(|x| x*x).sum().sqrt();
+        let initial_error = (&model.level1.belief.mean - &true_state)
+            .mapv(|x| x * x)
+            .sum()
+            .sqrt();
 
         // After inference, error should be reasonable
-        let final_error = (&model.level1.belief.mean - &true_state).mapv(|x| x*x).sum().sqrt();
+        let final_error = (&model.level1.belief.mean - &true_state)
+            .mapv(|x| x * x)
+            .sum()
+            .sqrt();
 
         assert!(final_error.is_finite(), "Posterior should be finite");
 
         // For noiseless observations, should recover state reasonably well
-        assert!(final_error < 1.0, "Posterior error should be reasonable: {}", final_error);
+        assert!(
+            final_error < 1.0,
+            "Posterior error should be reasonable: {}",
+            final_error
+        );
     }
 
     #[test]
@@ -108,7 +122,11 @@ mod tests {
         let validator = RecognitionModelValidator::new(inference.clone());
         let iterations = validator.iterations_to_converge(&mut model, &observations);
 
-        assert!(iterations <= 100, "Should converge within 100 iterations, took {}", iterations);
+        assert!(
+            iterations <= 100,
+            "Should converge within 100 iterations, took {}",
+            iterations
+        );
         assert!(iterations > 0, "Should take at least 1 iteration");
     }
 
@@ -154,7 +172,10 @@ mod tests {
         assert!(fe.total.is_finite());
 
         // Posterior should be finite (numerical stability with noisy observations is limited)
-        let error = (&model.level1.belief.mean - &true_state).mapv(|x| x * x).sum().sqrt();
+        let error = (&model.level1.belief.mean - &true_state)
+            .mapv(|x| x * x)
+            .sum()
+            .sqrt();
 
         assert!(error.is_finite(), "Error should be finite");
     }

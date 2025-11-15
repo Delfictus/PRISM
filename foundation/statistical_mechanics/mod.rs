@@ -25,9 +25,9 @@
 //! - T: Temperature
 //! - η(t): White noise (zero mean, unit variance)
 
-pub mod thermodynamic_network;
 pub mod gpu_bindings;
 pub mod gpu_integration;
+pub mod thermodynamic_network;
 
 // GPU-accelerated thermodynamic network
 #[cfg(feature = "cuda")]
@@ -37,11 +37,7 @@ pub mod gpu;
 pub use gpu::ThermodynamicGpu;
 
 pub use thermodynamic_network::{
-    ThermodynamicNetwork,
-    ThermodynamicState,
-    NetworkConfig,
-    ThermodynamicMetrics,
-    EvolutionResult,
+    EvolutionResult, NetworkConfig, ThermodynamicMetrics, ThermodynamicNetwork, ThermodynamicState,
 };
 
 pub use gpu_bindings::GpuThermodynamicNetwork;

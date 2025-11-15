@@ -3,10 +3,10 @@
 //! Implements QuantumPort for the PRCT algorithm.
 //! Constructs Hamiltonians from graphs and evolves quantum states.
 
-use prct_core::ports::QuantumPort;
-use prct_core::errors::Result;
-use shared_types::*;
 use crate::cuda::prct_gpu::PRCTGpuManager;
+use prct_core::errors::Result;
+use prct_core::ports::QuantumPort;
+use shared_types::*;
 use std::sync::Arc;
 
 /// Quantum processing adapter
@@ -19,9 +19,7 @@ pub struct QuantumAdapter {
 impl QuantumAdapter {
     pub fn new() -> Result<Self> {
         // Try to initialize GPU, fall back to CPU if unavailable
-        let gpu_manager = PRCTGpuManager::new()
-            .ok()
-            .map(Arc::new);
+        let gpu_manager = PRCTGpuManager::new().ok().map(Arc::new);
 
         if gpu_manager.is_some() {
             log::info!("[QUANTUM] GPU acceleration enabled");
@@ -71,14 +69,10 @@ impl QuantumPort for QuantumAdapter {
         }
 
         // Compute eigenvalues (simplified - just extract diagonal for now)
-        let eigenvalues: Vec<f64> = (0..n)
-            .map(|i| matrix_elements[i * n + i].0)
-            .collect();
+        let eigenvalues: Vec<f64> = (0..n).map(|i| matrix_elements[i * n + i].0).collect();
 
         // Find ground state energy
-        let ground_state_energy = eigenvalues.iter()
-            .cloned()
-            .fold(f64::INFINITY, f64::min);
+        let ground_state_energy = eigenvalues.iter().cloned().fold(f64::INFINITY, f64::min);
 
         Ok(HamiltonianState {
             matrix_elements,
@@ -99,10 +93,17 @@ impl QuantumPort for QuantumAdapter {
         // Try GPU acceleration
         let amplitudes = if let Some(gpu) = &self.gpu_manager {
             // Separate real and imaginary parts for GPU
-            let mut amps_re: Vec<f64> = initial_state.amplitudes.iter().map(|(re, _)| *re).collect();
-            let mut amps_im: Vec<f64> = initial_state.amplitudes.iter().map(|(_, im)| *im).collect();
+            let mut amps_re: Vec<f64> =
+                initial_state.amplitudes.iter().map(|(re, _)| *re).collect();
+            let mut amps_im: Vec<f64> =
+                initial_state.amplitudes.iter().map(|(_, im)| *im).collect();
 
-            match gpu.quantum_evolve_gpu(&mut amps_re, &mut amps_im, &hamiltonian.eigenvalues, evolution_time) {
+            match gpu.quantum_evolve_gpu(
+                &mut amps_re,
+                &mut amps_im,
+                &hamiltonian.eigenvalues,
+                evolution_time,
+            ) {
                 Ok(_) => {
                     log::debug!("[QUANTUM] GPU evolution succeeded");
                     // Recombine into tuples
@@ -110,21 +111,28 @@ impl QuantumPort for QuantumAdapter {
                 }
                 Err(e) => {
                     log::warn!("[QUANTUM] GPU evolution failed: {}, falling back to CPU", e);
-                    self.evolve_state_cpu(&initial_state.amplitudes, &hamiltonian.eigenvalues, evolution_time)
+                    self.evolve_state_cpu(
+                        &initial_state.amplitudes,
+                        &hamiltonian.eigenvalues,
+                        evolution_time,
+                    )
                 }
             }
         } else {
-            self.evolve_state_cpu(&initial_state.amplitudes, &hamiltonian.eigenvalues, evolution_time)
+            self.evolve_state_cpu(
+                &initial_state.amplitudes,
+                &hamiltonian.eigenvalues,
+                evolution_time,
+            )
         };
 
         // Compute phase coherence
-        let phases: Vec<f64> = amplitudes.iter()
-            .map(|(re, im)| im.atan2(*re))
-            .collect();
+        let phases: Vec<f64> = amplitudes.iter().map(|(re, im)| im.atan2(*re)).collect();
         let phase_coherence = self.compute_phase_coherence(&phases);
 
         // Compute energy
-        let energy = amplitudes.iter()
+        let energy = amplitudes
+            .iter()
             .enumerate()
             .map(|(i, (re, im))| {
                 let prob = re * re + im * im;
@@ -159,11 +167,19 @@ impl QuantumPort for QuantumAdapter {
                 }
                 Err(e) => {
                     log::warn!("[QUANTUM] GPU phase extraction failed: {}, using CPU", e);
-                    state.amplitudes.iter().map(|(re, im)| im.atan2(*re)).collect()
+                    state
+                        .amplitudes
+                        .iter()
+                        .map(|(re, im)| im.atan2(*re))
+                        .collect()
                 }
             }
         } else {
-            state.amplitudes.iter().map(|(re, im)| im.atan2(*re)).collect()
+            state
+                .amplitudes
+                .iter()
+                .map(|(re, im)| im.atan2(*re))
+                .collect()
         };
 
         // Compute coherence matrix - try GPU first
@@ -215,7 +231,8 @@ impl QuantumPort for QuantumAdapter {
         }
 
         // Normalize
-        let norm: f64 = amplitudes.iter()
+        let norm: f64 = amplitudes
+            .iter()
             .map(|(re, im)| re * re + im * im)
             .sum::<f64>()
             .sqrt();
@@ -228,9 +245,7 @@ impl QuantumPort for QuantumAdapter {
         }
 
         // Compute phase coherence
-        let phases: Vec<f64> = amplitudes.iter()
-            .map(|(re, im)| im.atan2(*re))
-            .collect();
+        let phases: Vec<f64> = amplitudes.iter().map(|(re, im)| im.atan2(*re)).collect();
         let phase_coherence = self.compute_phase_coherence(&phases);
 
         // Compute ground state energy
@@ -275,7 +290,8 @@ impl QuantumAdapter {
         }
 
         // Normalize
-        let norm: f64 = result.iter()
+        let norm: f64 = result
+            .iter()
             .map(|(re, im)| re * re + im * im)
             .sum::<f64>()
             .sqrt();

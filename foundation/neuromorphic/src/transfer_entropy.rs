@@ -93,7 +93,8 @@ impl TransferEntropyEngine {
 
         // Build histograms for entropy calculation
         let mut hist_target_future_given_past = vec![0usize; self.config.num_bins];
-        let mut hist_target_future_given_both = vec![0usize; self.config.num_bins * self.config.num_bins];
+        let mut hist_target_future_given_both =
+            vec![0usize; self.config.num_bins * self.config.num_bins];
         let mut count = 0;
 
         // Sliding window over time series
@@ -149,7 +150,8 @@ impl TransferEntropyEngine {
             return 0;
         }
 
-        let normalized = ((value - min) / range * (self.config.num_bins - 1) as f64).clamp(0.0, (self.config.num_bins - 1) as f64);
+        let normalized = ((value - min) / range * (self.config.num_bins - 1) as f64)
+            .clamp(0.0, (self.config.num_bins - 1) as f64);
         normalized as usize
     }
 
@@ -160,7 +162,10 @@ impl TransferEntropyEngine {
         }
 
         // Simple hash: sum of discretized values
-        let sum: usize = vec.iter().map(|&x| ((x * 10.0).abs() as usize) % self.config.num_bins).sum();
+        let sum: usize = vec
+            .iter()
+            .map(|&x| ((x * 10.0).abs() as usize) % self.config.num_bins)
+            .sum();
         sum % self.config.num_bins
     }
 
@@ -204,7 +209,11 @@ impl TransferEntropyEngine {
         }
 
         // Sort by absolute flow strength
-        flows.sort_by(|a, b| b.2.abs().partial_cmp(&a.2.abs()).unwrap_or(std::cmp::Ordering::Equal));
+        flows.sort_by(|a, b| {
+            b.2.abs()
+                .partial_cmp(&a.2.abs())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         flows
     }
 }
@@ -260,7 +269,10 @@ mod tests {
         let te = engine.compute_pairwise_te(&source, &target).unwrap();
 
         // Should detect information flow
-        assert!(te > 0.0, "Transfer entropy should be positive for coupled series");
+        assert!(
+            te > 0.0,
+            "Transfer entropy should be positive for coupled series"
+        );
     }
 
     #[test]
@@ -277,7 +289,10 @@ mod tests {
         let te = engine.compute_pairwise_te(&source, &target).unwrap();
 
         // Should be near zero for independent series
-        assert!(te < 0.5, "Transfer entropy should be low for independent series");
+        assert!(
+            te < 0.5,
+            "Transfer entropy should be low for independent series"
+        );
     }
 
     #[test]

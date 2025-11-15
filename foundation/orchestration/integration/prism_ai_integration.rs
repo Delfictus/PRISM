@@ -9,53 +9,51 @@
 //! - PWSA sensor fusion
 //! - Health monitoring and resilience
 
-use std::sync::Arc;
-use parking_lot::RwLock;
-use nalgebra as na;
-use ndarray::{Array2, Array1};
 use anyhow::Result;
+use nalgebra as na;
+use ndarray::{Array1, Array2};
+use parking_lot::RwLock;
+use std::sync::Arc;
 
 // Core PRISM-AI imports
 use crate::foundation::{
     // Active Inference
     active_inference::{
-        GenerativeModel, HierarchicalModel, VariationalInference,
-        PolicySelector, ActiveInferenceController, FreeEnergyComponents,
-    },
-    // Statistical Mechanics
-    statistical_mechanics::{
-        ThermodynamicNetwork, ThermodynamicState, NetworkConfig,
-        ThermodynamicMetrics, EvolutionResult,
+        ActiveInferenceController, FreeEnergyComponents, GenerativeModel, HierarchicalModel,
+        PolicySelector, VariationalInference,
     },
     // Information Theory
     information_theory::{
-        TransferEntropy, TransferEntropyResult, CausalDirection,
-        detect_causal_direction,
+        detect_causal_direction, CausalDirection, TransferEntropy, TransferEntropyResult,
     },
     // Integration Layer
     integration::{
-        CrossDomainBridge, DomainState, CouplingStrength,
-        InformationChannel, PhaseSynchronizer, UnifiedPlatform,
-        PlatformInput, PlatformOutput,
+        CouplingStrength, CrossDomainBridge, DomainState, InformationChannel, PhaseSynchronizer,
+        PlatformInput, PlatformOutput, UnifiedPlatform,
     },
     // Resilience
     resilience::{
-        HealthMonitor, ComponentHealth, HealthStatus, SystemState,
-        CircuitBreaker, CircuitState, CircuitBreakerConfig,
+        CircuitBreaker, CircuitBreakerConfig, CircuitState, ComponentHealth, HealthMonitor,
+        HealthStatus, SystemState,
     },
     // Quantum MLIR - Note: these types don't exist yet, commenting out
     // quantum_mlir::{
     //     QuantumCircuit, QuantumGate, GpuBackend,
     //     compile_and_execute, ExecutionConfig,
     // },
+    // Statistical Mechanics
+    statistical_mechanics::{
+        EvolutionResult, NetworkConfig, ThermodynamicMetrics, ThermodynamicNetwork,
+        ThermodynamicState,
+    },
 };
 
 // PWSA imports
 #[cfg(feature = "pwsa")]
 use crate::foundation::pwsa::{
     satellite_adapters::{
-        PwsaFusionPlatform, MissionAwareness, ThreatDetection,
-        OctTelemetry, IrSensorFrame, GroundStationData,
+        GroundStationData, IrSensorFrame, MissionAwareness, OctTelemetry, PwsaFusionPlatform,
+        ThreatDetection,
     },
     streaming::StreamingFusionPlatform,
     vendor_sandbox::VendorSandbox,
@@ -63,8 +61,8 @@ use crate::foundation::pwsa::{
 
 // Mission Charlie imports
 use crate::orchestration::{
-    MissionCharlieIntegration, OrchestrationError, LLMResponse,
-    integration::mission_charlie_integration::IntegrationConfig,
+    integration::mission_charlie_integration::IntegrationConfig, LLMResponse,
+    MissionCharlieIntegration, OrchestrationError,
 };
 
 /// Unified PRISM-AI Orchestrator
@@ -122,10 +120,8 @@ impl PrismAIOrchestrator {
         let charlie = MissionCharlieIntegration::new(charlie_config).await?;
 
         // Initialize Active Inference
-        let active_inference = HierarchicalModel::new(
-            config.inference_levels,
-            config.state_dimensions.clone(),
-        );
+        let active_inference =
+            HierarchicalModel::new(config.inference_levels, config.state_dimensions.clone());
 
         // Initialize Thermodynamic Network
         let network_config = NetworkConfig {
@@ -137,10 +133,8 @@ impl PrismAIOrchestrator {
         let thermodynamic = ThermodynamicNetwork::new(network_config)?;
 
         // Initialize Cross-Domain Bridge
-        let bridge = CrossDomainBridge::new(
-            config.coupling_strength,
-            config.information_bottleneck_beta,
-        );
+        let bridge =
+            CrossDomainBridge::new(config.coupling_strength, config.information_bottleneck_beta);
 
         // Initialize Unified Platform
         let platform = UnifiedPlatform::new()?;
@@ -159,9 +153,8 @@ impl PrismAIOrchestrator {
         };
 
         // Initialize Health Monitor
-        let health_monitor = HealthMonitor::new(
-            std::time::Duration::from_secs(config.health_check_interval),
-        );
+        let health_monitor =
+            HealthMonitor::new(std::time::Duration::from_secs(config.health_check_interval));
 
         // Initialize Circuit Breaker
         let breaker_config = CircuitBreakerConfig {
@@ -309,11 +302,7 @@ impl PrismAIOrchestrator {
         let mut metrics = self.metrics.write();
         metrics.pwsa_fusions += 1;
 
-        pwsa.fuse_mission_data(
-            &context.transport,
-            &context.tracking,
-            &context.ground,
-        )
+        pwsa.fuse_mission_data(&context.transport, &context.tracking, &context.ground)
     }
 
     /// Convert query to observations for active inference
@@ -357,7 +346,10 @@ impl PrismAIOrchestrator {
             circuit.add_gate(QuantumGate::Hadamard(0));
             circuit.add_gate(QuantumGate::CNOT(0, 1));
         } else {
-            circuit.add_gate(QuantumGate::RX(0, response.confidence * std::f64::consts::PI));
+            circuit.add_gate(QuantumGate::RX(
+                0,
+                response.confidence * std::f64::consts::PI,
+            ));
             circuit.add_gate(QuantumGate::RY(1, response.free_energy));
         }
 
@@ -491,10 +483,10 @@ mod tests {
         let config = OrchestratorConfig::default();
         let orchestrator = PrismAIOrchestrator::new(config).await.unwrap();
 
-        let response = orchestrator.process_unified_query(
-            "Analyze satellite constellation for threats",
-            None,
-        ).await.unwrap();
+        let response = orchestrator
+            .process_unified_query("Analyze satellite constellation for threats", None)
+            .await
+            .unwrap();
 
         assert!(response.confidence > 0.0);
         assert!(!response.algorithms_used.is_empty());

@@ -1,7 +1,7 @@
 //! GPU-accelerated activation functions (using simple implementation)
 
-use anyhow::Result;
 use crate::gpu::gpu_enabled::SimpleGpuTensor;
+use anyhow::Result;
 
 /// Apply ReLU activation in-place
 pub fn relu_gpu(tensor: &mut SimpleGpuTensor) -> Result<()> {

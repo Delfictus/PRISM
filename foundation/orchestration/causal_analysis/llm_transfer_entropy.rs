@@ -4,11 +4,11 @@
 //!
 //! CRITICAL: Article III compliance - REAL TE (not placeholder)
 
-use ndarray::Array2;
 use anyhow::Result;
+use ndarray::Array2;
 
-use crate::information_theory::transfer_entropy::TransferEntropy;
 use super::TextToTimeSeriesConverter;
+use crate::information_theory::transfer_entropy::TransferEntropy;
 
 /// LLM Causal Analyzer
 ///
@@ -29,15 +29,13 @@ impl LLMCausalAnalyzer {
     /// Compute transfer entropy between ALL LLM pairs
     ///
     /// Article III MANDATORY: Must use real TE, not placeholder
-    pub fn compute_llm_causality(
-        &self,
-        llm_texts: &[String],
-    ) -> Result<Array2<f64>> {
+    pub fn compute_llm_causality(&self, llm_texts: &[String]) -> Result<Array2<f64>> {
         let n = llm_texts.len();
         let mut te_matrix = Array2::zeros((n, n));
 
         // Convert to time series
-        let time_series: Vec<_> = llm_texts.iter()
+        let time_series: Vec<_> = llm_texts
+            .iter()
             .map(|t| self.text_converter.convert(t))
             .collect::<Result<Vec<_>>>()?;
 
@@ -45,10 +43,9 @@ impl LLMCausalAnalyzer {
         for i in 0..n {
             for j in 0..n {
                 if i != j && time_series[i].len() >= 20 && time_series[j].len() >= 20 {
-                    let te_result = self.te_calculator.calculate(
-                        &time_series[i],
-                        &time_series[j]
-                    );
+                    let te_result = self
+                        .te_calculator
+                        .calculate(&time_series[i], &time_series[j]);
                     te_matrix[[i, j]] = te_result.effective_te;
                 }
             }
@@ -63,7 +60,8 @@ impl LLMCausalAnalyzer {
             .map(|i| te_matrix.row(i).sum())
             .collect();
 
-        outgoing_te.iter()
+        outgoing_te
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(i, _)| i)

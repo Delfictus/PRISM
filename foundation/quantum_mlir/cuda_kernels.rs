@@ -3,11 +3,11 @@
 //! Uses cudarc's PTX runtime loading instead of FFI to .o files
 //! This solves ALL linking issues - kernels loaded at runtime from PTX files
 
+use anyhow::{Context, Result};
 use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchConfig};
 use cudarc::nvrtc::compile_ptx_with_opts;
-use std::sync::Arc;
 use std::collections::HashMap;
-use anyhow::{Result, Context};
+use std::sync::Arc;
 
 /// CUDA complex number type matching cuDoubleComplex
 #[repr(C)]
@@ -23,11 +23,17 @@ impl CudaComplex {
     }
 
     pub fn zero() -> Self {
-        Self { real: 0.0, imag: 0.0 }
+        Self {
+            real: 0.0,
+            imag: 0.0,
+        }
     }
 
     pub fn one() -> Self {
-        Self { real: 1.0, imag: 0.0 }
+        Self {
+            real: 1.0,
+            imag: 0.0,
+        }
     }
 }
 
@@ -64,12 +70,12 @@ impl QuantumGpuKernels {
             }
         }
 
-        let ptx_path = ptx_path
-            .ok_or_else(|| anyhow::anyhow!("quantum_mlir.ptx not found in any expected location"))?;
+        let ptx_path = ptx_path.ok_or_else(|| {
+            anyhow::anyhow!("quantum_mlir.ptx not found in any expected location")
+        })?;
 
         // Load PTX module
-        let ptx = std::fs::read_to_string(ptx_path)
-            .context("Failed to read PTX file")?;
+        let ptx = std::fs::read_to_string(ptx_path).context("Failed to read PTX file")?;
 
         // Load PTX and kernel functions
         let kernel_names = vec![
@@ -77,10 +83,11 @@ impl QuantumGpuKernels {
             "cnot_gate_kernel",
             "qft_kernel",
             "vqe_ansatz_kernel",
-            "measurement_kernel",  // Note: it's "measurement" not "measure" in PTX
+            "measurement_kernel", // Note: it's "measurement" not "measure" in PTX
         ];
 
-        device.load_ptx(ptx.into(), "quantum_module", &kernel_names)
+        device
+            .load_ptx(ptx.into(), "quantum_module", &kernel_names)
             .context("Failed to load PTX module")?;
 
         println!("[Quantum PTX] ✓ PTX module loaded");
@@ -116,7 +123,9 @@ impl QuantumGpuKernels {
         let num_blocks = ((dimension / 2) + 255) / 256;
         let num_threads = 256;
 
-        let func = self.kernels.get("hadamard_gate_kernel")
+        let func = self
+            .kernels
+            .get("hadamard_gate_kernel")
             .ok_or_else(|| anyhow::anyhow!("Hadamard kernel not loaded"))?;
 
         let config = LaunchConfig {
@@ -129,11 +138,8 @@ impl QuantumGpuKernels {
         let num_qubits_i32 = num_qubits as i32;
 
         unsafe {
-            func.clone().launch(config, (
-                state,
-                &qubit_i32,
-                &num_qubits_i32,
-            ))?;
+            func.clone()
+                .launch(config, (state, &qubit_i32, &num_qubits_i32))?;
         }
 
         Ok(())
@@ -151,7 +157,9 @@ impl QuantumGpuKernels {
         let num_blocks = ((dimension / 4) + 255) / 256;
         let num_threads = 256;
 
-        let func = self.kernels.get("cnot_gate_kernel")
+        let func = self
+            .kernels
+            .get("cnot_gate_kernel")
             .ok_or_else(|| anyhow::anyhow!("CNOT kernel not loaded"))?;
 
         let config = LaunchConfig {
@@ -165,12 +173,8 @@ impl QuantumGpuKernels {
         let num_qubits_i32 = num_qubits as i32;
 
         unsafe {
-            func.clone().launch(config, (
-                state,
-                &control_i32,
-                &target_i32,
-                &num_qubits_i32,
-            ))?;
+            func.clone()
+                .launch(config, (state, &control_i32, &target_i32, &num_qubits_i32))?;
         }
 
         Ok(())
@@ -187,7 +191,9 @@ impl QuantumGpuKernels {
         let num_blocks = (dimension + 255) / 256;
         let num_threads = 256;
 
-        let func = self.kernels.get("qft_kernel")
+        let func = self
+            .kernels
+            .get("qft_kernel")
             .ok_or_else(|| anyhow::anyhow!("QFT kernel not loaded"))?;
 
         let config = LaunchConfig {
@@ -199,11 +205,8 @@ impl QuantumGpuKernels {
         let num_qubits_i32 = num_qubits as i32;
 
         unsafe {
-            func.clone().launch(config, (
-                state,
-                &num_qubits_i32,
-                &inverse,
-            ))?;
+            func.clone()
+                .launch(config, (state, &num_qubits_i32, &inverse))?;
         }
 
         Ok(())
@@ -221,7 +224,9 @@ impl QuantumGpuKernels {
         let num_blocks = (dimension + 255) / 256;
         let num_threads = 256;
 
-        let func = self.kernels.get("vqe_ansatz_kernel")
+        let func = self
+            .kernels
+            .get("vqe_ansatz_kernel")
             .ok_or_else(|| anyhow::anyhow!("VQE kernel not loaded"))?;
 
         let config = LaunchConfig {
@@ -234,12 +239,10 @@ impl QuantumGpuKernels {
         let num_layers_i32 = num_layers as i32;
 
         unsafe {
-            func.clone().launch(config, (
-                state,
-                parameters,
-                &num_qubits_i32,
-                &num_layers_i32,
-            ))?;
+            func.clone().launch(
+                config,
+                (state, parameters, &num_qubits_i32, &num_layers_i32),
+            )?;
         }
 
         Ok(())
@@ -255,7 +258,9 @@ impl QuantumGpuKernels {
         let num_blocks = (dimension + 255) / 256;
         let num_threads = 256;
 
-        let func = self.kernels.get("measurement_kernel")
+        let func = self
+            .kernels
+            .get("measurement_kernel")
             .ok_or_else(|| anyhow::anyhow!("Measurement kernel not loaded"))?;
 
         let config = LaunchConfig {
@@ -267,11 +272,8 @@ impl QuantumGpuKernels {
         let dimension_i32 = dimension as i32;
 
         unsafe {
-            func.clone().launch(config, (
-                state,
-                probabilities,
-                &dimension_i32,
-            ))?;
+            func.clone()
+                .launch(config, (state, probabilities, &dimension_i32))?;
         }
 
         Ok(())

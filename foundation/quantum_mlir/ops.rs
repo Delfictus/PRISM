@@ -28,14 +28,26 @@ pub struct Operation {
 
 impl Operation {
     fn new(name: &'static str, qubit: usize) -> Self {
-        Self { name, qubit, target: None }
+        Self {
+            name,
+            qubit,
+            target: None,
+        }
     }
 
     fn new_binary(name: &'static str, control: usize, target: usize) -> Self {
-        Self { name, qubit: control, target: Some(target) }
+        Self {
+            name,
+            qubit: control,
+            target: Some(target),
+        }
     }
 
     fn evolution(name: &'static str, _hamiltonian: &Hamiltonian, _time: f64) -> Self {
-        Self { name, qubit: 0, target: None }
+        Self {
+            name,
+            qubit: 0,
+            target: None,
+        }
     }
 }

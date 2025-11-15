@@ -6,10 +6,10 @@
 //! - Transfer entropy routing (25% weight)
 
 use anyhow::Result;
-use prism_ai::foundation::orchestration::integration::prism_ai_integration::PrismAIOrchestrator;
 use prism_ai::foundation::orchestration::integration::bridges::{
     ConsensusRequest, ConsensusResponse,
 };
+use prism_ai::foundation::orchestration::integration::prism_ai_integration::PrismAIOrchestrator;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -35,29 +35,35 @@ async fn main() -> Result<()> {
 
     for (i, query) in queries.iter().enumerate() {
         println!("--- Query {}: {} ---", i + 1, query);
-        
+
         // Get consensus from all models
         let consensus_response = orchestrator.llm_consensus(query, &models).await?;
-        
+
         println!("📊 Consensus Results:");
         println!("   Confidence: {:.3}", consensus_response.confidence);
         println!("   Agreement: {:.3}", consensus_response.agreement_score);
-        println!("   Response Length: {} characters", consensus_response.text.len());
-        println!("   Models Used: {}", consensus_response.model_responses.len());
-        
+        println!(
+            "   Response Length: {} characters",
+            consensus_response.text.len()
+        );
+        println!(
+            "   Models Used: {}",
+            consensus_response.model_responses.len()
+        );
+
         println!("🔬 Algorithm Weights:");
         for (algorithm, weight) in &consensus_response.algorithm_weights {
             println!("   {}: {:.1}%", algorithm, weight * 100.0);
         }
-        
+
         println!("🤖 Individual Model Responses:");
         for model_response in &consensus_response.model_responses {
-            println!("   {}: {} tokens, ${:.4} cost", 
-                     model_response.model, 
-                     model_response.tokens, 
-                     model_response.cost);
+            println!(
+                "   {}: {} tokens, ${:.4} cost",
+                model_response.model, model_response.tokens, model_response.cost
+            );
         }
-        
+
         println!("📝 Consensus Response:");
         println!("   {}", consensus_response.text);
         println!();
@@ -68,8 +74,14 @@ async fn main() -> Result<()> {
     println!("🏥 System Health:");
     println!("   Overall Health: {:?}", health.overall_health);
     println!("   Total Queries: {}", health.metrics.total_queries);
-    println!("   GPU Accelerated Ops: {}", health.metrics.gpu_accelerated_ops);
-    println!("   System Health Score: {:.3}", health.metrics.system_health);
+    println!(
+        "   GPU Accelerated Ops: {}",
+        health.metrics.gpu_accelerated_ops
+    );
+    println!(
+        "   System Health Score: {:.3}",
+        health.metrics.system_health
+    );
 
     println!("\n=== Demo Complete ===");
     Ok(())
@@ -83,12 +95,12 @@ mod tests {
     async fn test_consensus_basic() {
         let orchestrator = PrismAIOrchestrator::new(Default::default()).await.unwrap();
         let models = vec!["gpt-4", "claude-3"];
-        
-        let response = orchestrator.llm_consensus(
-            "What is 2+2?", 
-            &models
-        ).await.unwrap();
-        
+
+        let response = orchestrator
+            .llm_consensus("What is 2+2?", &models)
+            .await
+            .unwrap();
+
         assert!(!response.text.is_empty());
         assert!(response.confidence > 0.0);
         assert!(response.agreement_score > 0.0);
@@ -100,12 +112,11 @@ mod tests {
     async fn test_consensus_error_handling() {
         let orchestrator = PrismAIOrchestrator::new(Default::default()).await.unwrap();
         let invalid_models = vec!["nonexistent-model"];
-        
-        let result = orchestrator.llm_consensus(
-            "Test query", 
-            &invalid_models
-        ).await;
-        
+
+        let result = orchestrator
+            .llm_consensus("Test query", &invalid_models)
+            .await;
+
         // Should handle errors gracefully
         assert!(result.is_err());
     }

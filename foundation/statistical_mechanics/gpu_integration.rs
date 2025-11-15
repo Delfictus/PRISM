@@ -3,7 +3,9 @@
 
 use anyhow::Result;
 
-use super::{ThermodynamicNetwork, ThermodynamicState, NetworkConfig, EvolutionResult, ThermodynamicMetrics};
+use super::{
+    EvolutionResult, NetworkConfig, ThermodynamicMetrics, ThermodynamicNetwork, ThermodynamicState,
+};
 
 /// Extension trait to add GPU acceleration to ThermodynamicNetwork
 pub trait ThermodynamicNetworkGpuExt {
@@ -42,5 +44,5 @@ impl ThermodynamicNetworkGpuExt for ThermodynamicNetwork {
             // Check for compiled thermodynamic PTX kernel
             std::path::Path::new("src/kernels/ptx/thermodynamic.ptx").exists()
         }
-            }
+    }
 }

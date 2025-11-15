@@ -4,29 +4,29 @@
 //! providing complete thermodynamic consensus, quantum entanglement analysis,
 //! neuromorphic processing, and advanced causal inference.
 
-use crate::orchestration::{OrchestrationError, LLMOrchestrator};
-use crate::orchestration::QuantumVotingConsensus;
-use crate::orchestration::ThermodynamicConsensus;
-use crate::orchestration::QuantumApproximateCache;
-use crate::orchestration::TransferEntropyRouter;
+use crate::orchestration::causality::bidirectional_causality::BidirectionalCausalityAnalyzer;
 use crate::orchestration::decomposition::pid_synergy::PIDSynergyDecomposition;
 use crate::orchestration::inference::hierarchical_active_inference::HierarchicalActiveInference;
-use crate::orchestration::neuromorphic::unified_neuromorphic::UnifiedNeuromorphicProcessor;
-use crate::orchestration::causality::bidirectional_causality::BidirectionalCausalityAnalyzer;
 use crate::orchestration::inference::joint_active_inference::JointActiveInference;
+use crate::orchestration::neuromorphic::unified_neuromorphic::UnifiedNeuromorphicProcessor;
 use crate::orchestration::optimization::geometric_manifold::GeometricManifoldOptimizer;
 use crate::orchestration::quantum::quantum_entanglement_measures::QuantumEntanglementAnalyzer;
+use crate::orchestration::QuantumApproximateCache;
+use crate::orchestration::QuantumVotingConsensus;
+use crate::orchestration::ThermodynamicConsensus;
+use crate::orchestration::TransferEntropyRouter;
+use crate::orchestration::{LLMOrchestrator, OrchestrationError};
 
-use nalgebra::{DVector, DMatrix};
+use nalgebra::{DMatrix, DVector};
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
 
 // PWSA imports for real integration
 #[cfg(feature = "pwsa")]
 use crate::pwsa::satellite_adapters::{
-    PwsaFusionPlatform, MissionAwareness, ThreatDetection,
-    OctTelemetry, IrSensorFrame, GroundStationData,
+    GroundStationData, IrSensorFrame, MissionAwareness, OctTelemetry, PwsaFusionPlatform,
+    ThreatDetection,
 };
 
 /// Mission Charlie Complete Integration System
@@ -91,39 +91,31 @@ impl MissionCharlieIntegration {
         let quantum_cache = QuantumApproximateCache::new(
             config.cache_size,
             config.num_hash_functions,
-            config.similarity_threshold
+            config.similarity_threshold,
         )?;
 
         // Initialize Tier 2 algorithms
         let quantum_voting = QuantumVotingConsensus::new(config.num_llms)?;
         let pid_decomposition = PIDSynergyDecomposition::new(
             crate::orchestration::decomposition::pid_synergy::RedundancyMeasure::Imin,
-            config.max_pid_order
+            config.max_pid_order,
         );
         let hierarchical_inference = HierarchicalActiveInference::new(
             config.hierarchy_levels.clone(),
-            config.temporal_depth
+            config.temporal_depth,
         )?;
-        let transfer_entropy = TransferEntropyRouter::new(
-            config.num_llms,
-            config.history_length
-        )?;
+        let transfer_entropy = TransferEntropyRouter::new(config.num_llms, config.history_length)?;
 
         // Initialize Tier 3 algorithms
         let neuromorphic = UnifiedNeuromorphicProcessor::new(
             config.input_neurons,
             config.hidden_neurons,
-            config.output_neurons
+            config.output_neurons,
         )?;
         let causality = BidirectionalCausalityAnalyzer::new();
-        let joint_inference = JointActiveInference::new(
-            config.num_agents,
-            config.state_dimension
-        )?;
-        let manifold_optimizer = GeometricManifoldOptimizer::new(
-            config.manifold_type,
-            config.manifold_dimension
-        )?;
+        let joint_inference = JointActiveInference::new(config.num_agents, config.state_dimension)?;
+        let manifold_optimizer =
+            GeometricManifoldOptimizer::new(config.manifold_type, config.manifold_dimension)?;
         let entanglement = QuantumEntanglementAnalyzer::new(config.quantum_dimension)?;
 
         // Initialize thermodynamic consensus
@@ -163,11 +155,17 @@ impl MissionCharlieIntegration {
     }
 
     /// Process query using all 12 algorithms in synergy
-    pub async fn process_query_full_integration(&mut self, query: &str) -> Result<IntegratedResponse, OrchestrationError> {
+    pub async fn process_query_full_integration(
+        &mut self,
+        query: &str,
+    ) -> Result<IntegratedResponse, OrchestrationError> {
         // Stage 1: Cache lookup with quantum approximate NN
         if let Some(cached) = self.quantum_cache.get(query).await? {
-            self.metrics.usage_counts.entry("quantum_cache".to_string())
-                .and_modify(|c| *c += 1).or_insert(1);
+            self.metrics
+                .usage_counts
+                .entry("quantum_cache".to_string())
+                .and_modify(|c| *c += 1)
+                .or_insert(1);
 
             if cached.similarity > 0.95 {
                 return Ok(IntegratedResponse {
@@ -182,88 +180,136 @@ impl MissionCharlieIntegration {
 
         // Stage 2: Route to appropriate LLMs using transfer entropy
         let routing_decision = self.transfer_entropy.route_query(query).await?;
-        self.metrics.usage_counts.entry("transfer_entropy".to_string())
-            .and_modify(|c| *c += 1).or_insert(1);
+        self.metrics
+            .usage_counts
+            .entry("transfer_entropy".to_string())
+            .and_modify(|c| *c += 1)
+            .or_insert(1);
 
         // Stage 3: Query selected LLMs
-        let llm_responses = self.orchestrator.query_selected_llms(
-            query,
-            &routing_decision.selected_llms
-        ).await?;
+        let llm_responses = self
+            .orchestrator
+            .query_selected_llms(query, &routing_decision.selected_llms)
+            .await?;
 
         // Stage 4: Analyze response synergy with PID
         let synergy_analysis = self.pid_decomposition.decompose(
-            &llm_responses.iter().map(|r| r.content.clone()).collect::<Vec<_>>(),
-            query
+            &llm_responses
+                .iter()
+                .map(|r| r.content.clone())
+                .collect::<Vec<_>>(),
+            query,
         )?;
-        self.metrics.usage_counts.entry("pid_synergy".to_string())
-            .and_modify(|c| *c += 1).or_insert(1);
+        self.metrics
+            .usage_counts
+            .entry("pid_synergy".to_string())
+            .and_modify(|c| *c += 1)
+            .or_insert(1);
 
         // Stage 5: Analyze causal relationships
         let mut causal_pairs = Vec::new();
         for i in 0..llm_responses.len() {
-            for j in i+1..llm_responses.len() {
+            for j in i + 1..llm_responses.len() {
                 let x_data = self.encode_response(&llm_responses[i].content);
                 let y_data = self.encode_response(&llm_responses[j].content);
 
                 let causality = self.causality.analyze(
-                    &format!("llm_{}", i), &x_data,
-                    &format!("llm_{}", j), &y_data
+                    &format!("llm_{}", i),
+                    &x_data,
+                    &format!("llm_{}", j),
+                    &y_data,
                 )?;
 
                 causal_pairs.push((i, j, causality.strength.overall));
             }
         }
-        self.metrics.usage_counts.entry("causality".to_string())
-            .and_modify(|c| *c += 1).or_insert(1);
+        self.metrics
+            .usage_counts
+            .entry("causality".to_string())
+            .and_modify(|c| *c += 1)
+            .or_insert(1);
 
         // Stage 6: Compute quantum entanglement
         let entanglement_analysis = self.entanglement.analyze_llm_entanglement(
-            &llm_responses.iter().map(|r| r.content.clone()).collect::<Vec<_>>()
+            &llm_responses
+                .iter()
+                .map(|r| r.content.clone())
+                .collect::<Vec<_>>(),
         )?;
-        self.metrics.usage_counts.entry("entanglement".to_string())
-            .and_modify(|c| *c += 1).or_insert(1);
+        self.metrics
+            .usage_counts
+            .entry("entanglement".to_string())
+            .and_modify(|c| *c += 1)
+            .or_insert(1);
 
         // Stage 7: Process through neuromorphic system
         let neuromorphic_consensus = self.neuromorphic.process_llm_responses(
-            &llm_responses.iter().map(|r| r.content.clone()).collect::<Vec<_>>()
+            &llm_responses
+                .iter()
+                .map(|r| r.content.clone())
+                .collect::<Vec<_>>(),
         )?;
-        self.metrics.usage_counts.entry("neuromorphic".to_string())
-            .and_modify(|c| *c += 1).or_insert(1);
+        self.metrics
+            .usage_counts
+            .entry("neuromorphic".to_string())
+            .and_modify(|c| *c += 1)
+            .or_insert(1);
 
         // Stage 8: Apply hierarchical active inference
         let observations = self.encode_responses_as_observations(&llm_responses);
         let inference_result = self.hierarchical_inference.infer(&observations)?;
-        self.metrics.usage_counts.entry("hierarchical_inference".to_string())
-            .and_modify(|c| *c += 1).or_insert(1);
+        self.metrics
+            .usage_counts
+            .entry("hierarchical_inference".to_string())
+            .and_modify(|c| *c += 1)
+            .or_insert(1);
 
         // Stage 9: Joint active inference for coordination
         let joint_result = self.joint_inference.process_llm_responses(
-            &llm_responses.iter().map(|r| r.content.clone()).collect::<Vec<_>>()
+            &llm_responses
+                .iter()
+                .map(|r| r.content.clone())
+                .collect::<Vec<_>>(),
         )?;
-        self.metrics.usage_counts.entry("joint_inference".to_string())
-            .and_modify(|c| *c += 1).or_insert(1);
+        self.metrics
+            .usage_counts
+            .entry("joint_inference".to_string())
+            .and_modify(|c| *c += 1)
+            .or_insert(1);
 
         // Stage 10: Optimize on manifold
         let quality_fn = |response: &str| -> f64 {
             // Quality metric based on response characteristics
             let length_score = 1.0 / (1.0 + (response.len() as f64 - 200.0).abs() / 100.0);
-            let diversity_score = response.chars().collect::<std::collections::HashSet<_>>().len() as f64 / 100.0;
+            let diversity_score = response
+                .chars()
+                .collect::<std::collections::HashSet<_>>()
+                .len() as f64
+                / 100.0;
             length_score * diversity_score
         };
 
         let manifold_result = self.manifold_optimizer.optimize_llm_responses(
-            &llm_responses.iter().map(|r| r.content.clone()).collect::<Vec<_>>(),
-            quality_fn
+            &llm_responses
+                .iter()
+                .map(|r| r.content.clone())
+                .collect::<Vec<_>>(),
+            quality_fn,
         )?;
-        self.metrics.usage_counts.entry("manifold".to_string())
-            .and_modify(|c| *c += 1).or_insert(1);
+        self.metrics
+            .usage_counts
+            .entry("manifold".to_string())
+            .and_modify(|c| *c += 1)
+            .or_insert(1);
 
         // Stage 11: Apply consensus algorithm based on analysis
         let consensus = if synergy_analysis.synergy > synergy_analysis.redundancy {
             // High synergy - use quantum voting
             self.quantum_voting.compute_consensus(
-                &llm_responses.iter().map(|r| r.content.clone()).collect::<Vec<_>>()
+                &llm_responses
+                    .iter()
+                    .map(|r| r.content.clone())
+                    .collect::<Vec<_>>(),
             )?
         } else if entanglement_analysis.entanglement_measures.is_entangled {
             // Entangled responses - use thermodynamic consensus
@@ -285,10 +331,11 @@ impl MissionCharlieIntegration {
                 &synergy_analysis,
                 &entanglement_analysis,
                 &neuromorphic_consensus,
-                &inference_result
+                &inference_result,
             ),
             algorithms_used: self.get_algorithms_used(),
-            consensus_type: self.determine_consensus_type(&synergy_analysis, &entanglement_analysis),
+            consensus_type: self
+                .determine_consensus_type(&synergy_analysis, &entanglement_analysis),
             processing_time_ms: 0, // Would track actual time
         })
     }
@@ -306,28 +353,37 @@ impl MissionCharlieIntegration {
     }
 
     /// Encode responses as observations
-    fn encode_responses_as_observations(&self, responses: &[crate::orchestration::LLMResponse]) -> Vec<DVector<f64>> {
-        responses.iter()
+    fn encode_responses_as_observations(
+        &self,
+        responses: &[crate::orchestration::LLMResponse],
+    ) -> Vec<DVector<f64>> {
+        responses
+            .iter()
             .map(|r| self.encode_response(&r.content))
             .collect()
     }
 
     /// Compute integrated confidence
-    fn compute_integrated_confidence(&self,
-                                      synergy: &crate::orchestration::decomposition::pid_synergy::PIDDecomposition,
-                                      entanglement: &crate::orchestration::quantum::quantum_entanglement_measures::LLMEntanglementAnalysis,
-                                      neuromorphic: &crate::orchestration::neuromorphic::unified_neuromorphic::NeuromorphicConsensus,
-                                      inference: &crate::orchestration::inference::hierarchical_active_inference::InferenceResult) -> f64 {
+    fn compute_integrated_confidence(
+        &self,
+        synergy: &crate::orchestration::decomposition::pid_synergy::PIDDecomposition,
+        entanglement: &crate::orchestration::quantum::quantum_entanglement_measures::LLMEntanglementAnalysis,
+        neuromorphic: &crate::orchestration::neuromorphic::unified_neuromorphic::NeuromorphicConsensus,
+        inference: &crate::orchestration::inference::hierarchical_active_inference::InferenceResult,
+    ) -> f64 {
         // Weighted combination of confidence metrics
         let weights = [0.2, 0.3, 0.2, 0.3];
         let confidences = [
             synergy.complexity,
-            entanglement.quantum_correlation / (entanglement.quantum_correlation + entanglement.classical_correlation + 1e-10),
+            entanglement.quantum_correlation
+                / (entanglement.quantum_correlation + entanglement.classical_correlation + 1e-10),
             neuromorphic.confidence,
             inference.confidence,
         ];
 
-        weights.iter().zip(confidences.iter())
+        weights
+            .iter()
+            .zip(confidences.iter())
             .map(|(w, c)| w * c)
             .sum()
     }
@@ -338,9 +394,11 @@ impl MissionCharlieIntegration {
     }
 
     /// Determine consensus type
-    fn determine_consensus_type(&self,
-                                synergy: &crate::orchestration::decomposition::pid_synergy::PIDDecomposition,
-                                entanglement: &crate::orchestration::quantum::quantum_entanglement_measures::LLMEntanglementAnalysis) -> ConsensusType {
+    fn determine_consensus_type(
+        &self,
+        synergy: &crate::orchestration::decomposition::pid_synergy::PIDDecomposition,
+        entanglement: &crate::orchestration::quantum::quantum_entanglement_measures::LLMEntanglementAnalysis,
+    ) -> ConsensusType {
         if synergy.synergy > synergy.redundancy * 2.0 {
             ConsensusType::Synergistic
         } else if entanglement.entanglement_measures.is_entangled {
@@ -356,7 +414,8 @@ impl MissionCharlieIntegration {
     fn update_metrics(&mut self, responses: &[crate::orchestration::LLMResponse]) {
         // Update efficiency based on response quality and speed
         let total_time: f64 = responses.iter().map(|r| r.latency_ms as f64).sum();
-        let avg_confidence: f64 = responses.iter().map(|r| r.confidence).sum::<f64>() / responses.len() as f64;
+        let avg_confidence: f64 =
+            responses.iter().map(|r| r.confidence).sum::<f64>() / responses.len() as f64;
 
         self.metrics.efficiency = avg_confidence / (1.0 + total_time / 1000.0);
 
@@ -396,7 +455,9 @@ impl MissionCharlieIntegration {
         );
 
         // Process through full integration pipeline
-        let mut response = self.process_query_full_integration(&augmented_query).await?;
+        let mut response = self
+            .process_query_full_integration(&augmented_query)
+            .await?;
 
         // Add sensor fusion to algorithms used
         response.algorithms_used.push("pwsa_fusion".to_string());
@@ -410,7 +471,8 @@ impl MissionCharlieIntegration {
             algorithms_available: 12,
             algorithms_active: self.metrics.usage_counts.len(),
             cache_hit_rate: self.quantum_cache.get_hit_rate(),
-            average_confidence: self.metrics.performance.values().sum::<f64>() / self.metrics.performance.len().max(1) as f64,
+            average_confidence: self.metrics.performance.values().sum::<f64>()
+                / self.metrics.performance.len().max(1) as f64,
             system_efficiency: self.metrics.efficiency,
             total_queries_processed: self.metrics.usage_counts.values().sum(),
         }
@@ -426,30 +488,60 @@ impl MissionCharlieIntegration {
         };
 
         // Test each algorithm
-        report.algorithm_status.insert("quantum_cache".to_string(), self.quantum_cache.is_healthy());
-        report.algorithm_status.insert("quantum_voting".to_string(), true);
-        report.algorithm_status.insert("thermodynamic".to_string(), true);
-        report.algorithm_status.insert("transfer_entropy".to_string(), true);
-        report.algorithm_status.insert("pid_synergy".to_string(), true);
-        report.algorithm_status.insert("hierarchical_inference".to_string(), true);
-        report.algorithm_status.insert("neuromorphic".to_string(), true);
-        report.algorithm_status.insert("causality".to_string(), true);
-        report.algorithm_status.insert("joint_inference".to_string(), true);
+        report
+            .algorithm_status
+            .insert("quantum_cache".to_string(), self.quantum_cache.is_healthy());
+        report
+            .algorithm_status
+            .insert("quantum_voting".to_string(), true);
+        report
+            .algorithm_status
+            .insert("thermodynamic".to_string(), true);
+        report
+            .algorithm_status
+            .insert("transfer_entropy".to_string(), true);
+        report
+            .algorithm_status
+            .insert("pid_synergy".to_string(), true);
+        report
+            .algorithm_status
+            .insert("hierarchical_inference".to_string(), true);
+        report
+            .algorithm_status
+            .insert("neuromorphic".to_string(), true);
+        report
+            .algorithm_status
+            .insert("causality".to_string(), true);
+        report
+            .algorithm_status
+            .insert("joint_inference".to_string(), true);
         report.algorithm_status.insert("manifold".to_string(), true);
-        report.algorithm_status.insert("entanglement".to_string(), true);
+        report
+            .algorithm_status
+            .insert("entanglement".to_string(), true);
 
         // Test integrations
-        report.integration_tests.insert("cache_orchestrator".to_string(), true);
-        report.integration_tests.insert("consensus_routing".to_string(), true);
-        report.integration_tests.insert("inference_chain".to_string(), true);
+        report
+            .integration_tests
+            .insert("cache_orchestrator".to_string(), true);
+        report
+            .integration_tests
+            .insert("consensus_routing".to_string(), true);
+        report
+            .integration_tests
+            .insert("inference_chain".to_string(), true);
 
         // Generate recommendations
         if self.metrics.efficiency < 0.5 {
-            report.recommendations.push("System efficiency low - consider adjusting consensus thresholds".to_string());
+            report.recommendations.push(
+                "System efficiency low - consider adjusting consensus thresholds".to_string(),
+            );
         }
 
         if self.quantum_cache.get_hit_rate() < 0.1 {
-            report.recommendations.push("Cache hit rate low - consider increasing cache size".to_string());
+            report
+                .recommendations
+                .push("Cache hit rate low - consider increasing cache size".to_string());
         }
 
         Ok(report)
@@ -495,7 +587,8 @@ impl Default for IntegrationConfig {
             output_neurons: 50,
             num_agents: 4,
             state_dimension: 20,
-            manifold_type: crate::orchestration::optimization::geometric_manifold::ManifoldType::Sphere,
+            manifold_type:
+                crate::orchestration::optimization::geometric_manifold::ManifoldType::Sphere,
             manifold_dimension: 10,
             quantum_dimension: 4,
         }
@@ -552,9 +645,10 @@ mod tests {
         let config = IntegrationConfig::default();
         let mut integration = MissionCharlieIntegration::new(config).await.unwrap();
 
-        let response = integration.process_query_full_integration(
-            "What is transfer entropy in information theory?"
-        ).await.unwrap();
+        let response = integration
+            .process_query_full_integration("What is transfer entropy in information theory?")
+            .await
+            .unwrap();
 
         assert!(!response.response.is_empty());
         assert!(response.confidence > 0.0);

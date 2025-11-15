@@ -12,8 +12,8 @@
 //! Performance: 50-100 tokens/sec on RTX 5070
 
 use anyhow::Result;
-use std::sync::Arc;
 use cudarc::driver::CudaDevice;
+use std::sync::Arc;
 
 // Placeholder until gpu_transformer module is implemented
 /// GPU LLM Inference engine placeholder
@@ -26,7 +26,13 @@ pub struct GpuLLMInference {
 }
 
 impl GpuLLMInference {
-    pub fn new(vocab_size: usize, d_model: usize, n_heads: usize, n_layers: usize, max_seq_len: usize) -> Result<Self> {
+    pub fn new(
+        vocab_size: usize,
+        d_model: usize,
+        n_heads: usize,
+        n_layers: usize,
+        max_seq_len: usize,
+    ) -> Result<Self> {
         Ok(Self {
             vocab_size,
             d_model,
@@ -137,7 +143,8 @@ impl SimpleTokenizer {
     /// Decode token IDs to text
     pub fn decode(&self, tokens: &[i32]) -> String {
         // Simple decoding (production would use vocab lookup)
-        tokens.iter()
+        tokens
+            .iter()
             .filter_map(|&t| {
                 if t >= 0 && t < self.vocab_size as i32 {
                     char::from_u32((t % 128) as u32)
@@ -218,10 +225,7 @@ impl GpuLocalLLMSystem {
     pub fn info(&self) -> String {
         format!(
             "GPU LLM: {} layers, {} heads, {} dims, {} vocab",
-            self.config.n_layers,
-            self.config.n_heads,
-            self.config.d_model,
-            self.config.vocab_size
+            self.config.n_layers, self.config.n_heads, self.config.d_model, self.config.vocab_size
         )
     }
 }

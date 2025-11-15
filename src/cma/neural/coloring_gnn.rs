@@ -1,12 +1,11 @@
+use super::onnx_gnn::{OnnxGNN, OnnxGnnPrediction};
 ///! Graph Coloring GNN - ONNX Runtime Integration
 ///!
 ///! GPU-ONLY inference using ONNX Runtime with CUDA execution provider
 ///!
 ///! Loads trained GATv2 model exported from Python for color prediction.
-
 use ndarray::{Array1, Array2};
 use std::path::Path;
-use super::onnx_gnn::{OnnxGNN, OnnxGnnPrediction};
 
 /// GNN predictions for graph coloring
 #[derive(Debug, Clone)]
@@ -32,7 +31,7 @@ pub struct ColoringGNN {
     model_path: String,
     max_colors: usize,
     device_id: i32,
-    onnx_model: Option<OnnxGNN>,  // Real ONNX Runtime model (if file exists)
+    onnx_model: Option<OnnxGNN>, // Real ONNX Runtime model (if file exists)
 }
 
 impl ColoringGNN {
@@ -116,7 +115,8 @@ impl ColoringGNN {
             // REAL ONNX RUNTIME INFERENCE
             let edge_index = adjacency_to_edge_list(adjacency);
 
-            let onnx_pred = onnx_model.predict(node_features, &edge_index)
+            let onnx_pred = onnx_model
+                .predict(node_features, &edge_index)
                 .map_err(|e| format!("ONNX inference failed: {}", e))?;
 
             // Convert OnnxGnnPrediction to GnnPrediction
@@ -184,7 +184,8 @@ impl ColoringGNN {
         let n = prediction.node_color_logits.nrows();
         let mut vertex_colors: Vec<(usize, usize)> = (0..n)
             .map(|v| {
-                let color = prediction.node_color_logits
+                let color = prediction
+                    .node_color_logits
                     .row(v)
                     .iter()
                     .enumerate()

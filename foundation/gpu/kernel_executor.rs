@@ -3,11 +3,11 @@
 //! This module provides the infrastructure to compile, load and execute
 //! actual GPU kernels using the correct cudarc API.
 
-use anyhow::{Result, Context as AnyhowContext};
+use anyhow::{Context as AnyhowContext, Result};
 use cudarc::{
-    driver::{CudaDevice, LaunchConfig, CudaFunction, LaunchAsync},
-    nvrtc::{compile_ptx_with_opts, CompileOptions},
     curand::CudaRng,
+    driver::{CudaDevice, CudaFunction, LaunchAsync, LaunchConfig},
+    nvrtc::{compile_ptx_with_opts, CompileOptions},
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -1074,8 +1074,7 @@ pub struct GpuKernelExecutor {
 impl GpuKernelExecutor {
     /// Create a new kernel executor
     pub fn new(device_id: usize) -> Result<Self> {
-        let device = CudaDevice::new(device_id)
-            .context("Failed to create CUDA device")?;
+        let device = CudaDevice::new(device_id).context("Failed to create CUDA device")?;
 
         println!("✅ GPU Kernel Executor initialized on device {}", device_id);
         println!("✅ cuRAND will be created on-demand for random operations");
@@ -1102,11 +1101,14 @@ impl GpuKernelExecutor {
         // Load PTX into device
         let module_name = format!("{}_module", name);
         let name_owned: &'static str = Box::leak(name.to_string().into_boxed_str());
-        self.device.load_ptx(ptx, &module_name, &[name_owned])
+        self.device
+            .load_ptx(ptx, &module_name, &[name_owned])
             .with_context(|| format!("Failed to load PTX module for: {}", name))?;
 
         // Get function
-        let func = self.device.get_func(&module_name, name_owned)
+        let func = self
+            .device
+            .get_func(&module_name, name_owned)
             .with_context(|| format!("Failed to get function: {}", name))?;
 
         // Store function
@@ -1184,7 +1186,8 @@ impl GpuKernelExecutor {
 
     /// Get a kernel function
     pub fn get_kernel(&self, name: &str) -> Result<&CudaFunction> {
-        self.kernels.get(name)
+        self.kernels
+            .get(name)
             .ok_or_else(|| anyhow::anyhow!("Kernel '{}' not found", name))
     }
 
@@ -1214,7 +1217,9 @@ impl GpuKernelExecutor {
         let cfg = LaunchConfig::for_num_elems(n as u32);
         let n_i32 = n as i32;
         unsafe {
-            kernel.clone().launch(cfg, (&a_dev, &b_dev, &mut c_dev, n_i32))?;
+            kernel
+                .clone()
+                .launch(cfg, (&a_dev, &b_dev, &mut c_dev, n_i32))?;
         }
 
         // Download result
@@ -1223,7 +1228,14 @@ impl GpuKernelExecutor {
     }
 
     /// Execute matrix multiplication
-    pub fn matrix_multiply(&self, a: &[f32], b: &[f32], m: usize, k: usize, n: usize) -> Result<Vec<f32>> {
+    pub fn matrix_multiply(
+        &self,
+        a: &[f32],
+        b: &[f32],
+        m: usize,
+        k: usize,
+        n: usize,
+    ) -> Result<Vec<f32>> {
         anyhow::ensure!(a.len() == m * k, "Matrix A dimensions incorrect");
         anyhow::ensure!(b.len() == k * n, "Matrix B dimensions incorrect");
 
@@ -1249,7 +1261,9 @@ impl GpuKernelExecutor {
         let k_i32 = k as i32;
         let n_i32 = n as i32;
         unsafe {
-            kernel.clone().launch(cfg, (&a_dev, &b_dev, &mut c_dev, m_i32, k_i32, n_i32))?;
+            kernel
+                .clone()
+                .launch(cfg, (&a_dev, &b_dev, &mut c_dev, m_i32, k_i32, n_i32))?;
         }
 
         // Download result
@@ -1300,7 +1314,9 @@ impl GpuKernelExecutor {
         let batch_size_i32 = batch_size as i32;
         let num_classes_i32 = num_classes as i32;
         unsafe {
-            kernel.clone().launch(cfg, (&mut data_dev, batch_size_i32, num_classes_i32))?;
+            kernel
+                .clone()
+                .launch(cfg, (&mut data_dev, batch_size_i32, num_classes_i32))?;
         }
 
         // Download result
@@ -1373,7 +1389,9 @@ impl GpuKernelExecutor {
 
         let n_i32 = n as i32;
         unsafe {
-            kernel.clone().launch(cfg, (&q_dev, &p_dev, &mut kl_dev, n_i32))?;
+            kernel
+                .clone()
+                .launch(cfg, (&q_dev, &p_dev, &mut kl_dev, n_i32))?;
         }
 
         // Download result
@@ -1397,7 +1415,9 @@ impl GpuKernelExecutor {
         let cfg = LaunchConfig::for_num_elems(n as u32);
         let n_i32 = n as i32;
         unsafe {
-            kernel.clone().launch(cfg, (&a_dev, &b_dev, &mut c_dev, n_i32))?;
+            kernel
+                .clone()
+                .launch(cfg, (&a_dev, &b_dev, &mut c_dev, n_i32))?;
         }
 
         // Download result
@@ -1432,9 +1452,17 @@ impl GpuKernelExecutor {
     }
 
     /// Compute free energy on GPU
-    pub fn compute_free_energy(&self, posterior: &[f32], prior: &[f32], log_likelihood: f32) -> Result<f32> {
+    pub fn compute_free_energy(
+        &self,
+        posterior: &[f32],
+        prior: &[f32],
+        log_likelihood: f32,
+    ) -> Result<f32> {
         let n = posterior.len();
-        anyhow::ensure!(prior.len() == n, "Posterior and prior must have same length");
+        anyhow::ensure!(
+            prior.len() == n,
+            "Posterior and prior must have same length"
+        );
         anyhow::ensure!(n <= 256, "Free energy kernel supports max 256 elements");
 
         let kernel = self.get_kernel("free_energy_kernel")?;
@@ -1453,7 +1481,16 @@ impl GpuKernelExecutor {
 
         let n_i32 = n as i32;
         unsafe {
-            kernel.clone().launch(cfg, (&posterior_dev, &prior_dev, log_likelihood, &mut fe_dev, n_i32))?;
+            kernel.clone().launch(
+                cfg,
+                (
+                    &posterior_dev,
+                    &prior_dev,
+                    log_likelihood,
+                    &mut fe_dev,
+                    n_i32,
+                ),
+            )?;
         }
 
         // Download result
@@ -1462,9 +1499,18 @@ impl GpuKernelExecutor {
     }
 
     /// Reservoir state update with leaky integration on GPU
-    pub fn reservoir_update(&self, state: &mut [f32], prev_state: &[f32], input: &[f32], leak_rate: f32) -> Result<()> {
+    pub fn reservoir_update(
+        &self,
+        state: &mut [f32],
+        prev_state: &[f32],
+        input: &[f32],
+        leak_rate: f32,
+    ) -> Result<()> {
         let n = state.len();
-        anyhow::ensure!(prev_state.len() == n && input.len() == n, "All arrays must have same length");
+        anyhow::ensure!(
+            prev_state.len() == n && input.len() == n,
+            "All arrays must have same length"
+        );
 
         let kernel = self.get_kernel("reservoir_update")?;
 
@@ -1477,7 +1523,16 @@ impl GpuKernelExecutor {
         let cfg = LaunchConfig::for_num_elems(n as u32);
         let n_i32 = n as i32;
         unsafe {
-            kernel.clone().launch(cfg, (&mut state_dev, &prev_state_dev, &input_dev, leak_rate, n_i32))?;
+            kernel.clone().launch(
+                cfg,
+                (
+                    &mut state_dev,
+                    &prev_state_dev,
+                    &input_dev,
+                    leak_rate,
+                    n_i32,
+                ),
+            )?;
         }
 
         // Download result
@@ -1500,7 +1555,9 @@ impl GpuKernelExecutor {
         let cfg = LaunchConfig::for_num_elems(n as u32);
         let n_i32 = n as i32;
         unsafe {
-            kernel.clone().launch(cfg, (&input_dev, &mut output_dev, n_i32))?;
+            kernel
+                .clone()
+                .launch(cfg, (&input_dev, &mut output_dev, n_i32))?;
         }
 
         // Download result
@@ -1531,7 +1588,9 @@ impl GpuKernelExecutor {
 
         let n_i32 = n as i32;
         unsafe {
-            kernel.clone().launch(cfg, (&a_dev, &b_dev, &mut result_dev, n_i32))?;
+            kernel
+                .clone()
+                .launch(cfg, (&a_dev, &b_dev, &mut result_dev, n_i32))?;
         }
 
         // Download result
@@ -1560,7 +1619,9 @@ impl GpuKernelExecutor {
 
         let n_i32 = n as i32;
         unsafe {
-            kernel.clone().launch(cfg, (&data_dev, &mut sum_dev, n_i32))?;
+            kernel
+                .clone()
+                .launch(cfg, (&data_dev, &mut sum_dev, n_i32))?;
         }
 
         // Download result
@@ -1590,7 +1651,9 @@ impl GpuKernelExecutor {
 
         let n_i32 = n as i32;
         unsafe {
-            kernel.clone().launch(cfg, (&probs_dev, &mut entropy_dev, n_i32))?;
+            kernel
+                .clone()
+                .launch(cfg, (&probs_dev, &mut entropy_dev, n_i32))?;
         }
 
         // Download result
@@ -1601,7 +1664,13 @@ impl GpuKernelExecutor {
     /// Broadcast add bias to batched data on GPU
     /// data[batch, features] += bias[features]
     /// GPU KERNEL - NO CPU LOOPS
-    pub fn broadcast_add_inplace(&self, data: &mut [f32], bias: &[f32], batch_size: usize, features: usize) -> Result<()> {
+    pub fn broadcast_add_inplace(
+        &self,
+        data: &mut [f32],
+        bias: &[f32],
+        batch_size: usize,
+        features: usize,
+    ) -> Result<()> {
         anyhow::ensure!(data.len() == batch_size * features, "Data size mismatch");
         anyhow::ensure!(bias.len() == features, "Bias size mismatch");
 
@@ -1618,7 +1687,10 @@ impl GpuKernelExecutor {
         let batch_size_i32 = batch_size as i32;
         let features_i32 = features as i32;
         unsafe {
-            kernel.clone().launch(cfg, (&mut data_dev, &bias_dev, batch_size_i32, features_i32))?;
+            kernel.clone().launch(
+                cfg,
+                (&mut data_dev, &bias_dev, batch_size_i32, features_i32),
+            )?;
         }
 
         // Download result
@@ -1690,8 +1762,7 @@ pub fn get_global_executor() -> Result<&'static std::sync::Mutex<GpuKernelExecut
     static EXECUTOR: OnceLock<Mutex<GpuKernelExecutor>> = OnceLock::new();
 
     let executor = EXECUTOR.get_or_init(|| {
-        let mut exec = GpuKernelExecutor::new(0)
-            .expect("Failed to create GPU kernel executor");
+        let mut exec = GpuKernelExecutor::new(0).expect("Failed to create GPU kernel executor");
         exec.register_standard_kernels()
             .expect("Failed to register standard kernels");
         Mutex::new(exec)

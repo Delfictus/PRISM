@@ -6,10 +6,10 @@
 
 use crate::orchestration::OrchestrationError;
 use nalgebra::{DMatrix, DVector, SVD};
-use std::collections::{HashMap, HashSet, VecDeque};
 use ordered_float::OrderedFloat;
 use rand::distributions::Distribution;
 use rand_distr::Normal;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Bidirectional causality analyzer
 pub struct BidirectionalCausalityAnalyzer {
@@ -173,8 +173,8 @@ struct PCAlgorithm {
 enum IndependenceTest {
     PartialCorrelation,
     MutualInformation,
-    HSIC,  // Hilbert-Schmidt Independence Criterion
-    KernelCIT,  // Kernel Conditional Independence Test
+    HSIC,      // Hilbert-Schmidt Independence Criterion
+    KernelCIT, // Kernel Conditional Independence Test
 }
 
 #[derive(Clone, Debug)]
@@ -214,7 +214,7 @@ struct CausalParameters {
 enum SurrogateMethod {
     RandomShuffle,
     PhaseRandomization,
-    IAAFT,  // Iterative Amplitude Adjusted Fourier Transform
+    IAAFT, // Iterative Amplitude Adjusted Fourier Transform
     TwinSurrogates,
 }
 
@@ -295,14 +295,20 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Analyze bidirectional causality between time series
-    pub fn analyze(&mut self,
-                    x_name: &str, x_data: &DVector<f64>,
-                    y_name: &str, y_data: &DVector<f64>) -> Result<CausalityResult, OrchestrationError> {
+    pub fn analyze(
+        &mut self,
+        x_name: &str,
+        x_data: &DVector<f64>,
+        y_name: &str,
+        y_data: &DVector<f64>,
+    ) -> Result<CausalityResult, OrchestrationError> {
         // Validate inputs
         if x_data.len() != y_data.len() {
-            return Err(OrchestrationError::DimensionMismatch(
-                format!("Expected {}, got {}", x_data.len(), y_data.len())
-            ));
+            return Err(OrchestrationError::DimensionMismatch(format!(
+                "Expected {}, got {}",
+                x_data.len(),
+                y_data.len()
+            )));
         }
 
         if x_data.len() < self.parameters.min_samples {
@@ -313,8 +319,12 @@ impl BidirectionalCausalityAnalyzer {
         }
 
         // Store in buffer
-        self.time_series_buffer.series.insert(x_name.to_string(), x_data.clone());
-        self.time_series_buffer.series.insert(y_name.to_string(), y_data.clone());
+        self.time_series_buffer
+            .series
+            .insert(x_name.to_string(), x_data.clone());
+        self.time_series_buffer
+            .series
+            .insert(y_name.to_string(), y_data.clone());
 
         // 1. Convergent Cross Mapping
         let ccm_result = self.convergent_cross_mapping(x_data, y_data)?;
@@ -353,7 +363,7 @@ impl BidirectionalCausalityAnalyzer {
             granger: GrangerResult {
                 f_statistic_x_to_y: granger_x_to_y,
                 f_statistic_y_to_x: granger_y_to_x,
-                significant: granger_x_to_y > 3.84 || granger_y_to_x > 3.84,  // Chi-square critical value
+                significant: granger_x_to_y > 3.84 || granger_y_to_x > 3.84, // Chi-square critical value
             },
             causal_direction: self.determine_direction(te_x_to_y, te_y_to_x, &ccm_result),
             strength: causal_strength,
@@ -363,7 +373,11 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Convergent Cross Mapping
-    fn convergent_cross_mapping(&mut self, x: &DVector<f64>, y: &DVector<f64>) -> Result<CCMResult, OrchestrationError> {
+    fn convergent_cross_mapping(
+        &mut self,
+        x: &DVector<f64>,
+        y: &DVector<f64>,
+    ) -> Result<CCMResult, OrchestrationError> {
         // Create shadow manifolds
         let manifold_x = self.create_shadow_manifold(x, "x")?;
         let manifold_y = self.create_shadow_manifold(y, "y")?;
@@ -388,7 +402,8 @@ impl BidirectionalCausalityAnalyzer {
 
             // Check convergence
             if rho_values.len() > 2 {
-                let recent_change = (rho_values[rho_values.len()-1].1 - rho_values[rho_values.len()-2].1).abs();
+                let recent_change =
+                    (rho_values[rho_values.len() - 1].1 - rho_values[rho_values.len() - 2].1).abs();
                 if recent_change < self.ccm_engine.convergence_threshold {
                     converged = true;
                     convergence_rate = recent_change;
@@ -397,8 +412,10 @@ impl BidirectionalCausalityAnalyzer {
         }
 
         // Fit convergence curve
-        let (asymptote_x_to_y, rate_x_to_y) = self.fit_convergence_curve(&rho_values.iter().map(|r| (r.0, r.1)).collect::<Vec<_>>())?;
-        let (asymptote_y_to_x, rate_y_to_x) = self.fit_convergence_curve(&rho_values.iter().map(|r| (r.0, r.2)).collect::<Vec<_>>())?;
+        let (asymptote_x_to_y, rate_x_to_y) =
+            self.fit_convergence_curve(&rho_values.iter().map(|r| (r.0, r.1)).collect::<Vec<_>>())?;
+        let (asymptote_y_to_x, rate_y_to_x) =
+            self.fit_convergence_curve(&rho_values.iter().map(|r| (r.0, r.2)).collect::<Vec<_>>())?;
 
         Ok(CCMResult {
             rho_values,
@@ -412,7 +429,11 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Create shadow manifold using time-delay embedding
-    fn create_shadow_manifold(&mut self, series: &DVector<f64>, name: &str) -> Result<ShadowManifold, OrchestrationError> {
+    fn create_shadow_manifold(
+        &mut self,
+        series: &DVector<f64>,
+        name: &str,
+    ) -> Result<ShadowManifold, OrchestrationError> {
         let E = self.ccm_engine.embedding_dim;
         let tau = self.ccm_engine.tau;
         let n_points = series.len() - (E - 1) * tau;
@@ -440,13 +461,20 @@ impl BidirectionalCausalityAnalyzer {
             time_indices,
         };
 
-        self.ccm_engine.shadow_manifolds.insert(name.to_string(), manifold.clone());
+        self.ccm_engine
+            .shadow_manifolds
+            .insert(name.to_string(), manifold.clone());
 
         Ok(manifold)
     }
 
     /// Cross map target from source manifold
-    fn cross_map(&self, source_manifold: &ShadowManifold, target: &DVector<f64>, lib_len: usize) -> Result<f64, OrchestrationError> {
+    fn cross_map(
+        &self,
+        source_manifold: &ShadowManifold,
+        target: &DVector<f64>,
+        lib_len: usize,
+    ) -> Result<f64, OrchestrationError> {
         let mut predictions = Vec::new();
         let mut observations = Vec::new();
 
@@ -458,7 +486,8 @@ impl BidirectionalCausalityAnalyzer {
         for test_idx in lib_len..source_manifold.embedded.nrows() {
             // Find k nearest neighbors in library
             let test_point = source_manifold.embedded.row(test_idx);
-            let mut distances: Vec<(usize, f64)> = library_indices.iter()
+            let mut distances: Vec<(usize, f64)> = library_indices
+                .iter()
                 .map(|&lib_idx| {
                     let lib_point = source_manifold.embedded.row(lib_idx);
                     let dist = (test_point - lib_point).norm();
@@ -467,13 +496,15 @@ impl BidirectionalCausalityAnalyzer {
                 .collect();
 
             distances.sort_by_key(|d| OrderedFloat(d.1));
-            let nearest = distances.iter()
+            let nearest = distances
+                .iter()
                 .take(self.ccm_engine.k_neighbors)
                 .collect::<Vec<_>>();
 
             // Compute weights (exponential)
             let min_dist = nearest[0].1;
-            let weights: Vec<f64> = nearest.iter()
+            let weights: Vec<f64> = nearest
+                .iter()
                 .map(|d| (-d.1 / (min_dist + 1e-10)).exp())
                 .collect();
             let weight_sum: f64 = weights.iter().sum();
@@ -504,7 +535,10 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Fit convergence curve
-    fn fit_convergence_curve(&self, rho_values: &[(usize, f64)]) -> Result<(f64, f64), OrchestrationError> {
+    fn fit_convergence_curve(
+        &self,
+        rho_values: &[(usize, f64)],
+    ) -> Result<(f64, f64), OrchestrationError> {
         if rho_values.len() < 2 {
             return Ok((0.0, 0.0));
         }
@@ -564,7 +598,11 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Compute transfer entropy
-    fn transfer_entropy(&self, source: &DVector<f64>, target: &DVector<f64>) -> Result<f64, OrchestrationError> {
+    fn transfer_entropy(
+        &self,
+        source: &DVector<f64>,
+        target: &DVector<f64>,
+    ) -> Result<f64, OrchestrationError> {
         let k = self.te_calculator.k_source;
         let l = self.te_calculator.k_target;
         let h = self.te_calculator.l_future;
@@ -588,7 +626,11 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Symbolic transfer entropy
-    fn symbolic_transfer_entropy(&self, source: &DVector<f64>, target: &DVector<f64>) -> Result<f64, OrchestrationError> {
+    fn symbolic_transfer_entropy(
+        &self,
+        source: &DVector<f64>,
+        target: &DVector<f64>,
+    ) -> Result<f64, OrchestrationError> {
         let perm_len = self.te_calculator.permutation_length;
 
         // Convert to symbolic sequences
@@ -605,14 +647,22 @@ impl BidirectionalCausalityAnalyzer {
         let l = self.te_calculator.k_target;
 
         for i in (k + l)..symbols_target.len() - 1 {
-            let target_past: Vec<usize> = symbols_target[(i-l)..i].to_vec();
-            let source_past: Vec<usize> = symbols_source[(i-k)..i].to_vec();
+            let target_past: Vec<usize> = symbols_target[(i - l)..i].to_vec();
+            let source_past: Vec<usize> = symbols_source[(i - k)..i].to_vec();
             let target_future = vec![symbols_target[i]];
 
-            *joint_counts.entry((target_future.clone(), target_past.clone(), source_past.clone())).or_insert(0.0) += 1.0;
+            *joint_counts
+                .entry((
+                    target_future.clone(),
+                    target_past.clone(),
+                    source_past.clone(),
+                ))
+                .or_insert(0.0) += 1.0;
             *target_future_counts.entry(target_future).or_insert(0.0) += 1.0;
             *target_past_counts.entry(target_past.clone()).or_insert(0.0) += 1.0;
-            *joint_past_counts.entry((target_past, source_past)).or_insert(0.0) += 1.0;
+            *joint_past_counts
+                .entry((target_past, source_past))
+                .or_insert(0.0) += 1.0;
         }
 
         // Compute transfer entropy
@@ -634,7 +684,11 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Symbolize time series
-    fn symbolize(&self, series: &DVector<f64>, perm_len: usize) -> Result<Vec<usize>, OrchestrationError> {
+    fn symbolize(
+        &self,
+        series: &DVector<f64>,
+        perm_len: usize,
+    ) -> Result<Vec<usize>, OrchestrationError> {
         let mut symbols = Vec::new();
 
         for i in 0..series.len() - perm_len + 1 {
@@ -659,7 +713,11 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Kernel density estimation transfer entropy
-    fn kernel_transfer_entropy(&self, source: &DVector<f64>, target: &DVector<f64>) -> Result<f64, OrchestrationError> {
+    fn kernel_transfer_entropy(
+        &self,
+        source: &DVector<f64>,
+        target: &DVector<f64>,
+    ) -> Result<f64, OrchestrationError> {
         // Simplified KDE-based TE
         // Would use proper kernel density estimation in production
 
@@ -680,9 +738,13 @@ impl BidirectionalCausalityAnalyzer {
 
             for j in 1..n {
                 if j != i {
-                    let kernel_target = (-((target[j] - target_past).powi(2)) / (2.0 * bandwidth.powi(2))).exp();
-                    let kernel_source = (-((source[j] - source_past).powi(2)) / (2.0 * bandwidth.powi(2))).exp();
-                    let kernel_future = (-((target[j + 1] - target_future).powi(2)) / (2.0 * bandwidth.powi(2))).exp();
+                    let kernel_target =
+                        (-((target[j] - target_past).powi(2)) / (2.0 * bandwidth.powi(2))).exp();
+                    let kernel_source =
+                        (-((source[j] - source_past).powi(2)) / (2.0 * bandwidth.powi(2))).exp();
+                    let kernel_future = (-((target[j + 1] - target_future).powi(2))
+                        / (2.0 * bandwidth.powi(2)))
+                    .exp();
 
                     p_future_given_both += kernel_future * kernel_target * kernel_source;
                     p_future_given_target += kernel_future * kernel_target;
@@ -705,7 +767,11 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Binned transfer entropy
-    fn binned_transfer_entropy(&self, source: &DVector<f64>, target: &DVector<f64>) -> Result<f64, OrchestrationError> {
+    fn binned_transfer_entropy(
+        &self,
+        source: &DVector<f64>,
+        target: &DVector<f64>,
+    ) -> Result<f64, OrchestrationError> {
         // Discretize data
         let n_bins = 10;
         let source_binned = self.discretize(source, n_bins);
@@ -719,22 +785,33 @@ impl BidirectionalCausalityAnalyzer {
         for i in 1..source_binned.len() - 1 {
             let key = (target_binned[i + 1], target_binned[i], source_binned[i]);
             *joint_prob.entry(key).or_insert(0.0) += 1.0;
-            *marginal_yt.entry((target_binned[i + 1], target_binned[i])).or_insert(0.0) += 1.0;
+            *marginal_yt
+                .entry((target_binned[i + 1], target_binned[i]))
+                .or_insert(0.0) += 1.0;
             *marginal_y.entry(target_binned[i]).or_insert(0.0) += 1.0;
         }
 
         // Normalize
         let total = (source_binned.len() - 2) as f64;
-        for v in joint_prob.values_mut() { *v /= total; }
-        for v in marginal_yt.values_mut() { *v /= total; }
-        for v in marginal_y.values_mut() { *v /= total; }
+        for v in joint_prob.values_mut() {
+            *v /= total;
+        }
+        for v in marginal_yt.values_mut() {
+            *v /= total;
+        }
+        for v in marginal_y.values_mut() {
+            *v /= total;
+        }
 
         // Calculate transfer entropy
         let mut te = 0.0;
         for ((y_next, y_curr, x_curr), p_joint) in &joint_prob {
-            if let (Some(&p_yt), Some(&p_y)) = (marginal_yt.get(&(*y_next, *y_curr)), marginal_y.get(y_curr)) {
+            if let (Some(&p_yt), Some(&p_y)) =
+                (marginal_yt.get(&(*y_next, *y_curr)), marginal_y.get(y_curr))
+            {
                 if p_yt > 0.0 && p_y > 0.0 && *p_joint > 0.0 {
-                    te += p_joint * (p_joint * p_y / (p_yt * marginal_y.get(y_curr).unwrap_or(&1.0))).log2();
+                    te += p_joint
+                        * (p_joint * p_y / (p_yt * marginal_y.get(y_curr).unwrap_or(&1.0))).log2();
                 }
             }
         }
@@ -748,14 +825,20 @@ impl BidirectionalCausalityAnalyzer {
         let max_val = data.max();
         let bin_width = (max_val - min_val) / n_bins as f64;
 
-        data.iter().map(|&x| {
-            let bin = ((x - min_val) / bin_width).floor() as usize;
-            bin.min(n_bins - 1)
-        }).collect()
+        data.iter()
+            .map(|&x| {
+                let bin = ((x - min_val) / bin_width).floor() as usize;
+                bin.min(n_bins - 1)
+            })
+            .collect()
     }
 
     /// Granger causality test
-    fn granger_causality(&self, source: &DVector<f64>, target: &DVector<f64>) -> Result<f64, OrchestrationError> {
+    fn granger_causality(
+        &self,
+        source: &DVector<f64>,
+        target: &DVector<f64>,
+    ) -> Result<f64, OrchestrationError> {
         if self.granger_tester.nonlinear {
             self.nonlinear_granger(source, target)
         } else {
@@ -764,7 +847,11 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Linear Granger causality
-    fn linear_granger(&self, source: &DVector<f64>, target: &DVector<f64>) -> Result<f64, OrchestrationError> {
+    fn linear_granger(
+        &self,
+        source: &DVector<f64>,
+        target: &DVector<f64>,
+    ) -> Result<f64, OrchestrationError> {
         let max_lag = self.granger_tester.max_lag;
         let n = source.len();
 
@@ -804,14 +891,18 @@ impl BidirectionalCausalityAnalyzer {
         let rss_unrestricted = self.compute_rss(&X_unrestricted, &y)?;
 
         // F-statistic
-        let f_stat = ((rss_restricted - rss_unrestricted) / max_lag as f64) /
-                    (rss_unrestricted / (n_samples - 2 * max_lag) as f64);
+        let f_stat = ((rss_restricted - rss_unrestricted) / max_lag as f64)
+            / (rss_unrestricted / (n_samples - 2 * max_lag) as f64);
 
         Ok(f_stat)
     }
 
     /// Nonlinear Granger causality
-    fn nonlinear_granger(&self, source: &DVector<f64>, target: &DVector<f64>) -> Result<f64, OrchestrationError> {
+    fn nonlinear_granger(
+        &self,
+        source: &DVector<f64>,
+        target: &DVector<f64>,
+    ) -> Result<f64, OrchestrationError> {
         // Use kernel regression for nonlinear Granger
         // Simplified implementation - would use proper kernel methods in production
 
@@ -886,20 +977,27 @@ impl BidirectionalCausalityAnalyzer {
             Ok(residuals.dot(&residuals))
         } else {
             Err(OrchestrationError::SingularMatrix {
-                matrix_name: "XtX".to_string()
+                matrix_name: "XtX".to_string(),
             })
         }
     }
 
     /// Update causal graph
-    fn update_causal_graph(&mut self, x_name: &str, y_name: &str,
-                            ccm: &CCMResult, te_x_to_y: f64, te_y_to_x: f64) -> Result<(), OrchestrationError> {
+    fn update_causal_graph(
+        &mut self,
+        x_name: &str,
+        y_name: &str,
+        ccm: &CCMResult,
+        te_x_to_y: f64,
+        te_y_to_x: f64,
+    ) -> Result<(), OrchestrationError> {
         // Add nodes if not present
         let x_idx = self.causal_graph.add_node(x_name);
         let y_idx = self.causal_graph.add_node(y_name);
 
         // Determine edge type and strength
-        let edge_type = if ccm.converged && ccm.asymptote_x_to_y > 0.7 && ccm.asymptote_y_to_x > 0.7 {
+        let edge_type = if ccm.converged && ccm.asymptote_x_to_y > 0.7 && ccm.asymptote_y_to_x > 0.7
+        {
             EdgeType::Bidirectional
         } else if te_x_to_y > te_y_to_x * 2.0 {
             EdgeType::Direct
@@ -911,11 +1009,13 @@ impl BidirectionalCausalityAnalyzer {
 
         // Add edges
         if te_x_to_y > self.te_calculator.ete_threshold {
-            self.causal_graph.add_edge(x_idx, y_idx, te_x_to_y, edge_type.clone());
+            self.causal_graph
+                .add_edge(x_idx, y_idx, te_x_to_y, edge_type.clone());
         }
 
         if te_y_to_x > self.te_calculator.ete_threshold {
-            self.causal_graph.add_edge(y_idx, x_idx, te_y_to_x, edge_type);
+            self.causal_graph
+                .add_edge(y_idx, x_idx, te_y_to_x, edge_type);
         }
 
         Ok(())
@@ -943,7 +1043,7 @@ impl BidirectionalCausalityAnalyzer {
         // Phase 1: Learn skeleton
         for size in 0..=self.pc_algorithm.max_conditioning_size {
             for i in 0..n_vars {
-                for j in i+1..n_vars {
+                for j in i + 1..n_vars {
                     if skeleton[(i, j)] == 0.0 {
                         continue;
                     }
@@ -1014,8 +1114,14 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Generate combinations recursively
-    fn combinations(&self, items: &[usize], size: usize, start: usize,
-                    current: HashSet<usize>, result: &mut Vec<HashSet<usize>>) {
+    fn combinations(
+        &self,
+        items: &[usize],
+        size: usize,
+        start: usize,
+        current: HashSet<usize>,
+        result: &mut Vec<HashSet<usize>>,
+    ) {
         if current.len() == size {
             result.push(current);
             return;
@@ -1029,7 +1135,12 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Test conditional independence
-    fn test_independence(&self, i: usize, j: usize, conditioning: &HashSet<usize>) -> Result<bool, OrchestrationError> {
+    fn test_independence(
+        &self,
+        i: usize,
+        j: usize,
+        conditioning: &HashSet<usize>,
+    ) -> Result<bool, OrchestrationError> {
         // Get time series data
         let series: Vec<&DVector<f64>> = self.time_series_buffer.series.values().collect();
 
@@ -1049,13 +1160,18 @@ impl BidirectionalCausalityAnalyzer {
                 let hsic = self.hsic_test(x, y)?;
                 Ok(hsic < self.pc_algorithm.alpha)
             }
-            _ => Ok(false)
+            _ => Ok(false),
         }
     }
 
     /// Partial correlation
-    fn partial_correlation(&self, x: &DVector<f64>, y: &DVector<f64>,
-                            conditioning: &HashSet<usize>, series: &[&DVector<f64>]) -> Result<f64, OrchestrationError> {
+    fn partial_correlation(
+        &self,
+        x: &DVector<f64>,
+        y: &DVector<f64>,
+        conditioning: &HashSet<usize>,
+        series: &[&DVector<f64>],
+    ) -> Result<f64, OrchestrationError> {
         if conditioning.is_empty() {
             return Ok(self.compute_correlation(&x.as_slice().to_vec(), &y.as_slice().to_vec()));
         }
@@ -1082,20 +1198,24 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Compute residuals after regression
-    fn compute_residuals(&self, y: &DVector<f64>, X: &DMatrix<f64>) -> Result<DVector<f64>, OrchestrationError> {
+    fn compute_residuals(
+        &self,
+        y: &DVector<f64>,
+        X: &DMatrix<f64>,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         let XtX = X.transpose() * X;
         if let Some(XtX_inv) = XtX.try_inverse() {
             let beta = XtX_inv * X.transpose() * y;
             Ok(y - X * beta)
         } else {
-            Ok(y.clone())  // Return original if regression fails
+            Ok(y.clone()) // Return original if regression fails
         }
     }
 
     /// Hilbert-Schmidt Independence Criterion
     fn hsic_test(&self, x: &DVector<f64>, y: &DVector<f64>) -> Result<f64, OrchestrationError> {
         let n = x.len();
-        let gamma = 1.0;  // RBF kernel bandwidth
+        let gamma = 1.0; // RBF kernel bandwidth
 
         // Compute kernel matrices
         let mut K_x = DMatrix::zeros(n, n);
@@ -1142,11 +1262,15 @@ impl BidirectionalCausalityAnalyzer {
 
         for j in 0..n {
             for i in 0..n {
-                for k in i+1..n {
+                for k in i + 1..n {
                     // Check if i -> j <- k is a v-structure
-                    if adjacency[(i, j)] > 0.0 && adjacency[(j, i)] > 0.0 &&
-                       adjacency[(k, j)] > 0.0 && adjacency[(j, k)] > 0.0 &&
-                       adjacency[(i, k)] == 0.0 && adjacency[(k, i)] == 0.0 {
+                    if adjacency[(i, j)] > 0.0
+                        && adjacency[(j, i)] > 0.0
+                        && adjacency[(k, j)] > 0.0
+                        && adjacency[(j, k)] > 0.0
+                        && adjacency[(i, k)] == 0.0
+                        && adjacency[(k, i)] == 0.0
+                    {
                         // Orient as collider
                         adjacency[(j, i)] = 0.0;
                         adjacency[(j, k)] = 0.0;
@@ -1250,10 +1374,14 @@ impl BidirectionalCausalityAnalyzer {
 
         for j in 0..n {
             for i in 0..n {
-                for k in i+1..n {
-                    if adjacency[(i, j)] > 0.0 && adjacency[(j, i)] == 0.0 &&
-                       adjacency[(k, j)] > 0.0 && adjacency[(j, k)] == 0.0 &&
-                       adjacency[(i, k)] == 0.0 && adjacency[(k, i)] == 0.0 {
+                for k in i + 1..n {
+                    if adjacency[(i, j)] > 0.0
+                        && adjacency[(j, i)] == 0.0
+                        && adjacency[(k, j)] > 0.0
+                        && adjacency[(j, k)] == 0.0
+                        && adjacency[(i, k)] == 0.0
+                        && adjacency[(k, i)] == 0.0
+                    {
                         v_structures.push((i, j, k));
                     }
                 }
@@ -1264,7 +1392,12 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Compute causal strength
-    fn compute_causal_strength(&self, ccm: &CCMResult, te_x_to_y: f64, te_y_to_x: f64) -> CausalStrength {
+    fn compute_causal_strength(
+        &self,
+        ccm: &CCMResult,
+        te_x_to_y: f64,
+        te_y_to_x: f64,
+    ) -> CausalStrength {
         let ccm_strength = (ccm.asymptote_x_to_y + ccm.asymptote_y_to_x) / 2.0;
         let te_strength = (te_x_to_y + te_y_to_x) / 2.0;
 
@@ -1277,7 +1410,11 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Bootstrap causal strength estimation
-    fn bootstrap_causal_strength(&mut self, x: &DVector<f64>, y: &DVector<f64>) -> Result<CausalStrength, OrchestrationError> {
+    fn bootstrap_causal_strength(
+        &mut self,
+        x: &DVector<f64>,
+        y: &DVector<f64>,
+    ) -> Result<CausalStrength, OrchestrationError> {
         let mut strengths = Vec::new();
 
         for _ in 0..self.parameters.n_bootstrap {
@@ -1295,16 +1432,23 @@ impl BidirectionalCausalityAnalyzer {
         // Compute mean and confidence intervals
         let mean_strength = CausalStrength {
             overall: strengths.iter().map(|s| s.overall).sum::<f64>() / strengths.len() as f64,
-            ccm_component: strengths.iter().map(|s| s.ccm_component).sum::<f64>() / strengths.len() as f64,
-            te_component: strengths.iter().map(|s| s.te_component).sum::<f64>() / strengths.len() as f64,
-            directionality: strengths.iter().map(|s| s.directionality).sum::<f64>() / strengths.len() as f64,
+            ccm_component: strengths.iter().map(|s| s.ccm_component).sum::<f64>()
+                / strengths.len() as f64,
+            te_component: strengths.iter().map(|s| s.te_component).sum::<f64>()
+                / strengths.len() as f64,
+            directionality: strengths.iter().map(|s| s.directionality).sum::<f64>()
+                / strengths.len() as f64,
         };
 
         Ok(mean_strength)
     }
 
     /// Bootstrap resample
-    fn bootstrap_resample(&self, x: &DVector<f64>, y: &DVector<f64>) -> (DVector<f64>, DVector<f64>) {
+    fn bootstrap_resample(
+        &self,
+        x: &DVector<f64>,
+        y: &DVector<f64>,
+    ) -> (DVector<f64>, DVector<f64>) {
         let n = x.len();
         let mut x_boot = DVector::zeros(n);
         let mut y_boot = DVector::zeros(n);
@@ -1319,17 +1463,25 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Test significance with surrogate data
-    fn test_significance_surrogates(&mut self, x: &DVector<f64>, y: &DVector<f64>,
-                                     observed_strength: &CausalStrength) -> Result<SignificanceResult, OrchestrationError> {
+    fn test_significance_surrogates(
+        &mut self,
+        x: &DVector<f64>,
+        y: &DVector<f64>,
+        observed_strength: &CausalStrength,
+    ) -> Result<SignificanceResult, OrchestrationError> {
         let mut null_distribution = Vec::new();
 
         for _ in 0..self.parameters.n_surrogates {
             // Generate surrogate data
             let (x_surr, y_surr) = match self.parameters.surrogate_method {
                 SurrogateMethod::RandomShuffle => (self.shuffle(x), self.shuffle(y)),
-                SurrogateMethod::PhaseRandomization => (self.phase_randomize(x)?, self.phase_randomize(y)?),
+                SurrogateMethod::PhaseRandomization => {
+                    (self.phase_randomize(x)?, self.phase_randomize(y)?)
+                }
                 SurrogateMethod::IAAFT => (self.iaaft_surrogate(x)?, self.iaaft_surrogate(y)?),
-                SurrogateMethod::TwinSurrogates => (self.twin_surrogate(x)?, self.twin_surrogate(y)?),
+                SurrogateMethod::TwinSurrogates => {
+                    (self.twin_surrogate(x)?, self.twin_surrogate(y)?)
+                }
             };
 
             // Compute causal strength for surrogate
@@ -1337,17 +1489,22 @@ impl BidirectionalCausalityAnalyzer {
             let te_x_to_y = self.transfer_entropy(&x_surr, &y_surr)?;
             let te_y_to_x = self.transfer_entropy(&y_surr, &x_surr)?;
 
-            null_distribution.push(self.compute_causal_strength(&ccm, te_x_to_y, te_y_to_x).overall);
+            null_distribution.push(
+                self.compute_causal_strength(&ccm, te_x_to_y, te_y_to_x)
+                    .overall,
+            );
         }
 
         // Compute p-value
-        let p_value = null_distribution.iter()
+        let p_value = null_distribution
+            .iter()
             .filter(|&&null_val| null_val >= observed_strength.overall)
-            .count() as f64 / null_distribution.len() as f64;
+            .count() as f64
+            / null_distribution.len() as f64;
 
         // Apply multiple testing correction
         let adjusted_p = match self.parameters.correction {
-            MultipleTestingCorrection::Bonferroni => p_value * 2.0,  // Adjust for bidirectional test
+            MultipleTestingCorrection::Bonferroni => p_value * 2.0, // Adjust for bidirectional test
             MultipleTestingCorrection::BenjaminiHochberg => self.benjamini_hochberg(p_value, 2),
             _ => p_value,
         };
@@ -1375,7 +1532,7 @@ impl BidirectionalCausalityAnalyzer {
 
     /// Phase randomization surrogate
     fn phase_randomize(&self, series: &DVector<f64>) -> Result<DVector<f64>, OrchestrationError> {
-        use rustfft::{FftPlanner, num_complex::Complex};
+        use rustfft::{num_complex::Complex, FftPlanner};
 
         let n = series.len();
         let mut planner = FftPlanner::new();
@@ -1383,15 +1540,14 @@ impl BidirectionalCausalityAnalyzer {
         let ifft = planner.plan_fft_inverse(n);
 
         // Convert to complex
-        let mut complex_data: Vec<Complex<f64>> = series.iter()
-            .map(|&x| Complex::new(x, 0.0))
-            .collect();
+        let mut complex_data: Vec<Complex<f64>> =
+            series.iter().map(|&x| Complex::new(x, 0.0)).collect();
 
         // Forward FFT
         fft.process(&mut complex_data);
 
         // Randomize phases (keep DC and Nyquist)
-        for i in 1..n/2 {
+        for i in 1..n / 2 {
             let phase = rand::random::<f64>() * 2.0 * std::f64::consts::PI;
             let magnitude = complex_data[i].norm();
             complex_data[i] = Complex::from_polar(magnitude, phase);
@@ -1418,7 +1574,8 @@ impl BidirectionalCausalityAnalyzer {
 
         let mut surrogate = self.phase_randomize(series)?;
 
-        for _ in 0..10 {  // Fixed iterations
+        for _ in 0..10 {
+            // Fixed iterations
             // Rank order to match original amplitude distribution
             let sorted_original: Vec<f64> = {
                 let mut v = series.as_slice().to_vec();
@@ -1468,7 +1625,9 @@ impl BidirectionalCausalityAnalyzer {
 
             for (j, other) in embedded.iter().enumerate() {
                 if j != i - 1 {
-                    let dist: f64 = current.iter().zip(other.iter())
+                    let dist: f64 = current
+                        .iter()
+                        .zip(other.iter())
                         .map(|(a, b)| (a - b).powi(2))
                         .sum();
 
@@ -1498,11 +1657,16 @@ impl BidirectionalCausalityAnalyzer {
     /// Benjamini-Hochberg correction
     fn benjamini_hochberg(&self, p_value: f64, n_tests: usize) -> f64 {
         // Simplified BH correction
-        p_value * n_tests as f64 / 1.0  // Would sort p-values in full implementation
+        p_value * n_tests as f64 / 1.0 // Would sort p-values in full implementation
     }
 
     /// Determine causal direction
-    fn determine_direction(&self, te_x_to_y: f64, te_y_to_x: f64, ccm: &CCMResult) -> CausalDirection {
+    fn determine_direction(
+        &self,
+        te_x_to_y: f64,
+        te_y_to_x: f64,
+        ccm: &CCMResult,
+    ) -> CausalDirection {
         let te_ratio = te_x_to_y / (te_y_to_x + 1e-10);
         let ccm_ratio = ccm.asymptote_x_to_y / (ccm.asymptote_y_to_x + 1e-10);
 
@@ -1518,7 +1682,11 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Analyze causality in LLM responses
-    pub fn analyze_llm_causality(&mut self, responses: &[String], query: &str) -> Result<LLMCausalityAnalysis, OrchestrationError> {
+    pub fn analyze_llm_causality(
+        &mut self,
+        responses: &[String],
+        query: &str,
+    ) -> Result<LLMCausalityAnalysis, OrchestrationError> {
         // Convert responses to time series (simplified encoding)
         let mut time_series = Vec::new();
 
@@ -1534,8 +1702,12 @@ impl BidirectionalCausalityAnalyzer {
         for i in 0..responses.len() {
             for j in 0..responses.len() {
                 if i != j {
-                    let result = self.analyze(&format!("llm_{}", i), &time_series[i],
-                                               &format!("llm_{}", j), &time_series[j])?;
+                    let result = self.analyze(
+                        &format!("llm_{}", i),
+                        &time_series[i],
+                        &format!("llm_{}", j),
+                        &time_series[j],
+                    )?;
 
                     causal_matrix[(i, j)] = result.strength.overall;
                     influence_scores[i] += result.strength.overall;
@@ -1578,7 +1750,10 @@ impl BidirectionalCausalityAnalyzer {
     }
 
     /// Identify causal chains
-    fn identify_causal_chains(&self, causal_matrix: &DMatrix<f64>) -> Result<Vec<CausalChain>, OrchestrationError> {
+    fn identify_causal_chains(
+        &self,
+        causal_matrix: &DMatrix<f64>,
+    ) -> Result<Vec<CausalChain>, OrchestrationError> {
         let mut chains = Vec::new();
         let threshold = 0.5;
 
@@ -1586,15 +1761,29 @@ impl BidirectionalCausalityAnalyzer {
         for start in 0..causal_matrix.nrows() {
             let mut visited = vec![false; causal_matrix.nrows()];
             let mut path = vec![start];
-            self.dfs_causal_chains(causal_matrix, start, &mut visited, &mut path, &mut chains, threshold);
+            self.dfs_causal_chains(
+                causal_matrix,
+                start,
+                &mut visited,
+                &mut path,
+                &mut chains,
+                threshold,
+            );
         }
 
         Ok(chains)
     }
 
     /// DFS for causal chains
-    fn dfs_causal_chains(&self, matrix: &DMatrix<f64>, node: usize, visited: &mut [bool],
-                          path: &mut Vec<usize>, chains: &mut Vec<CausalChain>, threshold: f64) {
+    fn dfs_causal_chains(
+        &self,
+        matrix: &DMatrix<f64>,
+        node: usize,
+        visited: &mut [bool],
+        path: &mut Vec<usize>,
+        chains: &mut Vec<CausalChain>,
+        threshold: f64,
+    ) {
         visited[node] = true;
 
         for next in 0..matrix.ncols() {
@@ -1644,8 +1833,8 @@ impl BidirectionalCausalityAnalyzer {
 
             if is_root {
                 // Check if this node causes others
-                let causes_others = (0..causal_matrix.ncols())
-                    .any(|j| i != j && causal_matrix[(i, j)] > 0.5);
+                let causes_others =
+                    (0..causal_matrix.ncols()).any(|j| i != j && causal_matrix[(i, j)] > 0.5);
 
                 if causes_others {
                     root_causes.push(i);
@@ -1658,7 +1847,8 @@ impl BidirectionalCausalityAnalyzer {
 
     /// Determine consensus mechanism
     fn determine_consensus_mechanism(&self, causal_matrix: &DMatrix<f64>) -> String {
-        let mean_causality = causal_matrix.sum() / (causal_matrix.nrows() * causal_matrix.ncols()) as f64;
+        let mean_causality =
+            causal_matrix.sum() / (causal_matrix.nrows() * causal_matrix.ncols()) as f64;
 
         if mean_causality > 0.7 {
             "Strong mutual causality - use weighted consensus".to_string()
@@ -1712,11 +1902,14 @@ impl CausalGraph {
     }
 
     fn add_edge(&mut self, from: usize, to: usize, strength: f64, edge_type: EdgeType) {
-        self.edges.insert((from, to), CausalEdge {
-            strength,
-            edge_type,
-            lag: 0,
-        });
+        self.edges.insert(
+            (from, to),
+            CausalEdge {
+                strength,
+                edge_type,
+                lag: 0,
+            },
+        );
 
         if from < self.adjacency.nrows() && to < self.adjacency.ncols() {
             self.adjacency[(from, to)] = strength;
@@ -1738,7 +1931,7 @@ pub struct CausalityResult {
 
 #[derive(Clone, Debug)]
 pub struct CCMResult {
-    pub rho_values: Vec<(usize, f64, f64)>,  // (lib_len, rho_x_to_y, rho_y_to_x)
+    pub rho_values: Vec<(usize, f64, f64)>, // (lib_len, rho_x_to_y, rho_y_to_x)
     pub converged: bool,
     pub convergence_rate: f64,
     pub asymptote_x_to_y: f64,
@@ -1824,13 +2017,16 @@ mod tests {
         y[0] = rand::random::<f64>();
 
         for i in 1..n {
-            x[i] = 0.7 * x[i-1] + 0.3 * y[i-1] + 0.1 * rand::random::<f64>();
-            y[i] = 0.5 * y[i-1] + 0.4 * x[i-1] + 0.1 * rand::random::<f64>();
+            x[i] = 0.7 * x[i - 1] + 0.3 * y[i - 1] + 0.1 * rand::random::<f64>();
+            y[i] = 0.5 * y[i - 1] + 0.4 * x[i - 1] + 0.1 * rand::random::<f64>();
         }
 
         let result = analyzer.analyze("x", &x, "y", &y).unwrap();
 
         assert!(result.strength.overall > 0.0);
-        assert!(matches!(result.causal_direction, CausalDirection::Bidirectional | CausalDirection::XCausesY | CausalDirection::YCausesX));
+        assert!(matches!(
+            result.causal_direction,
+            CausalDirection::Bidirectional | CausalDirection::XCausesY | CausalDirection::YCausesX
+        ));
     }
 }

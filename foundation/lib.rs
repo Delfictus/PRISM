@@ -45,7 +45,7 @@ pub use ingestion::{
     SourceInfo,
 };
 #[cfg(feature = "pwsa")]
-pub use orchestration::{PrismAIOrchestrator, OrchestratorConfig, UnifiedResponse};
+pub use orchestration::{OrchestratorConfig, PrismAIOrchestrator, UnifiedResponse};
 pub use phase_causal_matrix::{PcmConfig, PhaseCausalMatrixProcessor};
 pub use platform::NeuromorphicQuantumPlatform;
 pub use types::*;

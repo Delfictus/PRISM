@@ -15,7 +15,9 @@ pub struct QuantumPromptSearch {
 
 impl QuantumPromptSearch {
     pub fn new(templates: Vec<String>) -> Self {
-        Self { prompt_templates: templates }
+        Self {
+            prompt_templates: templates,
+        }
     }
 
     /// Find optimal prompt via amplitude amplification
@@ -55,8 +57,9 @@ impl InformationBottleneckCompressor {
         let sentences: Vec<&str> = verbose_prompt.split('.').collect();
 
         // Compute relevance (simplified)
-        let relevant: Vec<&str> = sentences.iter()
-            .filter(|s| s.len() > 10)  // Keep substantial sentences
+        let relevant: Vec<&str> = sentences
+            .iter()
+            .filter(|s| s.len() > 10) // Keep substantial sentences
             .take((sentences.len() as f64 * relevance_threshold) as usize)
             .copied()
             .collect();

@@ -2,12 +2,12 @@
 //!
 //! This is a simplified version that works without the full foundation module
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
+use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
-use serde::{Serialize, Deserialize};
 
 /// Mock types for demonstration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,20 +34,22 @@ impl PrismAIOrchestrator {
     pub async fn new() -> Result<Self> {
         Ok(Self)
     }
-    
+
     pub async fn llm_consensus(&self, query: &str, models: &[&str]) -> Result<ConsensusResponse> {
         // Simulate processing
         tokio::time::sleep(Duration::from_millis(500)).await;
-        
-        let model_responses: Vec<ModelResponse> = models.iter().enumerate().map(|(i, model)| {
-            ModelResponse {
+
+        let model_responses: Vec<ModelResponse> = models
+            .iter()
+            .enumerate()
+            .map(|(i, model)| ModelResponse {
                 model: model.to_string(),
                 text: format!("Response from {} for: {}", model, query),
                 tokens: 100 + i * 50,
                 cost: 0.01 + i as f64 * 0.005,
-            }
-        }).collect();
-        
+            })
+            .collect();
+
         Ok(ConsensusResponse {
             text: format!("Consensus response for query: '{}'\n\nAfter analyzing with {} models using 12 world-first algorithms, the consensus indicates that this is a complex topic requiring multi-dimensional analysis across quantum, thermodynamic, and information-theoretic domains.", query, models.len()),
             confidence: 0.85 + (models.len() as f64 * 0.02),
@@ -67,7 +69,7 @@ impl PrismAIOrchestrator {
             ],
         })
     }
-    
+
     pub fn get_health_status(&self) -> SystemHealth {
         SystemHealth {
             overall: 0.95,
@@ -145,16 +147,17 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
-    
+
     // Initialize logging
-    env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or(match cli.verbose {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(
+        match cli.verbose {
             0 => "warn",
             1 => "info",
             2 => "debug",
             _ => "trace",
-        })
-    ).init();
+        },
+    ))
+    .init();
 
     // Print header
     println!();
@@ -168,19 +171,23 @@ async fn main() -> Result<()> {
     spinner.set_style(
         ProgressStyle::default_spinner()
             .template("{spinner:.green} {msg}")
-            .unwrap()
+            .unwrap(),
     );
     spinner.set_message("Initializing PRISM-AI Orchestrator...");
     spinner.enable_steady_tick(Duration::from_millis(100));
-    
+
     let orchestrator = PrismAIOrchestrator::new().await?;
-    
+
     spinner.finish_with_message("✅ Orchestrator initialized successfully");
     println!();
 
     // Execute command
     match cli.command {
-        Commands::Consensus { query, models, detailed } => {
+        Commands::Consensus {
+            query,
+            models,
+            detailed,
+        } => {
             run_consensus(&orchestrator, &query, &models, detailed).await?;
         }
         Commands::Diagnostics { detailed } => {
@@ -204,11 +211,11 @@ async fn run_consensus(
     detailed: bool,
 ) -> Result<()> {
     let models: Vec<&str> = models_str.split(',').map(|s| s.trim()).collect();
-    
+
     println!("{}", "📋 Query:".bright_yellow().bold());
     println!("   {}", query.bright_white());
     println!();
-    
+
     println!("{}", "🤖 Models:".bright_yellow().bold());
     for model in &models {
         println!("   • {}", model.bright_cyan());
@@ -219,7 +226,7 @@ async fn run_consensus(
     pb.set_style(
         ProgressStyle::default_spinner()
             .template("{spinner:.cyan} {msg}")
-            .unwrap()
+            .unwrap(),
     );
     pb.set_message("Processing with 12 algorithms...");
     pb.enable_steady_tick(Duration::from_millis(100));
@@ -227,7 +234,7 @@ async fn run_consensus(
     let start = Instant::now();
     let response = orchestrator.llm_consensus(query, &models).await?;
     let elapsed = start.elapsed();
-    
+
     pb.finish_and_clear();
 
     println!("{}", "✅ Consensus Result".bright_green().bold());
@@ -236,11 +243,23 @@ async fn run_consensus(
     println!("{}", response.text.bright_white());
     println!();
     println!("{}", "═".repeat(70).bright_green());
-    
+
     println!("{}", "📊 Metrics:".bright_yellow().bold());
-    println!("   {} {:.1}%", "Confidence:".bright_white(), response.confidence * 100.0);
-    println!("   {} {:.1}%", "Agreement:".bright_white(), response.agreement_score * 100.0);
-    println!("   {} {:.2}s", "Time:".bright_white(), elapsed.as_secs_f64());
+    println!(
+        "   {} {:.1}%",
+        "Confidence:".bright_white(),
+        response.confidence * 100.0
+    );
+    println!(
+        "   {} {:.1}%",
+        "Agreement:".bright_white(),
+        response.agreement_score * 100.0
+    );
+    println!(
+        "   {} {:.2}s",
+        "Time:".bright_white(),
+        elapsed.as_secs_f64()
+    );
     println!();
 
     if detailed {
@@ -249,8 +268,9 @@ async fn run_consensus(
             let bar_length = (weight * 30.0) as usize;
             let bar = "█".repeat(bar_length);
             let empty = "░".repeat(30 - bar_length);
-            println!("   {:25} {} {:.1}%", 
-                algo.bright_cyan(), 
+            println!(
+                "   {:25} {} {:.1}%",
+                algo.bright_cyan(),
                 format!("{}{}", bar.bright_green(), empty.bright_black()),
                 weight * 100.0
             );
@@ -259,7 +279,8 @@ async fn run_consensus(
 
         println!("{}", "🤖 Model Responses:".bright_yellow().bold());
         for resp in &response.model_responses {
-            println!("   {} {} tokens, ${:.4}", 
+            println!(
+                "   {} {} tokens, ${:.4}",
                 format!("{}:", resp.model).bright_cyan().bold(),
                 resp.tokens,
                 resp.cost
@@ -277,10 +298,17 @@ async fn run_diagnostics(orchestrator: &PrismAIOrchestrator, detailed: bool) -> 
     println!();
 
     let health = orchestrator.get_health_status();
-    
-    let health_icon = if health.overall > 0.8 { "✅" } else if health.overall > 0.5 { "⚠️" } else { "❌" };
-    
-    println!("{} {} {:.1}%", 
+
+    let health_icon = if health.overall > 0.8 {
+        "✅"
+    } else if health.overall > 0.5 {
+        "⚠️"
+    } else {
+        "❌"
+    };
+
+    println!(
+        "{} {} {:.1}%",
         "Overall Health:".bright_white().bold(),
         health_icon,
         health.overall * 100.0
@@ -288,11 +316,23 @@ async fn run_diagnostics(orchestrator: &PrismAIOrchestrator, detailed: bool) -> 
     println!();
 
     println!("{}", "📈 System Metrics:".bright_cyan().bold());
-    println!("   {} {}", "Total Queries:".bright_white(), health.total_queries);
+    println!(
+        "   {} {}",
+        "Total Queries:".bright_white(),
+        health.total_queries
+    );
     println!("   {} {}", "Cache Hits:".bright_white(), health.cache_hits);
     println!("   {} {}", "GPU Operations:".bright_white(), health.gpu_ops);
-    println!("   {} {}", "PWSA Fusions:".bright_white(), health.pwsa_fusions);
-    println!("   {} {:.3}", "Free Energy:".bright_white(), health.free_energy);
+    println!(
+        "   {} {}",
+        "PWSA Fusions:".bright_white(),
+        health.pwsa_fusions
+    );
+    println!(
+        "   {} {:.3}",
+        "Free Energy:".bright_white(),
+        health.free_energy
+    );
     println!();
 
     if detailed {
@@ -363,7 +403,7 @@ async fn run_benchmark(
     println!("{}", "⚡ Performance Benchmark".bright_yellow().bold());
     println!("{}", "═".repeat(70).bright_yellow());
     println!();
-    
+
     println!("Query: {}", query.bright_white());
     println!("Iterations: {}", iterations.to_string().bright_white());
     println!();
@@ -374,7 +414,7 @@ async fn run_benchmark(
         ProgressStyle::default_bar()
             .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta})")
             .unwrap()
-            .progress_chars("#>-")
+            .progress_chars("#>-"),
     );
 
     let mut durations = Vec::new();
@@ -397,7 +437,11 @@ async fn run_benchmark(
     println!("   {} {:.3}s", "Average:".bright_white(), avg.as_secs_f64());
     println!("   {} {:.3}s", "Min:".bright_white(), min.as_secs_f64());
     println!("   {} {:.3}s", "Max:".bright_white(), max.as_secs_f64());
-    println!("   {} {:.1} req/s", "Throughput:".bright_white(), iterations as f64 / total.as_secs_f64());
+    println!(
+        "   {} {:.1} req/s",
+        "Throughput:".bright_white(),
+        iterations as f64 / total.as_secs_f64()
+    );
     println!();
 
     Ok(())

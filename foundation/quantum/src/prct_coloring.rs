@@ -9,12 +9,12 @@
 //! 3. TSP path optimization through color classes
 //! 4. Quantum phase coherence maximization
 
+use anyhow::{Context, Result};
 use ndarray::{Array1, Array2};
 use num_complex::Complex64;
-use anyhow::{Result, Context};
 use std::collections::{HashMap, HashSet};
 
-use crate::hamiltonian::{PhaseResonanceField, Hamiltonian};
+use crate::hamiltonian::{Hamiltonian, PhaseResonanceField};
 
 /// Phase Resonance Chromatic-TSP coloring
 #[derive(Debug, Clone)]
@@ -41,10 +41,7 @@ impl ChromaticColoring {
     /// Create new PRCT coloring with adaptive threshold
     ///
     /// This is the TRUE Phase Resonance Chromatic-TSP algorithm
-    pub fn new_adaptive(
-        coupling_matrix: &Array2<Complex64>,
-        target_colors: usize,
-    ) -> Result<Self> {
+    pub fn new_adaptive(coupling_matrix: &Array2<Complex64>, target_colors: usize) -> Result<Self> {
         let n = coupling_matrix.nrows();
 
         if n == 0 {
@@ -75,12 +72,8 @@ impl ChromaticColoring {
         )?;
 
         // Build TSP orderings within each color class
-        let tsp_orderings = Self::build_tsp_orderings(
-            &coloring,
-            coupling_matrix,
-            &phase_field,
-            target_colors,
-        );
+        let tsp_orderings =
+            Self::build_tsp_orderings(&coloring, coupling_matrix, &phase_field, target_colors);
 
         let mut instance = Self {
             num_colors: target_colors,
@@ -239,9 +232,8 @@ impl ChromaticColoring {
             let mut coherence_score = 0.0;
 
             // Vertices already assigned this color
-            let same_color_vertices: Vec<usize> = (0..n)
-                .filter(|&u| coloring[u] == color)
-                .collect();
+            let same_color_vertices: Vec<usize> =
+                (0..n).filter(|&u| coloring[u] == color).collect();
 
             if same_color_vertices.is_empty() {
                 // New color - base score
@@ -358,8 +350,10 @@ impl ChromaticColoring {
             let next = *unvisited
                 .iter()
                 .max_by(|&&a, &&b| {
-                    let score_a = phase_field.tsp_factor(current, a) * coupling[[current, a]].norm();
-                    let score_b = phase_field.tsp_factor(current, b) * coupling[[current, b]].norm();
+                    let score_a =
+                        phase_field.tsp_factor(current, a) * coupling[[current, a]].norm();
+                    let score_b =
+                        phase_field.tsp_factor(current, b) * coupling[[current, b]].norm();
                     score_a.partial_cmp(&score_b).unwrap()
                 })
                 .unwrap();

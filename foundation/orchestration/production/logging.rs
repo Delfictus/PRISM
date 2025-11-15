@@ -5,10 +5,10 @@
 //! Implements comprehensive structured logging with multiple severity levels,
 //! context enrichment, and integration with standard logging frameworks.
 
-use std::sync::{Arc, Mutex};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
-use serde::{Serialize, Deserialize};
 
 /// Production Logger with Structured Logging
 pub struct ProductionLogger {
@@ -96,7 +96,12 @@ impl ProductionLogger {
     }
 
     /// Log with additional metadata
-    pub fn log_with_metadata(&self, level: LogLevel, message: &str, metadata: HashMap<String, String>) {
+    pub fn log_with_metadata(
+        &self,
+        level: LogLevel,
+        message: &str,
+        metadata: HashMap<String, String>,
+    ) {
         self.log(level, message, Some(metadata));
     }
 
@@ -124,7 +129,12 @@ impl ProductionLogger {
     }
 
     /// Create a log entry with context
-    fn create_log_entry(&self, level: LogLevel, message: &str, metadata: Option<HashMap<String, String>>) -> LogEntry {
+    fn create_log_entry(
+        &self,
+        level: LogLevel,
+        message: &str,
+        metadata: Option<HashMap<String, String>>,
+    ) -> LogEntry {
         let timestamp = if self.config.enable_timestamps {
             Some(Self::get_timestamp())
         } else {
@@ -166,7 +176,8 @@ impl ProductionLogger {
 
     /// Format log entry as plain text
     fn format_plain(&self, entry: &LogEntry) -> String {
-        let timestamp = entry.timestamp
+        let timestamp = entry
+            .timestamp
             .map(|ts| format!("[{}] ", ts))
             .unwrap_or_default();
 
@@ -254,7 +265,8 @@ impl ProductionLogger {
     /// Get logs by level
     pub fn get_logs_by_level(&self, level: LogLevel) -> Vec<LogEntry> {
         let buffer = self.buffer.lock().unwrap();
-        buffer.iter()
+        buffer
+            .iter()
             .filter(|entry| entry.level == level)
             .cloned()
             .collect()
@@ -263,7 +275,8 @@ impl ProductionLogger {
     /// Get error count
     pub fn get_error_count(&self) -> usize {
         let buffer = self.buffer.lock().unwrap();
-        buffer.iter()
+        buffer
+            .iter()
             .filter(|entry| entry.level >= LogLevel::Error)
             .count()
     }
@@ -339,7 +352,8 @@ impl LogContext {
     }
 
     fn add_field(&mut self, key: &str, value: &str) {
-        self.custom_fields.insert(key.to_string(), value.to_string());
+        self.custom_fields
+            .insert(key.to_string(), value.to_string());
     }
 }
 
@@ -413,11 +427,18 @@ impl LLMOperationLogger {
         let mut metadata = HashMap::new();
         metadata.insert("consensus_method".to_string(), method.to_string());
         metadata.insert("llm_count".to_string(), llm_count.to_string());
-        metadata.insert("confidence".to_string(), format!("{:.3}", consensus_confidence));
+        metadata.insert(
+            "confidence".to_string(),
+            format!("{:.3}", consensus_confidence),
+        );
 
         self.logger.log_with_metadata(
             LogLevel::Info,
-            &format!("Consensus achieved via {} ({:.1}% confidence)", method, consensus_confidence * 100.0),
+            &format!(
+                "Consensus achieved via {} ({:.1}% confidence)",
+                method,
+                consensus_confidence * 100.0
+            ),
             metadata,
         );
     }
@@ -437,26 +458,43 @@ impl IntegrationLogger {
     pub fn log_sensor_fusion(&self, source_count: usize, fusion_time_ms: f64, threat_level: f64) {
         let mut metadata = HashMap::new();
         metadata.insert("source_count".to_string(), source_count.to_string());
-        metadata.insert("fusion_time_ms".to_string(), format!("{:.3}", fusion_time_ms));
+        metadata.insert(
+            "fusion_time_ms".to_string(),
+            format!("{:.3}", fusion_time_ms),
+        );
         metadata.insert("threat_level".to_string(), format!("{:.2}", threat_level));
 
         self.logger.log_with_metadata(
             LogLevel::Info,
-            &format!("Sensor fusion complete: {} sources, threat {:.2}", source_count, threat_level),
+            &format!(
+                "Sensor fusion complete: {} sources, threat {:.2}",
+                source_count, threat_level
+            ),
             metadata,
         );
     }
 
     /// Log LLM context enrichment
-    pub fn log_context_enrichment(&self, sensor_events: usize, llm_responses: usize, enrichment_time_ms: f64) {
+    pub fn log_context_enrichment(
+        &self,
+        sensor_events: usize,
+        llm_responses: usize,
+        enrichment_time_ms: f64,
+    ) {
         let mut metadata = HashMap::new();
         metadata.insert("sensor_events".to_string(), sensor_events.to_string());
         metadata.insert("llm_responses".to_string(), llm_responses.to_string());
-        metadata.insert("enrichment_time_ms".to_string(), format!("{:.3}", enrichment_time_ms));
+        metadata.insert(
+            "enrichment_time_ms".to_string(),
+            format!("{:.3}", enrichment_time_ms),
+        );
 
         self.logger.log_with_metadata(
             LogLevel::Info,
-            &format!("Context enrichment: {} sensors + {} LLM responses", sensor_events, llm_responses),
+            &format!(
+                "Context enrichment: {} sensors + {} LLM responses",
+                sensor_events, llm_responses
+            ),
             metadata,
         );
     }
@@ -469,7 +507,11 @@ impl IntegrationLogger {
 
         self.logger.log_with_metadata(
             LogLevel::Info,
-            &format!("Complete intelligence fusion ({:.2}ms, {:.1}% confidence)", total_time_ms, confidence * 100.0),
+            &format!(
+                "Complete intelligence fusion ({:.2}ms, {:.1}% confidence)",
+                total_time_ms,
+                confidence * 100.0
+            ),
             metadata,
         );
     }

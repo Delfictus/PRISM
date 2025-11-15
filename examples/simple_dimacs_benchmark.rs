@@ -1,8 +1,7 @@
 ///! Simple DIMACS Benchmark Runner for PRISM-AI
 ///!
 ///! Tests the PRISM platform against standard DIMACS graph coloring benchmarks
-
-use prism_ai::{PrismAI, PrismConfig, data::DIMACParser};
+use prism_ai::{data::DIMACParser, PrismAI, PrismConfig};
 use std::path::Path;
 use std::time::Instant;
 
@@ -21,11 +20,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Get number of attempts from command line (default: 1000)
     let num_attempts = if args.len() > 2 {
-        args[2].parse::<usize>()
-            .unwrap_or_else(|_| {
-                eprintln!("Warning: Invalid attempts value '{}', using default 1000", args[2]);
-                1000
-            })
+        args[2].parse::<usize>().unwrap_or_else(|_| {
+            eprintln!(
+                "Warning: Invalid attempts value '{}', using default 1000",
+                args[2]
+            );
+            1000
+        })
     } else {
         1000
     };
@@ -40,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("DSJC125.9", 44),
         ("DSJC250.5", 28),
         ("DSJC500.5", 48),
-        ("DSJC1000.5", 82),  // WORLD RECORD TARGET
+        ("DSJC1000.5", 82), // WORLD RECORD TARGET
         ("DSJR500.1", 12),
         ("queen8_8", 9),
         ("queen11_11", 11),
@@ -52,8 +53,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = PrismConfig::default();
     config.use_gpu = cfg!(feature = "cuda");
     config.max_iterations = 1000;
-    config.num_replicas = num_attempts;  // Use configurable attempts
-    config.temperature = 1.5;  // Increased for more exploration
+    config.num_replicas = num_attempts; // Use configurable attempts
+    config.temperature = 1.5; // Increased for more exploration
 
     println!("Configuration:");
     println!("  GPU Acceleration: {}", config.use_gpu);
@@ -65,8 +66,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let prism = PrismAI::new(config)?;
 
-    println!("{:<15} {:>8} {:>8} {:>10} {:>8} {:>8} {:>8}",
-             "Graph", "Vertices", "Edges", "Time (ms)", "Colors", "Best", "Gap %");
+    println!(
+        "{:<15} {:>8} {:>8} {:>10} {:>8} {:>8} {:>8}",
+        "Graph", "Vertices", "Edges", "Time (ms)", "Colors", "Best", "Gap %"
+    );
     println!("{}", "=".repeat(75));
 
     let mut total_tests = 0;
@@ -99,8 +102,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let colors = match prism.color_graph(adjacency) {
             Ok(c) => c,
             Err(e) => {
-                println!("{:<15} {:>8} {:>8} [ERROR: {}]",
-                         graph_name, num_vertices, num_edges, e);
+                println!(
+                    "{:<15} {:>8} {:>8} [ERROR: {}]",
+                    graph_name, num_vertices, num_edges, e
+                );
                 continue;
             }
         };
@@ -118,22 +123,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         successful_tests += 1;
 
-        println!("{:<15} {:>8} {:>8} {:>10.2} {:>8} {:>8} {:>7.1}%",
-                 graph_name,
-                 num_vertices,
-                 num_edges,
-                 duration.as_secs_f64() * 1000.0,
-                 num_colors,
-                 best_chromatic,
-                 gap_percent);
+        println!(
+            "{:<15} {:>8} {:>8} {:>10.2} {:>8} {:>8} {:>7.1}%",
+            graph_name,
+            num_vertices,
+            num_edges,
+            duration.as_secs_f64() * 1000.0,
+            num_colors,
+            best_chromatic,
+            gap_percent
+        );
     }
 
     println!("{}", "=".repeat(75));
     println!("\nSummary:");
     println!("  Total Benchmarks: {}", total_tests);
     println!("  Successful Runs: {}", successful_tests);
-    println!("  Success Rate: {:.1}%",
-             (successful_tests as f64 / total_tests as f64) * 100.0);
+    println!(
+        "  Success Rate: {:.1}%",
+        (successful_tests as f64 / total_tests as f64) * 100.0
+    );
 
     Ok(())
 }

@@ -3,8 +3,8 @@
 //! Domain interfaces that adapters must implement.
 //! Platform depends on these ports, not concrete implementations.
 
-use ndarray::{Array1, Array2};
 use anyhow::Result;
+use ndarray::{Array1, Array2};
 use shared_types::{KuramotoState, PhaseField};
 
 use crate::statistical_mechanics::ThermodynamicState;
@@ -21,7 +21,11 @@ pub trait NeuromorphicPort: Send + Sync {
 /// Information flow analysis port
 pub trait InformationFlowPort: Send + Sync {
     /// Compute transfer entropy between spike trains
-    fn compute_transfer_entropy(&mut self, source: &Array1<bool>, target: &Array1<bool>) -> Result<f64>;
+    fn compute_transfer_entropy(
+        &mut self,
+        source: &Array1<bool>,
+        target: &Array1<bool>,
+    ) -> Result<f64>;
 
     /// Build full coupling matrix from spike history
     fn compute_coupling_matrix(&mut self, spike_history: &[Array1<bool>]) -> Result<Array2<f64>>;

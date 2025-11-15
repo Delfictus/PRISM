@@ -10,10 +10,7 @@
 //! Run with:
 //! cargo run --release --features cuda --example full_integration_benchmark -- ../../benchmarks/dimacs/DSJC1000.5.col
 
-use prct_core::{
-    dimacs_parser::parse_graph_file,
-    CascadingPipeline,
-};
+use prct_core::{dimacs_parser::parse_graph_file, CascadingPipeline};
 use shared_types::KuramotoState;
 use std::env;
 use std::time::Instant;
@@ -37,14 +34,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Loading graph...");
     let load_start = Instant::now();
     let graph = parse_graph_file(&benchmark_file)?;
-    println!("✅ Loaded: {} vertices, {} edges ({:.2}ms)",
-             graph.num_vertices, graph.num_edges,
-             load_start.elapsed().as_micros() as f64 / 1000.0);
+    println!(
+        "✅ Loaded: {} vertices, {} edges ({:.2}ms)",
+        graph.num_vertices,
+        graph.num_edges,
+        load_start.elapsed().as_micros() as f64 / 1000.0
+    );
 
     // Calculate graph properties
     let avg_degree = (2 * graph.num_edges) as f64 / graph.num_vertices as f64;
-    let density = (2 * graph.num_edges) as f64 /
-                  (graph.num_vertices * (graph.num_vertices - 1)) as f64;
+    let density =
+        (2 * graph.num_edges) as f64 / (graph.num_vertices * (graph.num_vertices - 1)) as f64;
     println!("Average degree: {:.2}", avg_degree);
     println!("Graph density: {:.4}", density);
     println!();
@@ -52,7 +52,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create initial Kuramoto state
     // For this standalone test, we'll create a simple random phase initialization
     let n = graph.num_vertices;
-    let phases = (0..n).map(|i| (i as f64 * 2.0 * std::f64::consts::PI) / n as f64).collect();
+    let phases = (0..n)
+        .map(|i| (i as f64 * 2.0 * std::f64::consts::PI) / n as f64)
+        .collect();
     let initial_kuramoto = KuramotoState {
         phases,
         natural_frequencies: vec![1.0; n],

@@ -21,7 +21,11 @@ impl GpuTransferEntropy {
     }
 
     /// Calculate transfer entropy (GPU-accelerated when available)
-    pub fn calculate_gpu(&self, source: &Array1<f64>, target: &Array1<f64>) -> Result<TransferEntropyResult> {
+    pub fn calculate_gpu(
+        &self,
+        source: &Array1<f64>,
+        target: &Array1<f64>,
+    ) -> Result<TransferEntropyResult> {
         // In production with compiled PTX kernels, this would:
         // 1. Upload data to GPU
         // 2. Build 3D histograms on GPU (30x faster)
@@ -35,7 +39,10 @@ impl GpuTransferEntropy {
 
 impl TransferEntropy {
     #[cfg(feature = "cuda")]
-    fn calculate_gpu_with_ptx(source: &Array1<f64>, target: &Array1<f64>) -> Result<TransferEntropyResult> {
+    fn calculate_gpu_with_ptx(
+        source: &Array1<f64>,
+        target: &Array1<f64>,
+    ) -> Result<TransferEntropyResult> {
         // GPU launcher disabled for now
         // Will be enabled once cudarc API is stabilized
 
@@ -81,7 +88,7 @@ impl TransferEntropyGpuExt for TransferEntropy {
             // Check for compiled PTX kernel
             std::path::Path::new("src/kernels/ptx/transfer_entropy.ptx").exists()
         }
-            }
+    }
 }
 
 #[cfg(test)]

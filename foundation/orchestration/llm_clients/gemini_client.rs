@@ -2,14 +2,14 @@
 //!
 //! Mission Charlie: Task 1.3
 
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use tokio::time::{sleep, timeout, Duration, Instant};
+use anyhow::{bail, Result};
 use dashmap::DashMap;
 use parking_lot::Mutex;
-use anyhow::{Result, bail};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::SystemTime;
+use tokio::time::{sleep, timeout, Duration, Instant};
 
 use super::{LLMResponse, Usage};
 
@@ -91,7 +91,10 @@ struct TokenCounter {
 
 impl TokenCounter {
     fn new() -> Self {
-        Self { total_tokens: 0, total_cost: 0.0 }
+        Self {
+            total_tokens: 0,
+            total_cost: 0.0,
+        }
     }
 }
 
@@ -121,10 +124,13 @@ impl GeminiClient {
         let mut response = self.make_request(prompt, temperature).await?;
         response.latency = start.elapsed();
 
-        self.cache.insert(cache_key, CachedResponse {
-            response: response.clone(),
-            timestamp: SystemTime::now(),
-        });
+        self.cache.insert(
+            cache_key,
+            CachedResponse {
+                response: response.clone(),
+                timestamp: SystemTime::now(),
+            },
+        );
 
         let cost = self.calculate_cost(&response.usage);
         self.token_counter.lock().total_tokens += response.usage.total_tokens;
@@ -136,7 +142,9 @@ impl GeminiClient {
     async fn make_request(&self, prompt: &str, temperature: f32) -> Result<LLMResponse> {
         let request = GeminiRequest {
             contents: vec![Content {
-                parts: vec![Part { text: prompt.to_string() }],
+                parts: vec![Part {
+                    text: prompt.to_string(),
+                }],
             }],
             generation_config: GenerationConfig {
                 temperature,
@@ -155,8 +163,9 @@ impl GeminiClient {
                 .post(&url)
                 .header("Content-Type", "application/json")
                 .json(&request)
-                .send()
-        ).await??;
+                .send(),
+        )
+        .await??;
 
         if !response.status().is_success() {
             bail!("Gemini API error: {}", response.status());
@@ -164,7 +173,10 @@ impl GeminiClient {
 
         let api_response: GeminiResponse = response.json().await?;
 
-        let text = api_response.candidates[0].content.parts.iter()
+        let text = api_response.candidates[0]
+            .content
+            .parts
+            .iter()
             .map(|p| p.text.clone())
             .collect::<Vec<_>>()
             .join(" ");

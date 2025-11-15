@@ -11,12 +11,12 @@
 //! - Accuracy: Log-likelihood of observations
 //! - Updates: Natural gradient descent on GPU
 
-use std::sync::Arc;
+use anyhow::{anyhow, Context, Result};
+use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchAsync, LaunchConfig};
 use ndarray::{Array1, Array2};
-use anyhow::{Result, anyhow, Context};
-use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchConfig, LaunchAsync};
+use std::sync::Arc;
 
-use super::{HierarchicalModel, VariationalInference, ObservationModel};
+use super::{HierarchicalModel, ObservationModel, VariationalInference};
 
 /// GPU-accelerated variational inference engine
 ///
@@ -50,10 +50,7 @@ impl ActiveInferenceGpu {
     /// # Arguments
     /// * `context` - Shared CUDA context (Article V compliance)
     /// * `cpu_inference` - CPU inference engine (for initialization)
-    pub fn new(
-        context: Arc<CudaDevice>,
-        cpu_inference: VariationalInference
-    ) -> Result<Self> {
+    pub fn new(context: Arc<CudaDevice>, cpu_inference: VariationalInference) -> Result<Self> {
         // Load PTX module (Article VII compliance)
         let ptx_path = "target/ptx/active_inference.ptx";
 
@@ -66,24 +63,69 @@ impl ActiveInferenceGpu {
         let ptx = cudarc::nvrtc::Ptx::from_src(ptx_src);
 
         let kernel_names = vec![
-            "gemv_kernel", "prediction_error_kernel", "belief_update_kernel",
-            "precision_weight_kernel", "kl_divergence_kernel", "accuracy_kernel",
-            "sum_reduction_kernel", "axpby_kernel", "velocity_update_kernel",
-            "hierarchical_project_kernel"
+            "gemv_kernel",
+            "prediction_error_kernel",
+            "belief_update_kernel",
+            "precision_weight_kernel",
+            "kl_divergence_kernel",
+            "accuracy_kernel",
+            "sum_reduction_kernel",
+            "axpby_kernel",
+            "velocity_update_kernel",
+            "hierarchical_project_kernel",
         ];
         context.load_ptx(ptx, "active_inference", &kernel_names)?;
 
-        let gemv_kernel = Arc::new(context.get_func("active_inference", "gemv_kernel").ok_or_else(|| anyhow::anyhow!("Failed to get gemv_kernel"))?);
-        let prediction_error_kernel = Arc::new(context.get_func("active_inference", "prediction_error_kernel").ok_or_else(|| anyhow::anyhow!("Failed to get prediction_error_kernel"))?);
-        let belief_update_kernel = Arc::new(context.get_func("active_inference", "belief_update_kernel").ok_or_else(|| anyhow::anyhow!("Failed to get belief_update_kernel"))?);
-        let precision_weight_kernel = Arc::new(context.get_func("active_inference", "precision_weight_kernel").ok_or_else(|| anyhow::anyhow!("Failed to get precision_weight_kernel"))?);
-        let kl_divergence_kernel = Arc::new(context.get_func("active_inference", "kl_divergence_kernel").ok_or_else(|| anyhow::anyhow!("Failed to get kl_divergence_kernel"))?);
-        let accuracy_kernel = Arc::new(context.get_func("active_inference", "accuracy_kernel").ok_or_else(|| anyhow::anyhow!("Failed to get accuracy_kernel"))?);
-        let sum_reduction_kernel = Arc::new(context.get_func("active_inference", "sum_reduction_kernel").ok_or_else(|| anyhow::anyhow!("Failed to get sum_reduction_kernel"))?);
-        let axpby_kernel = Arc::new(context.get_func("active_inference", "axpby_kernel").ok_or_else(|| anyhow::anyhow!("Failed to get axpby_kernel"))?);
-        let velocity_update_kernel = Arc::new(context.get_func("active_inference", "velocity_update_kernel").ok_or_else(|| anyhow::anyhow!("Failed to get velocity_update_kernel"))?);
-        let hierarchical_project_kernel = Arc::new(context.get_func("active_inference", "hierarchical_project_kernel").ok_or_else(|| anyhow::anyhow!("Failed to get hierarchical_project_kernel"))?);
-
+        let gemv_kernel = Arc::new(
+            context
+                .get_func("active_inference", "gemv_kernel")
+                .ok_or_else(|| anyhow::anyhow!("Failed to get gemv_kernel"))?,
+        );
+        let prediction_error_kernel = Arc::new(
+            context
+                .get_func("active_inference", "prediction_error_kernel")
+                .ok_or_else(|| anyhow::anyhow!("Failed to get prediction_error_kernel"))?,
+        );
+        let belief_update_kernel = Arc::new(
+            context
+                .get_func("active_inference", "belief_update_kernel")
+                .ok_or_else(|| anyhow::anyhow!("Failed to get belief_update_kernel"))?,
+        );
+        let precision_weight_kernel = Arc::new(
+            context
+                .get_func("active_inference", "precision_weight_kernel")
+                .ok_or_else(|| anyhow::anyhow!("Failed to get precision_weight_kernel"))?,
+        );
+        let kl_divergence_kernel = Arc::new(
+            context
+                .get_func("active_inference", "kl_divergence_kernel")
+                .ok_or_else(|| anyhow::anyhow!("Failed to get kl_divergence_kernel"))?,
+        );
+        let accuracy_kernel = Arc::new(
+            context
+                .get_func("active_inference", "accuracy_kernel")
+                .ok_or_else(|| anyhow::anyhow!("Failed to get accuracy_kernel"))?,
+        );
+        let sum_reduction_kernel = Arc::new(
+            context
+                .get_func("active_inference", "sum_reduction_kernel")
+                .ok_or_else(|| anyhow::anyhow!("Failed to get sum_reduction_kernel"))?,
+        );
+        let axpby_kernel = Arc::new(
+            context
+                .get_func("active_inference", "axpby_kernel")
+                .ok_or_else(|| anyhow::anyhow!("Failed to get axpby_kernel"))?,
+        );
+        let velocity_update_kernel = Arc::new(
+            context
+                .get_func("active_inference", "velocity_update_kernel")
+                .ok_or_else(|| anyhow::anyhow!("Failed to get velocity_update_kernel"))?,
+        );
+        let hierarchical_project_kernel = Arc::new(
+            context
+                .get_func("active_inference", "hierarchical_project_kernel")
+                .ok_or_else(|| anyhow::anyhow!("Failed to get hierarchical_project_kernel"))?,
+        );
 
         Ok(Self {
             context,
@@ -115,7 +157,7 @@ impl ActiveInferenceGpu {
         var_posterior: &Array1<f64>,
         mean_prior: &Array1<f64>,
         var_prior: &Array1<f64>,
-        obs_precision: &Array1<f64>
+        obs_precision: &Array1<f64>,
     ) -> Result<f64> {
         let start = std::time::Instant::now();
         println!("[GPU-AI] compute_free_energy_gpu() called");
@@ -123,9 +165,15 @@ impl ActiveInferenceGpu {
         let n = mean_posterior.len();
 
         // Upload data to GPU
-        let mean_q_gpu = self.context.htod_sync_copy(mean_posterior.as_slice().unwrap())?;
-        let mean_p_gpu = self.context.htod_sync_copy(mean_prior.as_slice().unwrap())?;
-        let var_q_gpu = self.context.htod_sync_copy(var_posterior.as_slice().unwrap())?;
+        let mean_q_gpu = self
+            .context
+            .htod_sync_copy(mean_posterior.as_slice().unwrap())?;
+        let mean_p_gpu = self
+            .context
+            .htod_sync_copy(mean_prior.as_slice().unwrap())?;
+        let var_q_gpu = self
+            .context
+            .htod_sync_copy(var_posterior.as_slice().unwrap())?;
         let var_p_gpu = self.context.htod_sync_copy(var_prior.as_slice().unwrap())?;
 
         let threads = 256;
@@ -141,19 +189,34 @@ impl ActiveInferenceGpu {
         let n_i32 = n as i32;
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.kl_divergence_kernel).launch(cfg, (&mean_q_gpu, &mean_p_gpu, &var_q_gpu, &var_p_gpu, &mut kl_components, n_i32))?;
+            cudarc::driver::CudaFunction::clone(&*self.kl_divergence_kernel).launch(
+                cfg,
+                (
+                    &mean_q_gpu,
+                    &mean_p_gpu,
+                    &var_q_gpu,
+                    &var_p_gpu,
+                    &mut kl_components,
+                    n_i32,
+                ),
+            )?;
         }
 
         // Sum KL components
         let mut complexity_result = self.context.alloc_zeros::<f64>(1)?;
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.sum_reduction_kernel).launch(cfg, (&kl_components, &mut complexity_result, n_i32))?;
+            cudarc::driver::CudaFunction::clone(&*self.sum_reduction_kernel)
+                .launch(cfg, (&kl_components, &mut complexity_result, n_i32))?;
         }
 
         // Compute prediction error
-        let obs_gpu = self.context.htod_sync_copy(observations.as_slice().unwrap())?;
-        let precision_gpu = self.context.htod_sync_copy(obs_precision.as_slice().unwrap())?;
+        let obs_gpu = self
+            .context
+            .htod_sync_copy(observations.as_slice().unwrap())?;
+        let precision_gpu = self
+            .context
+            .htod_sync_copy(obs_precision.as_slice().unwrap())?;
 
         let mut error_gpu = self.context.alloc_zeros::<f64>(observations.len())?;
         let obs_n_i32 = observations.len() as i32;
@@ -166,21 +229,41 @@ impl ActiveInferenceGpu {
 
         // For simplicity, use mean as prediction (full model would predict from generative model)
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.prediction_error_kernel).launch(obs_cfg, (&mut error_gpu, &obs_gpu, &mean_q_gpu, &precision_gpu, obs_n_i32))?;
+            cudarc::driver::CudaFunction::clone(&*self.prediction_error_kernel).launch(
+                obs_cfg,
+                (
+                    &mut error_gpu,
+                    &obs_gpu,
+                    &mean_q_gpu,
+                    &precision_gpu,
+                    obs_n_i32,
+                ),
+            )?;
         }
 
         // Compute accuracy components
         let mut accuracy_components = self.context.alloc_zeros::<f64>(observations.len())?;
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.accuracy_kernel).launch(obs_cfg, (&error_gpu, &precision_gpu, &mut accuracy_components, obs_n_i32))?;
+            cudarc::driver::CudaFunction::clone(&*self.accuracy_kernel).launch(
+                obs_cfg,
+                (
+                    &error_gpu,
+                    &precision_gpu,
+                    &mut accuracy_components,
+                    obs_n_i32,
+                ),
+            )?;
         }
 
         // Sum accuracy components
         let mut accuracy_result = self.context.alloc_zeros::<f64>(1)?;
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.sum_reduction_kernel).launch(obs_cfg, (&accuracy_components, &mut accuracy_result, obs_n_i32))?;
+            cudarc::driver::CudaFunction::clone(&*self.sum_reduction_kernel).launch(
+                obs_cfg,
+                (&accuracy_components, &mut accuracy_result, obs_n_i32),
+            )?;
         }
 
         // Download results
@@ -192,7 +275,10 @@ impl ActiveInferenceGpu {
         let free_energy = complexity - accuracy;
 
         let elapsed = start.elapsed();
-        println!("[GPU-AI] compute_free_energy_gpu() completed in {:?}", elapsed);
+        println!(
+            "[GPU-AI] compute_free_energy_gpu() completed in {:?}",
+            elapsed
+        );
 
         Ok(free_energy)
     }
@@ -203,7 +289,7 @@ impl ActiveInferenceGpu {
         mean: &mut Array1<f64>,
         jacobian: &Array2<f64>,
         observations: &Array1<f64>,
-        precision: &Array1<f64>
+        precision: &Array1<f64>,
     ) -> Result<()> {
         let start = std::time::Instant::now();
         println!("[GPU-AI] update_beliefs_gpu() called");
@@ -213,7 +299,9 @@ impl ActiveInferenceGpu {
 
         // Upload to GPU
         let mut mean_gpu = self.context.htod_sync_copy(mean.as_slice().unwrap())?;
-        let obs_gpu = self.context.htod_sync_copy(observations.as_slice().unwrap())?;
+        let obs_gpu = self
+            .context
+            .htod_sync_copy(observations.as_slice().unwrap())?;
         let precision_gpu = self.context.htod_sync_copy(precision.as_slice().unwrap())?;
 
         // Flatten jacobian for GPU
@@ -233,7 +321,16 @@ impl ActiveInferenceGpu {
         let obs_n_i32 = obs_dim as i32;
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.prediction_error_kernel).launch(obs_cfg, (&mut pred_error, &obs_gpu, &mean_gpu, &precision_gpu, obs_n_i32))?;
+            cudarc::driver::CudaFunction::clone(&*self.prediction_error_kernel).launch(
+                obs_cfg,
+                (
+                    &mut pred_error,
+                    &obs_gpu,
+                    &mean_gpu,
+                    &precision_gpu,
+                    obs_n_i32,
+                ),
+            )?;
         }
 
         // Step 2: Compute gradient: J^T * error
@@ -251,14 +348,27 @@ impl ActiveInferenceGpu {
         let transpose = 1; // J^T
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.gemv_kernel).launch(state_cfg, (&mut gradient, &jac_gpu, &pred_error, m_i32, n_i32, alpha, beta, transpose))?;
+            cudarc::driver::CudaFunction::clone(&*self.gemv_kernel).launch(
+                state_cfg,
+                (
+                    &mut gradient,
+                    &jac_gpu,
+                    &pred_error,
+                    m_i32,
+                    n_i32,
+                    alpha,
+                    beta,
+                    transpose,
+                ),
+            )?;
         }
 
         // Step 3: Belief update
         let lr = self.learning_rate;
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.belief_update_kernel).launch(state_cfg, (&mut mean_gpu, &gradient, lr, n_i32))?;
+            cudarc::driver::CudaFunction::clone(&*self.belief_update_kernel)
+                .launch(state_cfg, (&mut mean_gpu, &gradient, lr, n_i32))?;
         }
 
         // Download updated mean
@@ -277,12 +387,15 @@ impl ActiveInferenceGpu {
     pub fn infer_gpu(
         &self,
         model: &mut HierarchicalModel,
-        observations: &Array1<f64>
+        observations: &Array1<f64>,
     ) -> Result<f64> {
         let start_total = std::time::Instant::now();
         println!("[GPU-AI] ========================================");
         println!("[GPU-AI] infer_gpu() STARTING");
-        println!("[GPU-AI] max_iterations.min(10) = {}", self.max_iterations.min(10));
+        println!(
+            "[GPU-AI] max_iterations.min(10) = {}",
+            self.max_iterations.min(10)
+        );
         println!("[GPU-AI] ========================================");
 
         // For now, use CPU inference (full GPU implementation is complex)
@@ -297,7 +410,7 @@ impl ActiveInferenceGpu {
                 &mut model.level1.belief.mean,
                 &self.cpu_inference.observation_model.jacobian,
                 observations,
-                &self.cpu_inference.observation_model.noise_precision
+                &self.cpu_inference.observation_model.noise_precision,
             )?;
         }
 
@@ -321,8 +434,8 @@ impl ActiveInferenceGpu {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::{ObservationModel, TransitionModel};
+    use super::*;
 
     #[test]
     fn test_active_inference_gpu_creation() {
@@ -330,11 +443,8 @@ mod tests {
             let hierarchical_model = HierarchicalModel::new();
             let obs_model = ObservationModel::new(100, 900, 8.0, 0.01);
             let trans_model = TransitionModel::default_timescales();
-            let cpu_inference = VariationalInference::new(
-                obs_model,
-                trans_model,
-                &hierarchical_model
-            );
+            let cpu_inference =
+                VariationalInference::new(obs_model, trans_model, &hierarchical_model);
 
             let gpu_inference = ActiveInferenceGpu::new(context, cpu_inference);
             assert!(gpu_inference.is_ok());
@@ -347,11 +457,8 @@ mod tests {
             let hierarchical_model = HierarchicalModel::new();
             let obs_model = ObservationModel::new(10, 20, 8.0, 0.01);
             let trans_model = TransitionModel::default_timescales();
-            let cpu_inference = VariationalInference::new(
-                obs_model.clone(),
-                trans_model,
-                &hierarchical_model
-            );
+            let cpu_inference =
+                VariationalInference::new(obs_model.clone(), trans_model, &hierarchical_model);
 
             if let Ok(gpu_inference) = ActiveInferenceGpu::new(context, cpu_inference) {
                 let mut mean = Array1::zeros(20);
@@ -363,7 +470,7 @@ mod tests {
                     &mut mean,
                     &jacobian,
                     &observations,
-                    &precision
+                    &precision,
                 );
 
                 assert!(result.is_ok());

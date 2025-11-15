@@ -37,8 +37,7 @@ pub struct ProteinContactGraph {
 impl ProteinContactGraph {
     /// Parse PDB file and build contact graph
     pub fn from_pdb_file<P: AsRef<Path>>(path: P, contact_distance: f64) -> Result<Self> {
-        let file = File::open(path.as_ref())
-            .context("Failed to open PDB file")?;
+        let file = File::open(path.as_ref()).context("Failed to open PDB file")?;
         let reader = BufReader::new(file);
 
         Self::parse_pdb(reader, contact_distance)

@@ -182,11 +182,7 @@ pub struct Prediction {
 
 impl Prediction {
     /// Create a new prediction
-    pub fn new(
-        direction: PredictionDirection,
-        confidence: f32,
-        time_horizon_ms: f64,
-    ) -> Self {
+    pub fn new(direction: PredictionDirection, confidence: f32, time_horizon_ms: f64) -> Self {
         Self {
             direction,
             confidence: confidence.clamp(0.0, 1.0),

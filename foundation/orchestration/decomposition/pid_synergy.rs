@@ -6,8 +6,8 @@
 
 use crate::orchestration::OrchestrationError;
 use nalgebra::{DMatrix, DVector};
-use std::collections::{HashMap, HashSet, BTreeMap, BTreeSet};
 use ordered_float::OrderedFloat;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 /// Advanced PID Decomposition with full lattice structure
 pub struct PIDSynergyDecomposition {
@@ -110,9 +110,11 @@ impl PIDSynergyDecomposition {
     }
 
     /// Decompose information from multiple LLM responses about a target
-    pub fn decompose(&mut self,
-                     llm_responses: &[String],
-                     target: &str) -> Result<PIDDecomposition, OrchestrationError> {
+    pub fn decompose(
+        &mut self,
+        llm_responses: &[String],
+        target: &str,
+    ) -> Result<PIDDecomposition, OrchestrationError> {
         // Convert to probability distributions
         let distributions = self.responses_to_distributions(llm_responses, target)?;
 
@@ -142,9 +144,11 @@ impl PIDSynergyDecomposition {
     }
 
     /// Convert text responses to probability distributions
-    fn responses_to_distributions(&self,
-                                   responses: &[String],
-                                   target: &str) -> Result<Vec<DVector<f64>>, OrchestrationError> {
+    fn responses_to_distributions(
+        &self,
+        responses: &[String],
+        target: &str,
+    ) -> Result<Vec<DVector<f64>>, OrchestrationError> {
         let vocab = self.build_vocabulary(responses, target);
         let vocab_size = vocab.len();
 
@@ -213,8 +217,8 @@ impl PIDSynergyDecomposition {
 
             // Add character n-grams for OOV handling
             if word.len() > 3 {
-                for i in 0..word.len()-2 {
-                    tokens.push(format!("##{}##", &word[i..i+3]));
+                for i in 0..word.len() - 2 {
+                    tokens.push(format!("##{}##", &word[i..i + 3]));
                 }
             }
         }
@@ -235,7 +239,10 @@ impl PIDSynergyDecomposition {
     }
 
     /// Compute redundancy function at each lattice node
-    fn compute_redundancies(&self, distributions: &[DVector<f64>]) -> Result<HashMap<BTreeSet<usize>, f64>, OrchestrationError> {
+    fn compute_redundancies(
+        &self,
+        distributions: &[DVector<f64>],
+    ) -> Result<HashMap<BTreeSet<usize>, f64>, OrchestrationError> {
         let mut redundancies = HashMap::new();
 
         for node in &self.lattice.nodes {
@@ -250,11 +257,21 @@ impl PIDSynergyDecomposition {
                     let mut weight_sum = 0.0;
                     for (measure, weight) in measures {
                         let value = match measure {
-                            RedundancyMeasure::Imin => self.compute_imin(&node.sources, distributions)?,
-                            RedundancyMeasure::Imax => self.compute_imax(&node.sources, distributions)?,
-                            RedundancyMeasure::Iproj => self.compute_iproj(&node.sources, distributions)?,
-                            RedundancyMeasure::Ibroja => self.compute_ibroja(&node.sources, distributions)?,
-                            RedundancyMeasure::Iccs => self.compute_iccs(&node.sources, distributions)?,
+                            RedundancyMeasure::Imin => {
+                                self.compute_imin(&node.sources, distributions)?
+                            }
+                            RedundancyMeasure::Imax => {
+                                self.compute_imax(&node.sources, distributions)?
+                            }
+                            RedundancyMeasure::Iproj => {
+                                self.compute_iproj(&node.sources, distributions)?
+                            }
+                            RedundancyMeasure::Ibroja => {
+                                self.compute_ibroja(&node.sources, distributions)?
+                            }
+                            RedundancyMeasure::Iccs => {
+                                self.compute_iccs(&node.sources, distributions)?
+                            }
                             _ => 0.0,
                         };
                         total += value * weight;
@@ -271,7 +288,11 @@ impl PIDSynergyDecomposition {
     }
 
     /// Compute Imin redundancy (Williams & Beer 2010)
-    fn compute_imin(&self, sources: &BTreeSet<usize>, distributions: &[DVector<f64>]) -> Result<f64, OrchestrationError> {
+    fn compute_imin(
+        &self,
+        sources: &BTreeSet<usize>,
+        distributions: &[DVector<f64>],
+    ) -> Result<f64, OrchestrationError> {
         if sources.is_empty() {
             return Ok(0.0);
         }
@@ -281,9 +302,11 @@ impl PIDSynergyDecomposition {
 
         for &source_idx in sources {
             if source_idx >= distributions.len() {
-                return Err(OrchestrationError::InvalidIndex(
-                    format!("Invalid index {} (max: {})", source_idx, distributions.len())
-                ));
+                return Err(OrchestrationError::InvalidIndex(format!(
+                    "Invalid index {} (max: {})",
+                    source_idx,
+                    distributions.len()
+                )));
             }
 
             // Compute MI(source; target) - simplified as entropy for this example
@@ -295,7 +318,11 @@ impl PIDSynergyDecomposition {
     }
 
     /// Compute Imax redundancy (Harder et al. 2013)
-    fn compute_imax(&self, sources: &BTreeSet<usize>, distributions: &[DVector<f64>]) -> Result<f64, OrchestrationError> {
+    fn compute_imax(
+        &self,
+        sources: &BTreeSet<usize>,
+        distributions: &[DVector<f64>],
+    ) -> Result<f64, OrchestrationError> {
         // Maximum entropy optimization for redundancy
         // This is computationally intensive - using approximation
 
@@ -307,9 +334,11 @@ impl PIDSynergyDecomposition {
         let mut source_dists = Vec::new();
         for &idx in sources {
             if idx >= distributions.len() {
-                return Err(OrchestrationError::InvalidIndex(
-                    format!("Invalid index {} (max: {})", idx, distributions.len())
-                ));
+                return Err(OrchestrationError::InvalidIndex(format!(
+                    "Invalid index {} (max: {})",
+                    idx,
+                    distributions.len()
+                )));
             }
             source_dists.push(distributions[idx].clone());
         }
@@ -322,7 +351,11 @@ impl PIDSynergyDecomposition {
     }
 
     /// Compute Iproj redundancy (projection-based)
-    fn compute_iproj(&self, sources: &BTreeSet<usize>, distributions: &[DVector<f64>]) -> Result<f64, OrchestrationError> {
+    fn compute_iproj(
+        &self,
+        sources: &BTreeSet<usize>,
+        distributions: &[DVector<f64>],
+    ) -> Result<f64, OrchestrationError> {
         if sources.is_empty() {
             return Ok(0.0);
         }
@@ -332,9 +365,11 @@ impl PIDSynergyDecomposition {
 
         for &idx in sources {
             if idx >= distributions.len() {
-                return Err(OrchestrationError::InvalidIndex(
-                    format!("Invalid index {} (max: {})", idx, distributions.len())
-                ));
+                return Err(OrchestrationError::InvalidIndex(format!(
+                    "Invalid index {} (max: {})",
+                    idx,
+                    distributions.len()
+                )));
             }
             projections.push(distributions[idx].clone());
         }
@@ -347,7 +382,11 @@ impl PIDSynergyDecomposition {
     }
 
     /// Compute BROJA redundancy (Bertschinger et al. 2014)
-    fn compute_ibroja(&self, sources: &BTreeSet<usize>, distributions: &[DVector<f64>]) -> Result<f64, OrchestrationError> {
+    fn compute_ibroja(
+        &self,
+        sources: &BTreeSet<usize>,
+        distributions: &[DVector<f64>],
+    ) -> Result<f64, OrchestrationError> {
         // BROJA uses optimization over probability simplex
         // This is the most mathematically rigorous but computationally expensive
 
@@ -358,9 +397,11 @@ impl PIDSynergyDecomposition {
         let mut source_dists = Vec::new();
         for &idx in sources {
             if idx >= distributions.len() {
-                return Err(OrchestrationError::InvalidIndex(
-                    format!("Invalid index {} (max: {})", idx, distributions.len())
-                ));
+                return Err(OrchestrationError::InvalidIndex(format!(
+                    "Invalid index {} (max: {})",
+                    idx,
+                    distributions.len()
+                )));
             }
             source_dists.push(distributions[idx].clone());
         }
@@ -373,7 +414,11 @@ impl PIDSynergyDecomposition {
     }
 
     /// Compute Iccs redundancy (Common Change in Surprisal)
-    fn compute_iccs(&self, sources: &BTreeSet<usize>, distributions: &[DVector<f64>]) -> Result<f64, OrchestrationError> {
+    fn compute_iccs(
+        &self,
+        sources: &BTreeSet<usize>,
+        distributions: &[DVector<f64>],
+    ) -> Result<f64, OrchestrationError> {
         if sources.is_empty() {
             return Ok(0.0);
         }
@@ -387,9 +432,11 @@ impl PIDSynergyDecomposition {
 
             for &idx in sources {
                 if idx >= distributions.len() {
-                    return Err(OrchestrationError::InvalidIndex(
-                        format!("Invalid index {} (max: {})", idx, distributions.len())
-                    ));
+                    return Err(OrchestrationError::InvalidIndex(format!(
+                        "Invalid index {} (max: {})",
+                        idx,
+                        distributions.len()
+                    )));
                 }
 
                 let p = distributions[idx][i];
@@ -408,11 +455,14 @@ impl PIDSynergyDecomposition {
     }
 
     /// Maximum entropy optimization
-    fn max_entropy_optimization(&self, distributions: &[DVector<f64>]) -> Result<DVector<f64>, OrchestrationError> {
+    fn max_entropy_optimization(
+        &self,
+        distributions: &[DVector<f64>],
+    ) -> Result<DVector<f64>, OrchestrationError> {
         if distributions.is_empty() {
             return Err(OrchestrationError::InsufficientData {
                 required: 1,
-                available: 0
+                available: 0,
             });
         }
 
@@ -452,11 +502,14 @@ impl PIDSynergyDecomposition {
     }
 
     /// PCA for projection-based redundancy
-    fn compute_pca(&self, distributions: &[DVector<f64>]) -> Result<DVector<f64>, OrchestrationError> {
+    fn compute_pca(
+        &self,
+        distributions: &[DVector<f64>],
+    ) -> Result<DVector<f64>, OrchestrationError> {
         if distributions.is_empty() {
             return Err(OrchestrationError::InsufficientData {
                 required: 1,
-                available: 0
+                available: 0,
             });
         }
 
@@ -489,11 +542,14 @@ impl PIDSynergyDecomposition {
     }
 
     /// BROJA optimization over probability simplex
-    fn broja_optimization(&self, distributions: &[DVector<f64>]) -> Result<DVector<f64>, OrchestrationError> {
+    fn broja_optimization(
+        &self,
+        distributions: &[DVector<f64>],
+    ) -> Result<DVector<f64>, OrchestrationError> {
         if distributions.is_empty() {
             return Err(OrchestrationError::InsufficientData {
                 required: 1,
-                available: 0
+                available: 0,
             });
         }
 
@@ -550,7 +606,10 @@ impl PIDSynergyDecomposition {
     }
 
     /// Möbius inversion to get partial information values
-    fn mobius_inversion(&self, redundancies: &HashMap<BTreeSet<usize>, f64>) -> Result<HashMap<BTreeSet<usize>, f64>, OrchestrationError> {
+    fn mobius_inversion(
+        &self,
+        redundancies: &HashMap<BTreeSet<usize>, f64>,
+    ) -> Result<HashMap<BTreeSet<usize>, f64>, OrchestrationError> {
         let mut partial_infos = HashMap::new();
 
         // Apply Möbius inversion formula
@@ -559,7 +618,11 @@ impl PIDSynergyDecomposition {
 
             // Sum over all ancestors in lattice
             for ancestor in self.get_ancestors(&node.sources) {
-                let sign = if (ancestor.len() - node.sources.len()) % 2 == 0 { 1.0 } else { -1.0 };
+                let sign = if (ancestor.len() - node.sources.len()) % 2 == 0 {
+                    1.0
+                } else {
+                    -1.0
+                };
                 let redundancy = redundancies.get(&ancestor).unwrap_or(&0.0);
                 pi_value += sign * redundancy;
             }
@@ -595,7 +658,11 @@ impl PIDSynergyDecomposition {
     }
 
     /// Extract unique, redundant, and synergistic components
-    fn extract_components(&self, partial_infos: &HashMap<BTreeSet<usize>, f64>, n_sources: usize) -> Result<PIDDecomposition, OrchestrationError> {
+    fn extract_components(
+        &self,
+        partial_infos: &HashMap<BTreeSet<usize>, f64>,
+        n_sources: usize,
+    ) -> Result<PIDDecomposition, OrchestrationError> {
         let mut unique = vec![0.0; n_sources];
         let mut redundancy = 0.0;
         let mut synergy = 0.0;
@@ -632,8 +699,8 @@ impl PIDSynergyDecomposition {
         }
 
         // Compute total mutual information
-        let total_mi = unique.iter().sum::<f64>() + redundancy + synergy +
-                      higher_order.values().sum::<f64>();
+        let total_mi =
+            unique.iter().sum::<f64>() + redundancy + synergy + higher_order.values().sum::<f64>();
 
         // Compute complexity (normalized synergy)
         let complexity = if total_mi > 0.0 {
@@ -678,8 +745,8 @@ impl PIDSynergyDecomposition {
 
     /// Compute cache key for distributions
     fn compute_cache_key(&self, distributions: &[DVector<f64>]) -> u64 {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
 
@@ -693,8 +760,10 @@ impl PIDSynergyDecomposition {
     }
 
     /// Analyze synergy patterns across multiple queries
-    pub fn analyze_synergy_evolution(&mut self,
-                                      query_history: &[(String, Vec<String>)]) -> Result<SynergyEvolution, OrchestrationError> {
+    pub fn analyze_synergy_evolution(
+        &mut self,
+        query_history: &[(String, Vec<String>)],
+    ) -> Result<SynergyEvolution, OrchestrationError> {
         let mut evolution = SynergyEvolution {
             synergy_timeline: Vec::new(),
             redundancy_timeline: Vec::new(),
@@ -714,7 +783,7 @@ impl PIDSynergyDecomposition {
             if decomposition.synergy > decomposition.redundancy * 2.0 {
                 evolution.emergent_patterns.insert(
                     query.clone(),
-                    "High synergy - LLMs complement each other".to_string()
+                    "High synergy - LLMs complement each other".to_string(),
                 );
             }
 
@@ -793,11 +862,18 @@ impl InformationLattice {
         // Compute Möbius function
         let mobius = Self::compute_mobius(&nodes, &edges);
 
-        Self { nodes, edges, mobius }
+        Self {
+            nodes,
+            edges,
+            mobius,
+        }
     }
 
     /// Compute Möbius function for inclusion-exclusion
-    fn compute_mobius(nodes: &[LatticeNode], edges: &HashMap<usize, Vec<usize>>) -> HashMap<(usize, usize), f64> {
+    fn compute_mobius(
+        nodes: &[LatticeNode],
+        edges: &HashMap<usize, Vec<usize>>,
+    ) -> HashMap<(usize, usize), f64> {
         let mut mobius = HashMap::new();
 
         for i in 0..nodes.len() {
@@ -810,8 +886,9 @@ impl InformationLattice {
 
                     // Sum over intermediate nodes
                     for k in 0..nodes.len() {
-                        if nodes[i].sources.is_subset(&nodes[k].sources) &&
-                           nodes[k].sources.is_subset(&nodes[j].sources) {
+                        if nodes[i].sources.is_subset(&nodes[k].sources)
+                            && nodes[k].sources.is_subset(&nodes[j].sources)
+                        {
                             value += mobius.get(&(i, k)).unwrap_or(&0.0);
                         }
                     }
@@ -841,7 +918,9 @@ mod tests {
             "France's capital is the city of Paris".to_string(),
         ];
 
-        let decomposition = pid.decompose(&responses, "What is the capital of France?").unwrap();
+        let decomposition = pid
+            .decompose(&responses, "What is the capital of France?")
+            .unwrap();
 
         assert!(decomposition.redundancy > 0.0);
         assert!(decomposition.total_mi > 0.0);

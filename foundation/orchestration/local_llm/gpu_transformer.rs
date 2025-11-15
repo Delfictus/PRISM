@@ -3,10 +3,10 @@
 //! Full LLM inference on GPU - NO PLACEHOLDERS
 //! Production-ready transformer with all operations on GPU
 
-use anyhow::Result;
-use std::sync::Arc;
-use cudarc::driver::{CudaDevice, CudaSlice, CudaFunction, LaunchConfig, LaunchAsync};
 use crate::gpu::GpuKernelExecutor;
+use anyhow::Result;
+use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchAsync, LaunchConfig};
+use std::sync::Arc;
 
 /// GPU Transformer Layer - Complete Implementation
 pub struct GpuTransformerLayer {
@@ -14,14 +14,14 @@ pub struct GpuTransformerLayer {
     device: Arc<CudaDevice>,
 
     // Layer parameters (stored on GPU)
-    wq: CudaSlice<f32>,  // Query projection weights
-    wk: CudaSlice<f32>,  // Key projection weights
-    wv: CudaSlice<f32>,  // Value projection weights
-    wo: CudaSlice<f32>,  // Output projection weights
+    wq: CudaSlice<f32>, // Query projection weights
+    wk: CudaSlice<f32>, // Key projection weights
+    wv: CudaSlice<f32>, // Value projection weights
+    wo: CudaSlice<f32>, // Output projection weights
 
     // Feed-forward weights
-    w1: CudaSlice<f32>,  // First FFN layer
-    w2: CudaSlice<f32>,  // Second FFN layer
+    w1: CudaSlice<f32>, // First FFN layer
+    w2: CudaSlice<f32>, // Second FFN layer
 
     // Layer norm parameters
     ln1_gamma: CudaSlice<f32>,
@@ -76,10 +76,16 @@ impl GpuTransformerLayer {
         Ok(Self {
             executor,
             device,
-            wq, wk, wv, wo,
-            w1, w2,
-            ln1_gamma, ln1_beta,
-            ln2_gamma, ln2_beta,
+            wq,
+            wk,
+            wv,
+            wo,
+            w1,
+            w2,
+            ln1_gamma,
+            ln1_beta,
+            ln2_gamma,
+            ln2_beta,
             d_model,
             n_heads,
             d_ff,
@@ -94,11 +100,17 @@ impl GpuTransformerLayer {
 
     /// Forward pass through transformer layer - 100% GPU
     pub fn forward(&self, input: &CudaSlice<f32>, seq_len: usize) -> Result<CudaSlice<f32>> {
-        let batch_size = 1;  // For simplicity, batch_size = 1
+        let batch_size = 1; // For simplicity, batch_size = 1
 
         // 1. Layer Norm 1 (GPU)
         let mut normalized1 = self.device.alloc_zeros::<f32>(seq_len * self.d_model)?;
-        self.apply_layer_norm_gpu(input, &mut normalized1, &self.ln1_gamma, &self.ln1_beta, seq_len)?;
+        self.apply_layer_norm_gpu(
+            input,
+            &mut normalized1,
+            &self.ln1_gamma,
+            &self.ln1_beta,
+            seq_len,
+        )?;
 
         // 2. Multi-head attention (GPU)
         let attention_out = self.multi_head_attention_gpu(&normalized1, seq_len)?;
@@ -112,7 +124,13 @@ impl GpuTransformerLayer {
 
         // 4. Layer Norm 2 (GPU)
         let mut normalized2 = self.device.alloc_zeros::<f32>(seq_len * self.d_model)?;
-        self.apply_layer_norm_gpu(&residual1_gpu, &mut normalized2, &self.ln2_gamma, &self.ln2_beta, seq_len)?;
+        self.apply_layer_norm_gpu(
+            &residual1_gpu,
+            &mut normalized2,
+            &self.ln2_gamma,
+            &self.ln2_beta,
+            seq_len,
+        )?;
 
         // 5. Feed-forward network (GPU)
         let ffn_out = self.feed_forward_gpu(&normalized2, seq_len)?;
@@ -144,22 +162,29 @@ impl GpuTransformerLayer {
         };
 
         unsafe {
-            kernel.clone().launch(cfg, (
-                input,
-                output,
-                gamma,
-                beta,
-                1i32,  // batch_size
-                seq_len as i32,
-                self.d_model as i32,
-                1e-5f32,  // eps
-            ))?;
+            kernel.clone().launch(
+                cfg,
+                (
+                    input,
+                    output,
+                    gamma,
+                    beta,
+                    1i32, // batch_size
+                    seq_len as i32,
+                    self.d_model as i32,
+                    1e-5f32, // eps
+                ),
+            )?;
         }
 
         Ok(())
     }
 
-    fn multi_head_attention_gpu(&self, input: &CudaSlice<f32>, seq_len: usize) -> Result<CudaSlice<f32>> {
+    fn multi_head_attention_gpu(
+        &self,
+        input: &CudaSlice<f32>,
+        seq_len: usize,
+    ) -> Result<CudaSlice<f32>> {
         // Project to Q, K, V using matrix multiplication (existing GPU kernel)
         let exec = self.executor.lock().unwrap();
 
@@ -178,17 +203,20 @@ impl GpuTransformerLayer {
         };
 
         unsafe {
-            kernel.clone().launch(cfg, (
-                input,  // Q
-                input,  // K
-                input,  // V
-                &mut output,
-                &mut attn_weights,
-                1i32,  // batch_size
-                seq_len as i32,
-                self.d_model as i32,
-                self.n_heads as i32,
-            ))?;
+            kernel.clone().launch(
+                cfg,
+                (
+                    input, // Q
+                    input, // K
+                    input, // V
+                    &mut output,
+                    &mut attn_weights,
+                    1i32, // batch_size
+                    seq_len as i32,
+                    self.d_model as i32,
+                    self.n_heads as i32,
+                ),
+            )?;
         }
 
         Ok(output)
@@ -213,18 +241,17 @@ impl GpuTransformerLayer {
 
         let cfg = LaunchConfig::for_num_elems(hidden.len() as u32);
         unsafe {
-            kernel.clone().launch(cfg, (
-                &hidden_gpu,
-                &mut activated_gpu,
-                hidden.len() as i32,
-            ))?;
+            kernel
+                .clone()
+                .launch(cfg, (&hidden_gpu, &mut activated_gpu, hidden.len() as i32))?;
         }
 
         // 3. Linear 2: hidden @ w2
         let activated_cpu = self.device.dtoh_sync_copy(&activated_gpu)?;
         let w2_cpu = self.device.dtoh_sync_copy(&self.w2)?;
 
-        let output = exec.matrix_multiply(&activated_cpu, &w2_cpu, seq_len, self.d_ff, self.d_model)?;
+        let output =
+            exec.matrix_multiply(&activated_cpu, &w2_cpu, seq_len, self.d_ff, self.d_model)?;
         let output_gpu = self.device.htod_sync_copy(&output)?;
 
         Ok(output_gpu)
@@ -297,7 +324,7 @@ impl GpuLLMInference {
                 device.clone(),
                 d_model,
                 n_heads,
-                d_model * 4,  // FFN hidden dim = 4 * d_model
+                d_model * 4, // FFN hidden dim = 4 * d_model
             )?;
             layers.push(layer);
         }
@@ -387,15 +414,18 @@ impl GpuLLMInference {
         };
 
         unsafe {
-            kernel.clone().launch(cfg, (
-                &token_ids_gpu,
-                &self.token_embeddings,
-                &mut output,
-                1i32,  // batch_size
-                seq_len as i32,
-                self.vocab_size as i32,
-                self.d_model as i32,
-            ))?;
+            kernel.clone().launch(
+                cfg,
+                (
+                    &token_ids_gpu,
+                    &self.token_embeddings,
+                    &mut output,
+                    1i32, // batch_size
+                    seq_len as i32,
+                    self.vocab_size as i32,
+                    self.d_model as i32,
+                ),
+            )?;
         }
 
         Ok(output)
@@ -410,7 +440,8 @@ impl GpuLLMInference {
 
         // For now, use greedy sampling (argmax)
         // Full implementation would use top-k GPU kernel
-        let token = probs.iter()
+        let token = probs
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(i, _)| i as i32)
@@ -450,17 +481,17 @@ mod tests {
     fn test_small_gpu_llm() -> Result<()> {
         // Small model for testing
         let mut llm = GpuLLMInference::new(
-            1000,  // vocab_size
-            128,   // d_model (tiny for testing)
-            2,     // n_layers
-            4,     // n_heads
-            512,   // max_seq_len
+            1000, // vocab_size
+            128,  // d_model (tiny for testing)
+            2,    // n_layers
+            4,    // n_heads
+            512,  // max_seq_len
         )?;
 
         println!("✅ Small GPU LLM created");
 
         // Test generation
-        let input_tokens = vec![1, 2, 3];  // Simple input
+        let input_tokens = vec![1, 2, 3]; // Simple input
         let output = llm.generate(&input_tokens, 5)?;
 
         println!("   Input: {} tokens", input_tokens.len());

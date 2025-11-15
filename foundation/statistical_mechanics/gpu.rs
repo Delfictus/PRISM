@@ -10,12 +10,12 @@
 //! - Coupling forces from network topology
 //! - Entropy production tracking (2nd Law verification)
 
-use std::sync::Arc;
+use anyhow::{anyhow, Context, Result};
+use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchAsync, LaunchConfig};
 use ndarray::{Array1, Array2};
-use anyhow::{Result, anyhow, Context};
-use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchConfig, LaunchAsync};
+use std::sync::Arc;
 
-use super::{ThermodynamicState, NetworkConfig};
+use super::{NetworkConfig, ThermodynamicState};
 
 /// GPU-accelerated thermodynamic network
 ///
@@ -64,24 +64,45 @@ impl ThermodynamicGpu {
         let ptx = cudarc::nvrtc::Ptx::from_src(ptx_src);
 
         let kernel_names = vec![
-            "initialize_oscillators_kernel", "compute_coupling_forces_kernel",
-            "evolve_oscillators_kernel", "compute_energy_kernel",
-            "compute_entropy_kernel", "compute_order_parameter_kernel"
+            "initialize_oscillators_kernel",
+            "compute_coupling_forces_kernel",
+            "evolve_oscillators_kernel",
+            "compute_energy_kernel",
+            "compute_entropy_kernel",
+            "compute_order_parameter_kernel",
         ];
         context.load_ptx(ptx, "thermodynamic", &kernel_names)?;
 
-        let init_kernel = Arc::new(context.get_func("thermodynamic", "initialize_oscillators_kernel")
-            .ok_or_else(|| anyhow!("Failed to load initialize_oscillators_kernel"))?);
-        let forces_kernel = Arc::new(context.get_func("thermodynamic", "compute_coupling_forces_kernel")
-            .ok_or_else(|| anyhow!("Failed to load compute_coupling_forces_kernel"))?);
-        let evolve_kernel = Arc::new(context.get_func("thermodynamic", "evolve_oscillators_kernel")
-            .ok_or_else(|| anyhow!("Failed to load evolve_oscillators_kernel"))?);
-        let energy_kernel = Arc::new(context.get_func("thermodynamic", "compute_energy_kernel")
-            .ok_or_else(|| anyhow!("Failed to load compute_energy_kernel"))?);
-        let entropy_kernel = Arc::new(context.get_func("thermodynamic", "compute_entropy_kernel")
-            .ok_or_else(|| anyhow!("Failed to load compute_entropy_kernel"))?);
-        let order_kernel = Arc::new(context.get_func("thermodynamic", "compute_order_parameter_kernel")
-            .ok_or_else(|| anyhow!("Failed to load compute_order_parameter_kernel"))?);
+        let init_kernel = Arc::new(
+            context
+                .get_func("thermodynamic", "initialize_oscillators_kernel")
+                .ok_or_else(|| anyhow!("Failed to load initialize_oscillators_kernel"))?,
+        );
+        let forces_kernel = Arc::new(
+            context
+                .get_func("thermodynamic", "compute_coupling_forces_kernel")
+                .ok_or_else(|| anyhow!("Failed to load compute_coupling_forces_kernel"))?,
+        );
+        let evolve_kernel = Arc::new(
+            context
+                .get_func("thermodynamic", "evolve_oscillators_kernel")
+                .ok_or_else(|| anyhow!("Failed to load evolve_oscillators_kernel"))?,
+        );
+        let energy_kernel = Arc::new(
+            context
+                .get_func("thermodynamic", "compute_energy_kernel")
+                .ok_or_else(|| anyhow!("Failed to load compute_energy_kernel"))?,
+        );
+        let entropy_kernel = Arc::new(
+            context
+                .get_func("thermodynamic", "compute_entropy_kernel")
+                .ok_or_else(|| anyhow!("Failed to load compute_entropy_kernel"))?,
+        );
+        let order_kernel = Arc::new(
+            context
+                .get_func("thermodynamic", "compute_order_parameter_kernel")
+                .ok_or_else(|| anyhow!("Failed to load compute_order_parameter_kernel"))?,
+        );
 
         let n = config.n_oscillators;
 
@@ -91,9 +112,9 @@ impl ThermodynamicGpu {
         let mut phases = context.alloc_zeros::<f64>(n)?;
 
         // Initialize coupling matrix (identity for now, will be updated)
-        let coupling_vec: Vec<f64> = (0..n*n).map(|i| {
-            if i / n == i % n { 1.0 } else { 0.0 }
-        }).collect();
+        let coupling_vec: Vec<f64> = (0..n * n)
+            .map(|i| if i / n == i % n { 1.0 } else { 0.0 })
+            .collect();
         let coupling_matrix = context.htod_sync_copy(&coupling_vec)?;
 
         // Initialize oscillators with random states
@@ -109,7 +130,10 @@ impl ThermodynamicGpu {
         let seed = config.seed as u64;
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(&init_kernel).launch(cfg, (&mut positions, &mut velocities, &mut phases, n_i32, seed))?;
+            cudarc::driver::CudaFunction::clone(&init_kernel).launch(
+                cfg,
+                (&mut positions, &mut velocities, &mut phases, n_i32, seed),
+            )?;
         }
 
         Ok(Self {
@@ -167,7 +191,16 @@ impl ThermodynamicGpu {
         let coupling_strength = self.config.coupling_strength;
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.forces_kernel).launch(cfg, (&self.positions, &self.coupling_matrix, &mut forces, n_i32, coupling_strength))?;
+            cudarc::driver::CudaFunction::clone(&*self.forces_kernel).launch(
+                cfg,
+                (
+                    &self.positions,
+                    &self.coupling_matrix,
+                    &mut forces,
+                    n_i32,
+                    coupling_strength,
+                ),
+            )?;
         }
 
         // Step 2: Evolve oscillators (Langevin dynamics)
@@ -178,7 +211,21 @@ impl ThermodynamicGpu {
         let iter_i32 = self.iteration as i32;
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.evolve_kernel).launch(cfg, (&mut self.positions, &mut self.velocities, &mut self.phases, &forces, dt, damping, temperature, n_i32, seed, iter_i32))?;
+            cudarc::driver::CudaFunction::clone(&*self.evolve_kernel).launch(
+                cfg,
+                (
+                    &mut self.positions,
+                    &mut self.velocities,
+                    &mut self.phases,
+                    &forces,
+                    dt,
+                    damping,
+                    temperature,
+                    n_i32,
+                    seed,
+                    iter_i32,
+                ),
+            )?;
         }
 
         self.iteration += 1;
@@ -211,7 +258,17 @@ impl ThermodynamicGpu {
         let coupling_strength = self.config.coupling_strength;
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.energy_kernel).launch(cfg, (&self.positions, &self.velocities, &self.coupling_matrix, &mut energy_components, n_i32, coupling_strength))?;
+            cudarc::driver::CudaFunction::clone(&*self.energy_kernel).launch(
+                cfg,
+                (
+                    &self.positions,
+                    &self.velocities,
+                    &self.coupling_matrix,
+                    &mut energy_components,
+                    n_i32,
+                    coupling_strength,
+                ),
+            )?;
         }
 
         // Compute entropy on GPU
@@ -219,7 +276,16 @@ impl ThermodynamicGpu {
         let temperature = self.config.temperature;
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.entropy_kernel).launch(cfg, (&self.positions, &self.velocities, &mut entropy_result, n_i32, temperature))?;
+            cudarc::driver::CudaFunction::clone(&*self.entropy_kernel).launch(
+                cfg,
+                (
+                    &self.positions,
+                    &self.velocities,
+                    &mut entropy_result,
+                    n_i32,
+                    temperature,
+                ),
+            )?;
         }
 
         // Compute order parameter on GPU
@@ -227,7 +293,8 @@ impl ThermodynamicGpu {
         let mut order_imag = self.context.alloc_zeros::<f64>(1)?;
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.order_kernel).launch(cfg, (&self.phases, &mut order_real, &mut order_imag, n_i32))?;
+            cudarc::driver::CudaFunction::clone(&*self.order_kernel)
+                .launch(cfg, (&self.phases, &mut order_real, &mut order_imag, n_i32))?;
         }
 
         // Download results
@@ -241,7 +308,9 @@ impl ThermodynamicGpu {
         let entropy = entropy_vec[0];
 
         // Order parameter: r = |⟨e^(iθ)⟩| / N
-        let order_r = (order_real_vec[0]*order_real_vec[0] + order_imag_vec[0]*order_imag_vec[0]).sqrt() / (n as f64);
+        let order_r =
+            (order_real_vec[0] * order_real_vec[0] + order_imag_vec[0] * order_imag_vec[0]).sqrt()
+                / (n as f64);
 
         // Build ThermodynamicState matching actual struct
         let n = self.config.n_oscillators;
@@ -250,14 +319,14 @@ impl ThermodynamicGpu {
         let velocities_vec = self.context.dtoh_sync_copy(&self.velocities)?;
 
         // Build coupling matrix (simplified - use identity for now)
-        let coupling_matrix: Vec<Vec<f64>> = (0..n).map(|i| {
-            (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect()
-        }).collect();
+        let coupling_matrix: Vec<Vec<f64>> = (0..n)
+            .map(|i| (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect())
+            .collect();
 
         Ok(ThermodynamicState {
             phases: phases_vec,
             velocities: velocities_vec,
-            natural_frequencies: vec![1.0; n],  // Simplified
+            natural_frequencies: vec![1.0; n], // Simplified
             coupling_matrix,
             time: (self.iteration as f64) * self.config.dt,
             entropy,
@@ -274,12 +343,17 @@ impl ThermodynamicGpu {
         }
 
         let n = self.entropy_history.len();
-        let s_current = self.entropy_history[n-1];
-        let s_prev = self.entropy_history[n-2];
+        let s_current = self.entropy_history[n - 1];
+        let s_prev = self.entropy_history[n - 2];
         let delta_s = s_current - s_prev;
 
-        eprintln!("[Thermo GPU] Entropy check: S_prev={:.4}, S_current={:.4}, ΔS={:.4}, dS/dt={:.4}",
-            s_prev, s_current, delta_s, delta_s / self.config.dt);
+        eprintln!(
+            "[Thermo GPU] Entropy check: S_prev={:.4}, S_current={:.4}, ΔS={:.4}, dS/dt={:.4}",
+            s_prev,
+            s_current,
+            delta_s,
+            delta_s / self.config.dt
+        );
 
         delta_s / self.config.dt
     }
@@ -313,14 +387,17 @@ impl ThermodynamicGpu {
 
         let n_i32 = n as i32;
         unsafe {
-            cudarc::driver::CudaFunction::clone(&*self.order_kernel).launch(cfg, (&self.phases, &mut order_real, &mut order_imag, n_i32))?;
+            cudarc::driver::CudaFunction::clone(&*self.order_kernel)
+                .launch(cfg, (&self.phases, &mut order_real, &mut order_imag, n_i32))?;
         }
 
         let order_real_vec = self.context.dtoh_sync_copy(&order_real)?;
         let order_imag_vec = self.context.dtoh_sync_copy(&order_imag)?;
 
         // Compute order parameter and mean phase
-        let order_parameter = (order_real_vec[0]*order_real_vec[0] + order_imag_vec[0]*order_imag_vec[0]).sqrt() / (n as f64);
+        let order_parameter =
+            (order_real_vec[0] * order_real_vec[0] + order_imag_vec[0] * order_imag_vec[0]).sqrt()
+                / (n as f64);
         let mean_phase = order_imag_vec[0].atan2(order_real_vec[0]);
 
         Ok(shared_types::KuramotoState {

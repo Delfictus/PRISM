@@ -3,10 +3,10 @@
 //! Implements NeuromorphicPort for the PRCT algorithm.
 //! Converts graphs to spike patterns and processes them through reservoir computing.
 
-use prct_core::ports::{NeuromorphicPort, NeuromorphicEncodingParams};
-use prct_core::errors::Result;
-use shared_types::*;
 use crate::cuda::prct_gpu::PRCTGpuManager;
+use prct_core::errors::Result;
+use prct_core::ports::{NeuromorphicEncodingParams, NeuromorphicPort};
+use shared_types::*;
 use std::sync::Arc;
 
 /// Neuromorphic processing adapter
@@ -19,9 +19,7 @@ pub struct NeuromorphicAdapter {
 impl NeuromorphicAdapter {
     pub fn new() -> Result<Self> {
         // Try to initialize GPU, fall back to CPU if unavailable
-        let gpu_manager = PRCTGpuManager::new()
-            .ok()
-            .map(Arc::new);
+        let gpu_manager = PRCTGpuManager::new().ok().map(Arc::new);
 
         if gpu_manager.is_some() {
             log::info!("[NEUROMORPHIC] GPU acceleration enabled");
@@ -30,8 +28,8 @@ impl NeuromorphicAdapter {
         }
 
         Ok(Self {
-            base_frequency: 20.0,  // Hz
-            time_window: 100.0,    // ms
+            base_frequency: 20.0, // Hz
+            time_window: 100.0,   // ms
             gpu_manager,
         })
     }
@@ -83,12 +81,8 @@ impl NeuromorphicPort for NeuromorphicAdapter {
         // Try GPU acceleration first
         let (mut neuron_states, spike_pattern) = if let Some(gpu) = &self.gpu_manager {
             // Extract spike data for GPU
-            let spike_ids: Vec<i32> = spikes.spikes.iter()
-                .map(|s| s.neuron_id as i32)
-                .collect();
-            let spike_amps: Vec<f64> = spikes.spikes.iter()
-                .map(|s| s.amplitude)
-                .collect();
+            let spike_ids: Vec<i32> = spikes.spikes.iter().map(|s| s.neuron_id as i32).collect();
+            let spike_amps: Vec<f64> = spikes.spikes.iter().map(|s| s.amplitude).collect();
 
             match gpu.process_spikes_gpu(&spike_ids, &spike_amps, n) {
                 Ok((states, counts)) => {
@@ -98,7 +92,10 @@ impl NeuromorphicPort for NeuromorphicAdapter {
                     (states, counts_u8)
                 }
                 Err(e) => {
-                    log::warn!("[NEUROMORPHIC] GPU processing failed: {}, falling back to CPU", e);
+                    log::warn!(
+                        "[NEUROMORPHIC] GPU processing failed: {}, falling back to CPU",
+                        e
+                    );
                     self.process_spikes_cpu(spikes, n)?
                 }
             }
@@ -187,7 +184,10 @@ impl NeuromorphicAdapter {
 
         // Compute as order parameter: r = |<e^(iθ)>|
         let n = states.len() as f64;
-        let phases: Vec<f64> = states.iter().map(|&s| s * 2.0 * std::f64::consts::PI).collect();
+        let phases: Vec<f64> = states
+            .iter()
+            .map(|&s| s * 2.0 * std::f64::consts::PI)
+            .collect();
 
         let sum_cos: f64 = phases.iter().map(|p| p.cos()).sum();
         let sum_sin: f64 = phases.iter().map(|p| p.sin()).sum();

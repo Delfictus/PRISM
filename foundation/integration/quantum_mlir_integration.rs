@@ -3,15 +3,15 @@
 //! Integrates the new quantum MLIR dialect with native GPU complex support
 //! into the main PRISM-AI platform
 
-use anyhow::{Result, Context};
-use std::sync::Arc;
+use anyhow::{Context, Result};
 use parking_lot::Mutex;
+use std::sync::Arc;
 
 use crate::quantum_mlir::{
-    QuantumCompiler, QuantumOp, Hamiltonian, Complex64,
-    QuantumState, ExecutionParams, CompiledQuantumKernel
+    CompiledQuantumKernel, Complex64, ExecutionParams, Hamiltonian, QuantumCompiler, QuantumOp,
+    QuantumState,
 };
-use shared_types::{Graph, EvolutionParams};
+use shared_types::{EvolutionParams, Graph};
 // use platform_foundation::types::{NeuroQuantumState, ProcessingConfig};  // TODO: Add these types
 
 /// Quantum MLIR integration for the platform
@@ -37,11 +37,14 @@ struct IntegrationMetrics {
 impl QuantumMlirIntegration {
     /// Create new quantum MLIR integration
     pub fn new(num_qubits: usize) -> Result<Self> {
-        println!("[Integration] Initializing Quantum MLIR with {} qubits", num_qubits);
+        println!(
+            "[Integration] Initializing Quantum MLIR with {} qubits",
+            num_qubits
+        );
 
         let compiler = Arc::new(
             QuantumCompiler::with_qubits(num_qubits)
-                .context("Failed to create quantum compiler")?
+                .context("Failed to create quantum compiler")?,
         );
 
         // Initialize quantum state to |00...0>
@@ -70,24 +73,23 @@ impl QuantumMlirIntegration {
         let hamiltonian = self.build_hamiltonian_from_graph(graph, params)?;
 
         // Create evolution operation
-        let ops = vec![
-            QuantumOp::Evolution {
-                hamiltonian,
-                time: params.dt,  // Use time step from params
-            }
-        ];
+        let ops = vec![QuantumOp::Evolution {
+            hamiltonian,
+            time: params.dt, // Use time step from params
+        }];
 
         // Compile and execute on GPU
         let kernel = self.compiler.compile(&ops)?;
 
         // Get current state
         let mut state_guard = self.current_state.lock();
-        let mut state = state_guard.take()
+        let mut state = state_guard
+            .take()
             .ok_or_else(|| anyhow::anyhow!("Quantum state not initialized"))?;
 
         // Execute on GPU
         let exec_params = ExecutionParams {
-            time: params.dt,  // Use time step from params
+            time: params.dt, // Use time step from params
             dimension: state.dimension,
         };
         kernel.execute(&mut state, &exec_params)?;
@@ -108,7 +110,8 @@ impl QuantumMlirIntegration {
         let start = std::time::Instant::now();
 
         // Convert to quantum operations
-        let ops: Vec<QuantumOp> = gates.into_iter()
+        let ops: Vec<QuantumOp> = gates
+            .into_iter()
             .map(|gate| self.convert_gate_to_op(gate))
             .collect();
 
@@ -122,7 +125,11 @@ impl QuantumMlirIntegration {
     }
 
     /// Build Hamiltonian from graph structure
-    fn build_hamiltonian_from_graph(&self, graph: &Graph, params: &EvolutionParams) -> Result<Hamiltonian> {
+    fn build_hamiltonian_from_graph(
+        &self,
+        graph: &Graph,
+        params: &EvolutionParams,
+    ) -> Result<Hamiltonian> {
         let dimension = 1 << graph.num_vertices;
         let mut elements = vec![Complex64::zero(); dimension * dimension];
 
@@ -169,7 +176,8 @@ impl QuantumMlirIntegration {
         metrics.avg_speedup = 100.0;
 
         if metrics.gpu_executions % 100 == 0 {
-            println!("[Quantum MLIR] {} GPU executions, avg time: {:.2}ms, speedup: {:.0}x",
+            println!(
+                "[Quantum MLIR] {} GPU executions, avg time: {:.2}ms, speedup: {:.0}x",
                 metrics.gpu_executions,
                 metrics.total_gpu_time_ms / metrics.gpu_executions as f64,
                 metrics.avg_speedup
@@ -179,7 +187,8 @@ impl QuantumMlirIntegration {
 
     /// Get current quantum state
     pub fn get_state(&self) -> Result<QuantumState> {
-        self.current_state.lock()
+        self.current_state
+            .lock()
             .as_ref()
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("Quantum state not initialized"))
@@ -232,7 +241,9 @@ impl QuantumMlirIntegration {
             metrics.gpu_executions,
             if metrics.gpu_executions > 0 {
                 metrics.total_gpu_time_ms / metrics.gpu_executions as f64
-            } else { 0.0 },
+            } else {
+                0.0
+            },
             metrics.avg_speedup
         )
     }

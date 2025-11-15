@@ -153,9 +153,12 @@ impl PhaseSynchronizer {
 
         // Velocity dispersion
         let mean_omega = self.omega_neuro.mean().unwrap();
-        let velocity_dispersion = self.omega_neuro.iter()
+        let velocity_dispersion = self
+            .omega_neuro
+            .iter()
             .map(|&omega| (omega - mean_omega).powi(2))
-            .sum::<f64>() / self.n_oscillators as f64;
+            .sum::<f64>()
+            / self.n_oscillators as f64;
 
         SynchronizationMetrics {
             coherence,
@@ -171,9 +174,12 @@ impl PhaseSynchronizer {
         let (coherence, mean_phase) = self.compute_order_parameter(&self.phases_quantum);
 
         let mean_omega = self.omega_quantum.mean().unwrap();
-        let velocity_dispersion = self.omega_quantum.iter()
+        let velocity_dispersion = self
+            .omega_quantum
+            .iter()
             .map(|&omega| (omega - mean_omega).powi(2))
-            .sum::<f64>() / self.n_oscillators as f64;
+            .sum::<f64>()
+            / self.n_oscillators as f64;
 
         SynchronizationMetrics {
             coherence,
@@ -282,7 +288,7 @@ mod tests {
 
     #[test]
     fn test_order_parameter_uniform() {
-        let phases = Array1::from_vec(vec![0.0, PI/2.0, PI, 3.0*PI/2.0]);
+        let phases = Array1::from_vec(vec![0.0, PI / 2.0, PI, 3.0 * PI / 2.0]);
         let synchronizer = PhaseSynchronizer::new(4, 1.0);
 
         let (coherence, _) = synchronizer.compute_order_parameter(&phases);
@@ -337,8 +343,8 @@ mod tests {
         let mut synchronizer = PhaseSynchronizer::new(20, 2.0);
 
         // Initialize with identical phases
-        synchronizer.phases_neuro.fill(PI/4.0);
-        synchronizer.phases_quantum.fill(PI/4.0);
+        synchronizer.phases_neuro.fill(PI / 4.0);
+        synchronizer.phases_quantum.fill(PI / 4.0);
 
         let coherence = synchronizer.compute_cross_domain_coherence();
 
@@ -365,9 +371,15 @@ mod tests {
 
     #[test]
     fn test_coherence_level_classification() {
-        assert_eq!(CoherenceLevel::from_coherence(0.1), CoherenceLevel::Incoherent);
+        assert_eq!(
+            CoherenceLevel::from_coherence(0.1),
+            CoherenceLevel::Incoherent
+        );
         assert_eq!(CoherenceLevel::from_coherence(0.5), CoherenceLevel::Partial);
-        assert_eq!(CoherenceLevel::from_coherence(0.9), CoherenceLevel::HighCoherence);
+        assert_eq!(
+            CoherenceLevel::from_coherence(0.9),
+            CoherenceLevel::HighCoherence
+        );
     }
 
     #[test]

@@ -5,11 +5,11 @@
 //! Centralized configuration system for Mission Charlie with
 //! environment variable support, validation, and defaults.
 
-use anyhow::{Result, anyhow};
-use serde::{Serialize, Deserialize};
-use std::path::Path;
-use std::fs;
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 use std::env;
+use std::fs;
+use std::path::Path;
 
 /// Master Configuration for Mission Charlie
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -417,21 +417,31 @@ impl MissionCharlieConfig {
         }
 
         if self.consensus_config.min_llms_for_consensus > 4 {
-            return Err(anyhow!("Minimum LLMs for consensus cannot exceed 4 (total available)"));
+            return Err(anyhow!(
+                "Minimum LLMs for consensus cannot exceed 4 (total available)"
+            ));
         }
 
         // Validate confidence threshold
-        if self.consensus_config.confidence_threshold < 0.0 || self.consensus_config.confidence_threshold > 1.0 {
+        if self.consensus_config.confidence_threshold < 0.0
+            || self.consensus_config.confidence_threshold > 1.0
+        {
             return Err(anyhow!("Confidence threshold must be between 0.0 and 1.0"));
         }
 
         // Validate cache configuration
-        if self.cache_config.similarity_threshold < 0.0 || self.cache_config.similarity_threshold > 1.0 {
-            return Err(anyhow!("Cache similarity threshold must be between 0.0 and 1.0"));
+        if self.cache_config.similarity_threshold < 0.0
+            || self.cache_config.similarity_threshold > 1.0
+        {
+            return Err(anyhow!(
+                "Cache similarity threshold must be between 0.0 and 1.0"
+            ));
         }
 
         // Validate performance configuration
-        if self.performance_config.compression_level < 0 || self.performance_config.compression_level > 10 {
+        if self.performance_config.compression_level < 0
+            || self.performance_config.compression_level > 10
+        {
             return Err(anyhow!("Compression level must be between 0 and 10"));
         }
 
@@ -459,10 +469,18 @@ impl MissionCharlieConfig {
     /// Get count of enabled LLMs
     pub fn enabled_llm_count(&self) -> usize {
         let mut count = 0;
-        if self.llm_config.openai.enabled { count += 1; }
-        if self.llm_config.claude.enabled { count += 1; }
-        if self.llm_config.gemini.enabled { count += 1; }
-        if self.llm_config.grok.enabled { count += 1; }
+        if self.llm_config.openai.enabled {
+            count += 1;
+        }
+        if self.llm_config.claude.enabled {
+            count += 1;
+        }
+        if self.llm_config.gemini.enabled {
+            count += 1;
+        }
+        if self.llm_config.grok.enabled {
+            count += 1;
+        }
         count
     }
 

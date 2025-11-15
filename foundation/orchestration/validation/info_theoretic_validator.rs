@@ -71,8 +71,12 @@ impl InfoTheoreticValidator {
         let has_capitals = text.chars().filter(|c| c.is_uppercase()).count() > 3;
 
         let mut specificity = 0.5;
-        if has_numbers { specificity += 0.25; }
-        if has_capitals { specificity += 0.25; }
+        if has_numbers {
+            specificity += 0.25;
+        }
+        if has_capitals {
+            specificity += 0.25;
+        }
 
         specificity
     }
@@ -110,10 +114,7 @@ impl MMLResponseSelector {
     ///
     /// MML = L(model) + L(data|model)
     /// Choose simplest explanation that fits
-    pub fn select_best(
-        &self,
-        responses: &[String],
-    ) -> usize {
+    pub fn select_best(&self, responses: &[String]) -> usize {
         let mut mml_scores = Vec::new();
 
         for (i, response) in responses.iter().enumerate() {
@@ -130,7 +131,8 @@ impl MMLResponseSelector {
         }
 
         // Select minimum MML (Occam's Razor)
-        mml_scores.iter()
+        mml_scores
+            .iter()
             .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
             .map(|(i, _)| *i)
             .unwrap_or(0)

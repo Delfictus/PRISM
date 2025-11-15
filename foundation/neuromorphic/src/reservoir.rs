@@ -2,10 +2,10 @@
 //! COMPLETE IMPLEMENTATION - ALL 456+ LINES PRESERVED
 //! LIQUID STATE MACHINE WITH FULL MATHEMATICAL SOPHISTICATION
 
+use crate::stdp_profiles::{LearningStats, STDPConfig, STDPProfile};
 use crate::types::SpikePattern;
-use crate::stdp_profiles::{STDPProfile, STDPConfig, LearningStats};
-use nalgebra::{DMatrix, DVector};
 use anyhow::Result;
+use nalgebra::{DMatrix, DVector};
 use rand::Rng;
 
 /// Reservoir computer for processing spike patterns
@@ -51,15 +51,15 @@ pub struct ReservoirConfig {
 impl Default for ReservoirConfig {
     fn default() -> Self {
         Self {
-            size: 1000,                    // Large reservoir for rich dynamics
-            input_size: 100,               // Sufficient input dimensionality
-            spectral_radius: 0.95,         // Near-critical dynamics (edge of chaos)
-            connection_prob: 0.1,          // Sparse connectivity (biological realism)
-            leak_rate: 0.3,                // Moderate temporal memory
-            input_scaling: 1.0,            // Unity input scaling
-            noise_level: 0.01,             // Small amount of noise for robustness
-            enable_plasticity: false,      // Plasticity disabled by default
-            stdp_profile: STDPProfile::Balanced,  // Balanced learning profile
+            size: 1000,                          // Large reservoir for rich dynamics
+            input_size: 100,                     // Sufficient input dimensionality
+            spectral_radius: 0.95,               // Near-critical dynamics (edge of chaos)
+            connection_prob: 0.1,                // Sparse connectivity (biological realism)
+            leak_rate: 0.3,                      // Moderate temporal memory
+            input_scaling: 1.0,                  // Unity input scaling
+            noise_level: 0.01,                   // Small amount of noise for robustness
+            enable_plasticity: false,            // Plasticity disabled by default
+            stdp_profile: STDPProfile::Balanced, // Balanced learning profile
         }
     }
 }
@@ -145,10 +145,14 @@ impl ReservoirComputer {
             return Err(anyhow::anyhow!("Input size must be greater than 0"));
         }
         if config.spectral_radius <= 0.0 || config.spectral_radius >= 1.0 {
-            return Err(anyhow::anyhow!("Spectral radius must be between 0 and 1 for stability"));
+            return Err(anyhow::anyhow!(
+                "Spectral radius must be between 0 and 1 for stability"
+            ));
         }
         if config.connection_prob < 0.0 || config.connection_prob > 1.0 {
-            return Err(anyhow::anyhow!("Connection probability must be between 0 and 1"));
+            return Err(anyhow::anyhow!(
+                "Connection probability must be between 0 and 1"
+            ));
         }
         if config.leak_rate <= 0.0 || config.leak_rate >= 1.0 {
             return Err(anyhow::anyhow!("Leak rate must be between 0 and 1"));
@@ -270,13 +274,10 @@ impl ReservoirComputer {
         // Count saturated weights
         let saturated_count = weights_flat
             .iter()
-            .filter(|&&w| {
-                w >= stdp.max_weight * 0.95 || w <= stdp.min_weight * 1.05
-            })
+            .filter(|&&w| w >= stdp.max_weight * 0.95 || w <= stdp.min_weight * 1.05)
             .count();
 
-        let saturation_percentage =
-            (saturated_count as f64 / weights_flat.len() as f64) * 100.0;
+        let saturation_percentage = (saturated_count as f64 / weights_flat.len() as f64) * 100.0;
 
         // Calculate weight entropy (diversity measure)
         let weight_entropy = self.calculate_weight_entropy(&weights_flat);
@@ -285,8 +286,7 @@ impl ReservoirComputer {
         let mean_activity = if self.mean_activity_history.is_empty() {
             0.0
         } else {
-            self.mean_activity_history.iter().sum::<f64>()
-                / self.mean_activity_history.len() as f64
+            self.mean_activity_history.iter().sum::<f64>() / self.mean_activity_history.len() as f64
         };
 
         LearningStats {
@@ -353,11 +353,7 @@ impl ReservoirComputer {
             .collect();
 
         let mean = recent.iter().sum::<f64>() / recent.len() as f64;
-        let variance = recent
-            .iter()
-            .map(|w| (w - mean).powi(2))
-            .sum::<f64>()
-            / recent.len() as f64;
+        let variance = recent.iter().map(|w| (w - mean).powi(2)).sum::<f64>() / recent.len() as f64;
 
         variance < threshold
     }
@@ -412,9 +408,7 @@ impl ReservoirComputer {
     fn compute_spectral_radius(matrix: &DMatrix<f64>) -> Result<f64> {
         // Method 1: Try nalgebra's built-in eigenvalue computation
         if let Some(eigenvalues) = matrix.eigenvalues() {
-            let max_eigenvalue = eigenvalues.iter()
-                .map(|c| c.abs())
-                .fold(0.0, f64::max);
+            let max_eigenvalue = eigenvalues.iter().map(|c| c.abs()).fold(0.0, f64::max);
             return Ok(max_eigenvalue);
         }
 
@@ -490,7 +484,8 @@ impl ReservoirComputer {
 
         // Distribute spikes into temporal bins
         for spike in &pattern.spikes {
-            let bin_index = ((spike.time_ms / bin_duration) as usize).min(self.config.input_size - 1);
+            let bin_index =
+                ((spike.time_ms / bin_duration) as usize).min(self.config.input_size - 1);
             input[bin_index] += 1.0;
 
             // Add amplitude if present (enhanced biological realism)
@@ -536,9 +531,8 @@ impl ReservoirComputer {
         for i in 0..self.config.size {
             // Leaky integration: x(t) = (1-α)x(t-1) + α*tanh(W_in*u + W*x + noise)
             let new_activation = (1.0 - self.config.leak_rate) * self.previous_state[i]
-                + self.config.leak_rate * (
-                    input_contribution[i] + recurrent_contribution[i] + noise[i]
-                ).tanh(); // Hyperbolic tangent nonlinearity (biological activation)
+                + self.config.leak_rate
+                    * (input_contribution[i] + recurrent_contribution[i] + noise[i]).tanh(); // Hyperbolic tangent nonlinearity (biological activation)
 
             self.state[i] = new_activation;
         }
@@ -660,9 +654,8 @@ impl ReservoirComputer {
         // Measure state space utilization through variance
         if self.config.size > 1 {
             let mean = self.state.mean();
-            let variance = self.state.iter()
-                .map(|&x| (x - mean).powi(2))
-                .sum::<f64>() / (self.config.size - 1) as f64;
+            let variance = self.state.iter().map(|&x| (x - mean).powi(2)).sum::<f64>()
+                / (self.config.size - 1) as f64;
             variance.sqrt().min(1.0)
         } else {
             0.0
@@ -673,7 +666,9 @@ impl ReservoirComputer {
     /// RANK APPROXIMATION ANALYSIS
     fn calculate_approximation(&self) -> f64 {
         // Effective dimensionality of current state
-        let active_neurons = self.state.iter()
+        let active_neurons = self
+            .state
+            .iter()
             .filter(|&&x| x.abs() > 0.01) // Threshold for active neurons
             .count() as f64;
 
@@ -822,14 +817,10 @@ mod tests {
         let mut reservoir = ReservoirComputer::new(100, 20, 0.95, 0.1, 0.2).unwrap();
 
         // Create two different temporal patterns
-        let pattern1_spikes = vec![
-            Spike::new(0, 5.0), Spike::new(1, 15.0), Spike::new(2, 25.0),
-        ];
+        let pattern1_spikes = vec![Spike::new(0, 5.0), Spike::new(1, 15.0), Spike::new(2, 25.0)];
         let pattern1 = SpikePattern::new(pattern1_spikes, 50.0);
 
-        let pattern2_spikes = vec![
-            Spike::new(0, 25.0), Spike::new(1, 15.0), Spike::new(2, 5.0),
-        ];
+        let pattern2_spikes = vec![Spike::new(0, 25.0), Spike::new(1, 15.0), Spike::new(2, 5.0)];
         let pattern2 = SpikePattern::new(pattern2_spikes, 50.0);
 
         // Process both patterns
@@ -837,7 +828,9 @@ mod tests {
         let state2 = reservoir.process(&pattern2).unwrap();
 
         // Verify different patterns produce different reservoir states
-        let correlation = state1.activations.iter()
+        let correlation = state1
+            .activations
+            .iter()
             .zip(state2.activations.iter())
             .map(|(a, b)| a * b)
             .sum::<f64>();
@@ -866,7 +859,8 @@ mod tests {
         }
 
         // Verify weights have changed due to plasticity
-        let weights_changed = !initial_weights.iter()
+        let weights_changed = !initial_weights
+            .iter()
             .zip(reservoir.weights_reservoir.iter())
             .all(|(a, b)| (a - b).abs() < 1e-10);
 

@@ -1,8 +1,7 @@
 ///! GPU-Accelerated Protein Structure Coloring Benchmark
 ///!
 ///! Parses PDB files and colors residue contact graphs using PRISM-AI GPU acceleration
-
-use prism_ai::{PrismAI, PrismConfig, protein_parser::ProteinContactGraph};
+use prism_ai::{protein_parser::ProteinContactGraph, PrismAI, PrismConfig};
 use std::path::Path;
 use std::time::Instant;
 
@@ -22,22 +21,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Get contact distance threshold (default: 8.0 Angstroms)
     let contact_distance = if args.len() > 2 {
-        args[2].parse::<f64>()
-            .unwrap_or_else(|_| {
-                eprintln!("Warning: Invalid contact distance '{}', using default 8.0Å", args[2]);
-                8.0
-            })
+        args[2].parse::<f64>().unwrap_or_else(|_| {
+            eprintln!(
+                "Warning: Invalid contact distance '{}', using default 8.0Å",
+                args[2]
+            );
+            8.0
+        })
     } else {
         8.0
     };
 
     // Get number of GPU attempts (default: 5000)
     let num_attempts = if args.len() > 3 {
-        args[3].parse::<usize>()
-            .unwrap_or_else(|_| {
-                eprintln!("Warning: Invalid attempts value '{}', using default 5000", args[3]);
-                5000
-            })
+        args[3].parse::<usize>().unwrap_or_else(|_| {
+            eprintln!(
+                "Warning: Invalid attempts value '{}', using default 5000",
+                args[3]
+            );
+            5000
+        })
     } else {
         5000
     };
@@ -64,8 +67,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("  ✅ Parsed in {:.2}ms", parse_time.as_secs_f64() * 1000.0);
     println!("  📊 {}", contact_graph.summary());
-    println!("  📊 Graph density: {:.2}%\n",
-        (contact_graph.num_edges as f64 / (contact_graph.num_vertices * (contact_graph.num_vertices - 1) / 2) as f64) * 100.0
+    println!(
+        "  📊 Graph density: {:.2}%\n",
+        (contact_graph.num_edges as f64
+            / (contact_graph.num_vertices * (contact_graph.num_vertices - 1) / 2) as f64)
+            * 100.0
     );
 
     // Convert to adjacency list
@@ -82,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = PrismConfig::default();
     config.use_gpu = cfg!(feature = "cuda");
     config.num_replicas = num_attempts;
-    config.temperature = 1.5;  // Increased for better exploration
+    config.temperature = 1.5; // Increased for better exploration
     config.max_iterations = 1000;
 
     println!("  Configuration:");
@@ -106,13 +112,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("║                    RESULTS SUMMARY                           ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
-    println!("PDB File:           {}", Path::new(&pdb_path).file_name().unwrap().to_string_lossy());
+    println!(
+        "PDB File:           {}",
+        Path::new(&pdb_path).file_name().unwrap().to_string_lossy()
+    );
     println!("Residues:           {}", contact_graph.num_vertices);
     println!("Contacts:           {}", contact_graph.num_edges);
     println!("Contact Threshold:  {:.1}Å", contact_distance);
     println!();
     println!("Chromatic Number:   {} colors", chromatic_number);
-    println!("Coloring Time:      {:.2}ms", coloring_time.as_secs_f64() * 1000.0);
+    println!(
+        "Coloring Time:      {:.2}ms",
+        coloring_time.as_secs_f64() * 1000.0
+    );
     println!("GPU Attempts:       {}", num_attempts);
     println!();
 
@@ -125,7 +137,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Color Distribution:");
     for (color_id, count) in color_counts.iter().enumerate() {
         let percentage = (*count as f64 / contact_graph.num_vertices as f64) * 100.0;
-        println!("  Color {:2}: {:3} residues ({:5.2}%)", color_id, count, percentage);
+        println!(
+            "  Color {:2}: {:3} residues ({:5.2}%)",
+            color_id, count, percentage
+        );
     }
     println!();
 
@@ -151,12 +166,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("║                   PERFORMANCE METRICS                        ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
-    println!("PDB Parsing:        {:.2}ms", parse_time.as_secs_f64() * 1000.0);
-    println!("GPU Coloring:       {:.2}ms", coloring_time.as_secs_f64() * 1000.0);
-    println!("Total Time:         {:.2}ms", (parse_time + coloring_time).as_secs_f64() * 1000.0);
+    println!(
+        "PDB Parsing:        {:.2}ms",
+        parse_time.as_secs_f64() * 1000.0
+    );
+    println!(
+        "GPU Coloring:       {:.2}ms",
+        coloring_time.as_secs_f64() * 1000.0
+    );
+    println!(
+        "Total Time:         {:.2}ms",
+        (parse_time + coloring_time).as_secs_f64() * 1000.0
+    );
     println!();
-    println!("Residues/second:    {:.0}", contact_graph.num_vertices as f64 / coloring_time.as_secs_f64());
-    println!("Edges/second:       {:.0}", contact_graph.num_edges as f64 / coloring_time.as_secs_f64());
+    println!(
+        "Residues/second:    {:.0}",
+        contact_graph.num_vertices as f64 / coloring_time.as_secs_f64()
+    );
+    println!(
+        "Edges/second:       {:.0}",
+        contact_graph.num_edges as f64 / coloring_time.as_secs_f64()
+    );
     println!();
 
     println!("✅ Protein structure analysis complete!");

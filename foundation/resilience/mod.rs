@@ -28,28 +28,16 @@
 //! - State integrity through atomic checkpointing
 //! - Production-grade error handling throughout
 
-pub mod fault_tolerance;
-pub mod circuit_breaker;
 pub mod checkpoint_manager;
+pub mod circuit_breaker;
+pub mod fault_tolerance;
 
-pub use fault_tolerance::{
-    HealthMonitor,
-    ComponentHealth,
-    HealthStatus,
-    SystemState,
-};
+pub use fault_tolerance::{ComponentHealth, HealthMonitor, HealthStatus, SystemState};
 
 pub use circuit_breaker::{
-    CircuitBreaker,
-    CircuitState,
-    CircuitBreakerConfig,
-    CircuitBreakerError,
+    CircuitBreaker, CircuitBreakerConfig, CircuitBreakerError, CircuitState,
 };
 
 pub use checkpoint_manager::{
-    CheckpointManager,
-    Checkpointable,
-    CheckpointMetadata,
-    StorageBackend,
-    CheckpointError,
+    CheckpointError, CheckpointManager, CheckpointMetadata, Checkpointable, StorageBackend,
 };

@@ -4,8 +4,8 @@
 //!
 //! Converts LLM text to time series format for transfer entropy computation
 
-use ndarray::Array1;
 use anyhow::Result;
+use ndarray::Array1;
 
 /// Text-to-TimeSeries Converter
 pub struct TextToTimeSeriesConverter {
@@ -31,9 +31,11 @@ impl TextToTimeSeriesConverter {
 
         for i in 0..words.len().saturating_sub(self.window_size) {
             // Aggregate window (simple: average word lengths)
-            let window_value: f64 = words[i..i+self.window_size].iter()
+            let window_value: f64 = words[i..i + self.window_size]
+                .iter()
                 .map(|w| w.len() as f64)
-                .sum::<f64>() / self.window_size as f64;
+                .sum::<f64>()
+                / self.window_size as f64;
 
             series.push(window_value);
         }

@@ -16,16 +16,16 @@
 // Use Device type from neural_quantum module
 use self::neural_quantum::Device;
 
-pub mod gnn_integration;   // REAL GNN implementation (Sprint 2.1)
-pub mod diffusion;          // REAL diffusion model (Sprint 2.2)
-pub mod neural_quantum;     // REAL neural quantum states (Sprint 2.3)
-pub mod coloring_gnn;       // Graph coloring GNN with ONNX Runtime (PLACEHOLDER)
-pub mod onnx_gnn;           // REAL ONNX Runtime CUDA inference
+pub mod coloring_gnn; // Graph coloring GNN with ONNX Runtime (PLACEHOLDER)
+pub mod diffusion; // REAL diffusion model (Sprint 2.2)
+pub mod gnn_integration; // REAL GNN implementation (Sprint 2.1)
+pub mod neural_quantum; // REAL neural quantum states (Sprint 2.3)
+pub mod onnx_gnn; // REAL ONNX Runtime CUDA inference
 
-pub use gnn_integration::E3EquivariantGNN;
+pub use coloring_gnn::{compute_node_features, ColoringGNN, GnnPrediction};
 pub use diffusion::ConsistencyDiffusion;
+pub use gnn_integration::E3EquivariantGNN;
 pub use neural_quantum::{NeuralQuantumState as NeuralQuantumStateImpl, VariationalMonteCarlo};
-pub use coloring_gnn::{ColoringGNN, GnnPrediction, compute_node_features};
 pub use onnx_gnn::{OnnxGNN, OnnxGnnPrediction};
 
 /// Geometric manifold learner using REAL E(3)-equivariant GNN
@@ -41,12 +41,13 @@ impl GeometricManifoldLearner {
 
         // Real GNN with proper architecture
         let gnn = E3EquivariantGNN::new(
-            8,    // node_dim: cost + statistics
-            4,    // edge_dim: distance + relative position
-            128,  // hidden_dim
-            4,    // num_layers
+            8,   // node_dim: cost + statistics
+            4,   // edge_dim: distance + relative position
+            128, // hidden_dim
+            4,   // num_layers
             device.clone(),
-        ).expect("Failed to create GNN");
+        )
+        .expect("Failed to create GNN");
 
         Self { gnn, device }
     }
@@ -55,14 +56,14 @@ impl GeometricManifoldLearner {
     pub fn enhance_manifold(
         &mut self,
         analytical_manifold: super::CausalManifold,
-        ensemble: &super::Ensemble
+        ensemble: &super::Ensemble,
     ) -> super::CausalManifold {
         // Use REAL GNN to discover causal structure
         match self.gnn.forward(ensemble) {
             Ok(learned_manifold) => {
                 // Merge analytical (KSG transfer entropy) with learned (GNN)
                 self.merge_manifolds(analytical_manifold, learned_manifold)
-            },
+            }
             Err(e) => {
                 eprintln!("GNN forward pass failed: {}, using analytical only", e);
                 analytical_manifold
@@ -73,27 +74,29 @@ impl GeometricManifoldLearner {
     fn merge_manifolds(
         &self,
         analytical: super::CausalManifold,
-        learned: super::CausalManifold
+        learned: super::CausalManifold,
     ) -> super::CausalManifold {
         // Combine analytical (KSG-based) and learned (GNN-based) causal structures
         let mut merged_edges = analytical.edges.clone();
 
         // Add learned edges that don't conflict with analytical
         for learned_edge in learned.edges {
-            let exists = merged_edges.iter().any(|e|
-                e.source == learned_edge.source && e.target == learned_edge.target
-            );
+            let exists = merged_edges
+                .iter()
+                .any(|e| e.source == learned_edge.source && e.target == learned_edge.target);
 
             if !exists {
                 // New edge discovered by GNN
                 merged_edges.push(learned_edge);
             } else {
                 // Edge exists - strengthen with GNN confidence
-                if let Some(existing) = merged_edges.iter_mut().find(|e|
-                    e.source == learned_edge.source && e.target == learned_edge.target
-                ) {
+                if let Some(existing) = merged_edges
+                    .iter_mut()
+                    .find(|e| e.source == learned_edge.source && e.target == learned_edge.target)
+                {
                     // Average KSG and GNN estimates
-                    existing.transfer_entropy = (existing.transfer_entropy + learned_edge.transfer_entropy) / 2.0;
+                    existing.transfer_entropy =
+                        (existing.transfer_entropy + learned_edge.transfer_entropy) / 2.0;
                     existing.p_value = existing.p_value.min(learned_edge.p_value);
                 }
             }
@@ -122,12 +125,8 @@ impl DiffusionRefinement {
         let hidden_dim = 256;
         let num_steps = 50; // Fewer steps for faster inference
 
-        let diffusion = ConsistencyDiffusion::new(
-            solution_dim,
-            hidden_dim,
-            num_steps,
-            device,
-        ).expect("Failed to create diffusion model");
+        let diffusion = ConsistencyDiffusion::new(solution_dim, hidden_dim, num_steps, device)
+            .expect("Failed to create diffusion model");
 
         Self {
             diffusion,
@@ -139,7 +138,7 @@ impl DiffusionRefinement {
     pub fn refine(
         &mut self,
         solution: super::Solution,
-        manifold: &super::CausalManifold
+        manifold: &super::CausalManifold,
     ) -> super::Solution {
         match self.diffusion.refine(&solution, manifold) {
             Ok(refined) => {
@@ -150,7 +149,7 @@ impl DiffusionRefinement {
                     // If no improvement, return original
                     solution
                 }
-            },
+            }
             Err(e) => {
                 eprintln!("Diffusion refinement failed: {}, returning original", e);
                 solution
@@ -173,34 +172,31 @@ impl NeuralQuantumState {
         let hidden_dim = 256;
         let num_layers = 6;
 
-        let vmc = VariationalMonteCarlo::new(
-            solution_dim,
-            hidden_dim,
-            num_layers,
-            device,
-        ).expect("Failed to create VMC");
+        let vmc = VariationalMonteCarlo::new(solution_dim, hidden_dim, num_layers, device)
+            .expect("Failed to create VMC");
 
-        Self {
-            vmc,
-            solution_dim,
-        }
+        Self { vmc, solution_dim }
     }
 
     /// Optimize using REAL neural wavefunction with variational Monte Carlo
     pub fn optimize_with_manifold(
         &mut self,
         manifold: &super::CausalManifold,
-        initial: &super::Solution
+        initial: &super::Solution,
     ) -> super::Solution {
         // Use real neural quantum state implementation
-        match self.vmc.neural_state.optimize_with_manifold(manifold, initial) {
+        match self
+            .vmc
+            .neural_state
+            .optimize_with_manifold(manifold, initial)
+        {
             Ok(optimized) => {
                 if optimized.cost < initial.cost {
                     optimized
                 } else {
                     initial.clone()
                 }
-            },
+            }
             Err(e) => {
                 eprintln!("Neural quantum optimization failed: {}, using initial", e);
                 initial.clone()

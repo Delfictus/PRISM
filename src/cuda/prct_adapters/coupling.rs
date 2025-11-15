@@ -3,10 +3,10 @@
 //! Implements PhysicsCouplingPort for the PRCT algorithm.
 //! Bridges neuromorphic and quantum layers via Kuramoto synchronization.
 
-use prct_core::ports::PhysicsCouplingPort;
-use prct_core::errors::Result;
-use shared_types::*;
 use crate::cuda::prct_gpu::PRCTGpuManager;
+use prct_core::errors::Result;
+use prct_core::ports::PhysicsCouplingPort;
+use shared_types::*;
 use std::sync::Arc;
 
 /// Physics coupling adapter implementing Kuramoto synchronization
@@ -19,9 +19,7 @@ pub struct PhysicsCouplingAdapter {
 impl PhysicsCouplingAdapter {
     pub fn new(coupling_strength: f64) -> Result<Self> {
         // Try to initialize GPU, fall back to CPU if unavailable
-        let gpu_manager = PRCTGpuManager::new()
-            .ok()
-            .map(Arc::new);
+        let gpu_manager = PRCTGpuManager::new().ok().map(Arc::new);
 
         if gpu_manager.is_some() {
             log::info!("[COUPLING] GPU acceleration enabled");
@@ -67,7 +65,8 @@ impl PhysicsCouplingPort for PhysicsCouplingAdapter {
         let n = neuro_phases.len().min(quantum_phases.len());
 
         // Initialize natural frequencies from quantum phases
-        let natural_frequencies: Vec<f64> = quantum_phases.iter()
+        let natural_frequencies: Vec<f64> = quantum_phases
+            .iter()
             .take(n)
             .map(|&phase| phase / (2.0 * std::f64::consts::PI))
             .collect();
@@ -96,15 +95,30 @@ impl PhysicsCouplingPort for PhysicsCouplingAdapter {
                         phases = new_phases;
                     }
                     Err(e) => {
-                        log::warn!("[COUPLING] GPU Kuramoto step failed: {}, falling back to CPU", e);
-                        phases = self.kuramoto_step_cpu(&phases, &natural_frequencies, &coupling_matrix, step_dt, n);
+                        log::warn!(
+                            "[COUPLING] GPU Kuramoto step failed: {}, falling back to CPU",
+                            e
+                        );
+                        phases = self.kuramoto_step_cpu(
+                            &phases,
+                            &natural_frequencies,
+                            &coupling_matrix,
+                            step_dt,
+                            n,
+                        );
                     }
                 }
             }
         } else {
             // CPU fallback
             for _ in 0..num_steps {
-                phases = self.kuramoto_step_cpu(&phases, &natural_frequencies, &coupling_matrix, step_dt, n);
+                phases = self.kuramoto_step_cpu(
+                    &phases,
+                    &natural_frequencies,
+                    &coupling_matrix,
+                    step_dt,
+                    n,
+                );
             }
         }
 
@@ -194,12 +208,16 @@ impl PhysicsCouplingPort for PhysicsCouplingAdapter {
         quantum_state: &QuantumState,
     ) -> Result<BidirectionalCoupling> {
         // Extract phases from neuron states (normalize to [0, 2π])
-        let neuro_phases: Vec<f64> = neuro_state.neuron_states.iter()
+        let neuro_phases: Vec<f64> = neuro_state
+            .neuron_states
+            .iter()
             .map(|&state| state * 2.0 * std::f64::consts::PI)
             .collect();
 
         // Extract phases from quantum amplitudes
-        let quantum_phases: Vec<f64> = quantum_state.amplitudes.iter()
+        let quantum_phases: Vec<f64> = quantum_state
+            .amplitudes
+            .iter()
             .map(|(re, im)| im.atan2(*re))
             .collect();
 
@@ -210,11 +228,8 @@ impl PhysicsCouplingPort for PhysicsCouplingAdapter {
             1.0, // 1 ms lag
         )?;
 
-        let quantum_to_neuro_entropy = self.calculate_transfer_entropy(
-            &quantum_phases,
-            &neuro_state.neuron_states,
-            1.0,
-        )?;
+        let quantum_to_neuro_entropy =
+            self.calculate_transfer_entropy(&quantum_phases, &neuro_state.neuron_states, 1.0)?;
 
         // Update Kuramoto synchronization
         let kuramoto_state = self.update_kuramoto_sync(
@@ -226,7 +241,8 @@ impl PhysicsCouplingPort for PhysicsCouplingAdapter {
         // Compute overall coupling quality
         let coupling_quality = (neuro_to_quantum_entropy.confidence
             + quantum_to_neuro_entropy.confidence
-            + kuramoto_state.order_parameter) / 3.0;
+            + kuramoto_state.order_parameter)
+            / 3.0;
 
         Ok(BidirectionalCoupling {
             neuro_to_quantum_entropy,
@@ -282,21 +298,27 @@ impl PhysicsCouplingAdapter {
         target_mean: f64,
         min_len: usize,
     ) -> (f64, f64, f64) {
-        let covariance: f64 = source.iter()
+        let covariance: f64 = source
+            .iter()
             .zip(target.iter())
             .take(min_len)
             .map(|(s, t)| (s - source_mean) * (t - target_mean))
-            .sum::<f64>() / min_len as f64;
+            .sum::<f64>()
+            / min_len as f64;
 
-        let source_var: f64 = source.iter()
+        let source_var: f64 = source
+            .iter()
             .take(min_len)
             .map(|s| (s - source_mean).powi(2))
-            .sum::<f64>() / min_len as f64;
+            .sum::<f64>()
+            / min_len as f64;
 
-        let target_var: f64 = target.iter()
+        let target_var: f64 = target
+            .iter()
             .take(min_len)
             .map(|t| (t - target_mean).powi(2))
-            .sum::<f64>() / min_len as f64;
+            .sum::<f64>()
+            / min_len as f64;
 
         (covariance, source_var, target_var)
     }

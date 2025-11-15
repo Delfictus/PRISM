@@ -2,13 +2,13 @@
 // PhD-level enhancements for information-theoretic causal analysis
 // Constitution: Phase 1 Task 1.2 (Advanced Extensions)
 
+use kdtree::distance::squared_euclidean;
+use kdtree::KdTree;
 use ndarray::{Array1, Array2};
-use std::collections::HashMap;
-use rustfft::{FftPlanner, num_complex::Complex};
 use rand::prelude::*;
 use rand_distr::Normal;
-use kdtree::KdTree;
-use kdtree::distance::squared_euclidean;
+use rustfft::{num_complex::Complex, FftPlanner};
+use std::collections::HashMap;
 
 /// Advanced Transfer Entropy with PhD-level enhancements
 pub struct AdvancedTransferEntropy {
@@ -20,8 +20,8 @@ pub struct AdvancedTransferEntropy {
     /// Advanced parameters
     pub use_kozachenko_leonenko: bool,
     pub use_symbolic_encoding: bool,
-    pub renyi_order: f64,  // α parameter for Rényi entropy
-    pub permutation_order: usize,  // For ordinal patterns
+    pub renyi_order: f64,         // α parameter for Rényi entropy
+    pub permutation_order: usize, // For ordinal patterns
     pub surrogate_method: SurrogateMethod,
     pub n_surrogates: usize,
     pub use_partial_conditioning: bool,
@@ -69,7 +69,9 @@ impl KozachenkoLeonenkoEstimator {
         for i in 0..n {
             let point: Vec<f64> = data.row(i).to_vec();
             // Find k+1 nearest neighbors (including self)
-            let neighbors = kdtree.nearest(&point, self.k + 1, &squared_euclidean).unwrap();
+            let neighbors = kdtree
+                .nearest(&point, self.k + 1, &squared_euclidean)
+                .unwrap();
 
             // Distance to k-th neighbor (excluding self)
             if neighbors.len() > self.k {
@@ -112,13 +114,14 @@ impl KozachenkoLeonenkoEstimator {
     }
 
     /// Estimate transfer entropy using continuous KL estimator
-    pub fn estimate_transfer_entropy(&self,
+    pub fn estimate_transfer_entropy(
+        &self,
         source: &Array1<f64>,
         target: &Array1<f64>,
         source_embedding: usize,
         target_embedding: usize,
-        time_lag: usize) -> f64 {
-
+        time_lag: usize,
+    ) -> f64 {
         let n = source.len();
         let start_idx = source_embedding.max(target_embedding);
         let end_idx = n - time_lag;
@@ -156,7 +159,8 @@ impl KozachenkoLeonenkoEstimator {
 
         // Build joint matrices
         let mut y_past_future = Array2::zeros((n_samples, target_embedding + 1));
-        let mut xy_past_future = Array2::zeros((n_samples, source_embedding + target_embedding + 1));
+        let mut xy_past_future =
+            Array2::zeros((n_samples, source_embedding + target_embedding + 1));
 
         for i in 0..n_samples {
             // Y_past, Y_future
@@ -176,14 +180,19 @@ impl KozachenkoLeonenkoEstimator {
         }
 
         // Calculate conditional entropies
-        let h_y_future_given_y_past = self.estimate_entropy(&y_past_future) - self.estimate_entropy(&y_embed);
-        let h_y_future_given_xy_past = self.estimate_entropy(&xy_past_future) - self.estimate_entropy(&Array2::from_shape_fn((n_samples, source_embedding + target_embedding), |(i, j)| {
-            if j < source_embedding {
-                x_embed[[i, j]]
-            } else {
-                y_embed[[i, j - source_embedding]]
-            }
-        }));
+        let h_y_future_given_y_past =
+            self.estimate_entropy(&y_past_future) - self.estimate_entropy(&y_embed);
+        let h_y_future_given_xy_past = self.estimate_entropy(&xy_past_future)
+            - self.estimate_entropy(&Array2::from_shape_fn(
+                (n_samples, source_embedding + target_embedding),
+                |(i, j)| {
+                    if j < source_embedding {
+                        x_embed[[i, j]]
+                    } else {
+                        y_embed[[i, j - source_embedding]]
+                    }
+                },
+            ));
 
         (h_y_future_given_y_past - h_y_future_given_xy_past).max(0.0)
     }
@@ -198,7 +207,10 @@ pub struct SymbolicTransferEntropy {
 
 impl SymbolicTransferEntropy {
     pub fn new(permutation_order: usize, time_delay: usize) -> Self {
-        Self { permutation_order, time_delay }
+        Self {
+            permutation_order,
+            time_delay,
+        }
     }
 
     /// Convert time series to ordinal patterns (Bandt-Pompe method)
@@ -279,34 +291,40 @@ impl SymbolicTransferEntropy {
             }
         }
 
-        te / std::f64::consts::LN_2  // Convert to bits
+        te / std::f64::consts::LN_2 // Convert to bits
     }
 }
 
 /// Rényi Transfer Entropy for non-extensive systems
 /// Generalizes Shannon entropy to Rényi entropy of order α
 pub struct RenyiTransferEntropy {
-    pub alpha: f64,  // Rényi order (α → 1 gives Shannon entropy)
+    pub alpha: f64, // Rényi order (α → 1 gives Shannon entropy)
     pub embedding_dim: usize,
 }
 
 impl RenyiTransferEntropy {
     pub fn new(alpha: f64, embedding_dim: usize) -> Self {
         assert!(alpha > 0.0 && alpha != 1.0, "Alpha must be > 0 and != 1");
-        Self { alpha, embedding_dim }
+        Self {
+            alpha,
+            embedding_dim,
+        }
     }
 
     /// Calculate Rényi entropy of order α
     pub fn renyi_entropy(&self, probs: &[f64]) -> f64 {
         if self.alpha == 1.0 {
             // Limit case: Shannon entropy
-            return -probs.iter()
+            return -probs
+                .iter()
                 .filter(|&&p| p > 0.0)
                 .map(|&p| p * p.ln())
-                .sum::<f64>() / std::f64::consts::LN_2;
+                .sum::<f64>()
+                / std::f64::consts::LN_2;
         }
 
-        let sum_p_alpha: f64 = probs.iter()
+        let sum_p_alpha: f64 = probs
+            .iter()
             .filter(|&&p| p > 0.0)
             .map(|&p| p.powf(self.alpha))
             .sum();
@@ -319,8 +337,13 @@ impl RenyiTransferEntropy {
     }
 
     /// Calculate Rényi transfer entropy
-    pub fn calculate(&self, source: &Array1<f64>, target: &Array1<f64>,
-                     time_lag: usize, n_bins: usize) -> f64 {
+    pub fn calculate(
+        &self,
+        source: &Array1<f64>,
+        target: &Array1<f64>,
+        time_lag: usize,
+        n_bins: usize,
+    ) -> f64 {
         // Discretize for probability estimation
         let x_binned = discretize(source, n_bins);
         let y_binned = discretize(target, n_bins);
@@ -337,12 +360,8 @@ impl RenyiTransferEntropy {
         let mut marginal_y = HashMap::new();
 
         for i in self.embedding_dim..(n - time_lag) {
-            let x_state: Vec<i32> = (0..self.embedding_dim)
-                .map(|j| x_binned[i - j])
-                .collect();
-            let y_state: Vec<i32> = (0..self.embedding_dim)
-                .map(|j| y_binned[i - j])
-                .collect();
+            let x_state: Vec<i32> = (0..self.embedding_dim).map(|j| x_binned[i - j]).collect();
+            let y_state: Vec<i32> = (0..self.embedding_dim).map(|j| y_binned[i - j]).collect();
             let z = y_binned[i + time_lag];
 
             let key_xyz = format!("{:?}_{:?}_{}", x_state, y_state, z);
@@ -385,14 +404,18 @@ pub struct ConditionalTransferEntropy {
 }
 
 impl ConditionalTransferEntropy {
-    pub fn calculate(&self,
+    pub fn calculate(
+        &self,
         source: &Array1<f64>,
         target: &Array1<f64>,
         condition: &Array1<f64>,
-        estimator: &KozachenkoLeonenkoEstimator) -> f64 {
-
+        estimator: &KozachenkoLeonenkoEstimator,
+    ) -> f64 {
         let n = source.len().min(target.len()).min(condition.len());
-        let start_idx = self.source_embedding.max(self.target_embedding).max(self.condition_embedding);
+        let start_idx = self
+            .source_embedding
+            .max(self.target_embedding)
+            .max(self.condition_embedding);
         let end_idx = n - self.time_lag;
 
         if end_idx <= start_idx {
@@ -402,14 +425,20 @@ impl ConditionalTransferEntropy {
         let n_samples = end_idx - start_idx;
 
         // Build embedding matrices including conditioning variable
-        let mut xyz_past_future = Array2::zeros((n_samples,
-            self.source_embedding + self.target_embedding + self.condition_embedding + 1));
-        let mut yz_past_future = Array2::zeros((n_samples,
-            self.target_embedding + self.condition_embedding + 1));
-        let mut xyz_past = Array2::zeros((n_samples,
-            self.source_embedding + self.target_embedding + self.condition_embedding));
-        let mut yz_past = Array2::zeros((n_samples,
-            self.target_embedding + self.condition_embedding));
+        let mut xyz_past_future = Array2::zeros((
+            n_samples,
+            self.source_embedding + self.target_embedding + self.condition_embedding + 1,
+        ));
+        let mut yz_past_future = Array2::zeros((
+            n_samples,
+            self.target_embedding + self.condition_embedding + 1,
+        ));
+        let mut xyz_past = Array2::zeros((
+            n_samples,
+            self.source_embedding + self.target_embedding + self.condition_embedding,
+        ));
+        let mut yz_past =
+            Array2::zeros((n_samples, self.target_embedding + self.condition_embedding));
 
         for i in 0..n_samples {
             let idx = i + start_idx;
@@ -442,12 +471,14 @@ impl ConditionalTransferEntropy {
 
             // Y_future
             xyz_past_future[[i, col]] = target[idx + self.time_lag];
-            yz_past_future[[i, self.target_embedding + self.condition_embedding]] = target[idx + self.time_lag];
+            yz_past_future[[i, self.target_embedding + self.condition_embedding]] =
+                target[idx + self.time_lag];
         }
 
         // CTE = H(Y_future | Y_past, Z_past) - H(Y_future | X_past, Y_past, Z_past)
         let h1 = estimator.estimate_entropy(&yz_past_future) - estimator.estimate_entropy(&yz_past);
-        let h2 = estimator.estimate_entropy(&xyz_past_future) - estimator.estimate_entropy(&xyz_past);
+        let h2 =
+            estimator.estimate_entropy(&xyz_past_future) - estimator.estimate_entropy(&xyz_past);
 
         (h1 - h2).max(0.0)
     }
@@ -455,17 +486,18 @@ impl ConditionalTransferEntropy {
 
 /// Local Transfer Entropy for pointwise causal analysis
 pub struct LocalTransferEntropy {
-    pub epsilon: f64,  // Neighborhood size for local estimation
+    pub epsilon: f64, // Neighborhood size for local estimation
 }
 
 impl LocalTransferEntropy {
-    pub fn calculate_pointwise(&self,
+    pub fn calculate_pointwise(
+        &self,
         source: &Array1<f64>,
         target: &Array1<f64>,
         point_index: usize,
         embedding: usize,
-        lag: usize) -> f64 {
-
+        lag: usize,
+    ) -> f64 {
         let n = source.len();
         if point_index < embedding || point_index + lag >= n {
             return 0.0;
@@ -484,7 +516,8 @@ impl LocalTransferEntropy {
             }
         }
 
-        if local_indices.len() < 10 {  // Need minimum samples
+        if local_indices.len() < 10 {
+            // Need minimum samples
             return 0.0;
         }
 
@@ -492,7 +525,7 @@ impl LocalTransferEntropy {
         // Implementation would follow standard TE but on local subset
         // This is a simplified version - full implementation would be more complex
 
-        0.0  // Placeholder
+        0.0 // Placeholder
     }
 }
 
@@ -521,25 +554,22 @@ impl SurrogateDataGenerator {
 
         for _iter in 0..max_iterations {
             // Step 1: FFT of current surrogate
-            let mut spectrum: Vec<Complex<f64>> = surrogate.iter()
-                .map(|&x| Complex::new(x, 0.0))
-                .collect();
+            let mut spectrum: Vec<Complex<f64>> =
+                surrogate.iter().map(|&x| Complex::new(x, 0.0)).collect();
             fft.process(&mut spectrum);
 
             // Step 2: Randomize phases while preserving amplitudes
             let mut rng = thread_rng();
-            for i in 1..n/2 {
+            for i in 1..n / 2 {
                 let phase = rng.gen::<f64>() * 2.0 * std::f64::consts::PI;
                 let amp = spectrum[i].norm();
                 spectrum[i] = Complex::new(amp * phase.cos(), amp * phase.sin());
-                spectrum[n - i] = spectrum[i].conj();  // Maintain symmetry
+                spectrum[n - i] = spectrum[i].conj(); // Maintain symmetry
             }
 
             // Step 3: Inverse FFT
             ifft.process(&mut spectrum);
-            let phase_randomized: Vec<f64> = spectrum.iter()
-                .map(|c| c.re / n as f64)
-                .collect();
+            let phase_randomized: Vec<f64> = spectrum.iter().map(|c| c.re / n as f64).collect();
 
             // Step 4: Rank order to match original distribution
             let mut ranks: Vec<usize> = (0..n).collect();
@@ -555,20 +585,25 @@ impl SurrogateDataGenerator {
 
     /// Generate twin surrogates (Thiel et al. method)
     /// Preserves recurrence structure of the original series
-    pub fn generate_twin(&self, series: &Array1<f64>, embedding_dim: usize,
-                         time_delay: usize, threshold: f64) -> Array1<f64> {
+    pub fn generate_twin(
+        &self,
+        series: &Array1<f64>,
+        embedding_dim: usize,
+        time_delay: usize,
+        threshold: f64,
+    ) -> Array1<f64> {
         let n = series.len();
         let m = embedding_dim;
         let tau = time_delay;
 
         // Build recurrence matrix
-        let mut recurrence = Array2::zeros((n - (m-1)*tau, n - (m-1)*tau));
+        let mut recurrence = Array2::zeros((n - (m - 1) * tau, n - (m - 1) * tau));
 
-        for i in 0..(n - (m-1)*tau) {
-            for j in i+1..(n - (m-1)*tau) {
+        for i in 0..(n - (m - 1) * tau) {
+            for j in i + 1..(n - (m - 1) * tau) {
                 let mut dist = 0.0;
                 for k in 0..m {
-                    dist += (series[i + k*tau] - series[j + k*tau]).powi(2);
+                    dist += (series[i + k * tau] - series[j + k * tau]).powi(2);
                 }
                 dist = dist.sqrt();
                 if dist < threshold {
@@ -582,9 +617,9 @@ impl SurrogateDataGenerator {
         let mut surrogate = series.clone();
         let mut rng = thread_rng();
 
-        for i in 0..(n - (m-1)*tau) {
+        for i in 0..(n - (m - 1) * tau) {
             // Find all twins of point i
-            let twins: Vec<usize> = (0..(n - (m-1)*tau))
+            let twins: Vec<usize> = (0..(n - (m - 1) * tau))
                 .filter(|&j| recurrence[[i, j]] > 0.0)
                 .collect();
 
@@ -593,8 +628,8 @@ impl SurrogateDataGenerator {
                 let twin_idx = twins[rng.gen_range(0..twins.len())];
 
                 // Swap future values
-                if i + (m-1)*tau + 1 < n && twin_idx + (m-1)*tau + 1 < n {
-                    surrogate.swap(i + (m-1)*tau + 1, twin_idx + (m-1)*tau + 1);
+                if i + (m - 1) * tau + 1 < n && twin_idx + (m - 1) * tau + 1 < n {
+                    surrogate.swap(i + (m - 1) * tau + 1, twin_idx + (m - 1) * tau + 1);
                 }
             }
         }
@@ -611,17 +646,19 @@ pub struct PartialInformationDecomposition {
 
 impl PartialInformationDecomposition {
     /// Calculate unique information from source i about target
-    pub fn unique_information(&self, source_i: &Array1<f64>,
-                             other_sources: &[Array1<f64>],
-                             target: &Array1<f64>) -> f64 {
+    pub fn unique_information(
+        &self,
+        source_i: &Array1<f64>,
+        other_sources: &[Array1<f64>],
+        target: &Array1<f64>,
+    ) -> f64 {
         // UI(Xi → Y | X_others) = I(Xi; Y) - I(Xi; Y | X_others)
         // Simplified implementation - full PID is quite complex
-        0.0  // Placeholder
+        0.0 // Placeholder
     }
 
     /// Calculate redundant information shared by all sources
-    pub fn redundant_information(&self, sources: &[Array1<f64>],
-                                target: &Array1<f64>) -> f64 {
+    pub fn redundant_information(&self, sources: &[Array1<f64>], target: &Array1<f64>) -> f64 {
         // Red(X1, X2, ... → Y) = min_i I(Xi; Y)
         // This is the Williams-Beer redundancy measure
         let mut min_mi = f64::INFINITY;
@@ -637,11 +674,10 @@ impl PartialInformationDecomposition {
     }
 
     /// Calculate synergistic information (emergent from joint sources)
-    pub fn synergistic_information(&self, sources: &[Array1<f64>],
-                                  target: &Array1<f64>) -> f64 {
+    pub fn synergistic_information(&self, sources: &[Array1<f64>], target: &Array1<f64>) -> f64 {
         // Syn(X1, X2, ... → Y) = I(X1, X2, ...; Y) - Σ UI(Xi) - Red(X1, X2, ...)
         // This requires full joint MI calculation
-        0.0  // Placeholder
+        0.0 // Placeholder
     }
 }
 
@@ -663,10 +699,13 @@ fn discretize(series: &Array1<f64>, n_bins: usize) -> Vec<i32> {
         return vec![0; series.len()];
     }
 
-    series.iter().map(|&x| {
-        let bin = ((x - min) / range * (n_bins as f64 - 1.0)) as i32;
-        bin.min(n_bins as i32 - 1).max(0)
-    }).collect()
+    series
+        .iter()
+        .map(|&x| {
+            let bin = ((x - min) / range * (n_bins as f64 - 1.0)) as i32;
+            bin.min(n_bins as i32 - 1).max(0)
+        })
+        .collect()
 }
 
 fn calculate_mutual_information(x: &Array1<f64>, y: &Array1<f64>) -> f64 {
@@ -697,7 +736,7 @@ fn calculate_mutual_information(x: &Array1<f64>, y: &Array1<f64>) -> f64 {
         }
     }
 
-    mi / std::f64::consts::LN_2  // Convert to bits
+    mi / std::f64::consts::LN_2 // Convert to bits
 }
 
 fn digamma(x: f64) -> f64 {
@@ -747,8 +786,16 @@ mod tests {
         // Theoretical entropy of 2D standard normal: H = (d/2) * log(2πe) ≈ 2.8379
         // Note: KL estimator can have significant bias, especially with small k
         // Just verify it's finite and reasonable for now
-        assert!(entropy.is_finite(), "Entropy should be finite, got: {}", entropy);
-        assert!(entropy > -5.0 && entropy < 10.0, "Entropy should be in reasonable range, got: {}", entropy);
+        assert!(
+            entropy.is_finite(),
+            "Entropy should be finite, got: {}",
+            entropy
+        );
+        assert!(
+            entropy > -5.0 && entropy < 10.0,
+            "Entropy should be in reasonable range, got: {}",
+            entropy
+        );
     }
 
     #[test]
@@ -773,7 +820,7 @@ mod tests {
         let ste = SymbolicTransferEntropy::new(3, 1);
         let te = ste.calculate(&x_arr, &y_arr, 1);
 
-        assert!(te > 0.0);  // Should detect causality
+        assert!(te > 0.0); // Should detect causality
     }
 
     #[test]

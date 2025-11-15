@@ -1,14 +1,13 @@
+use anyhow::{anyhow, Result};
 ///! GPU Thermodynamic Ensemble Generation for Graph Coloring
 ///!
 ///! Generates multiple diverse initial states (vertex orderings) using
 ///! temperature-based sampling for parallel exploration.
 ///!
 ///! GPU-ONLY: All generation on CUDA
-
 use cudarc::driver::{CudaDevice, CudaSlice, LaunchConfig};
 use cudarc::nvrtc::Ptx;
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
 
 /// Ensemble of thermodynamic replicas
 #[derive(Debug, Clone)]
@@ -40,18 +39,22 @@ impl GpuEnsembleGenerator {
 
         // Load ensemble generation kernel from PTX
         let ptx_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/ptx/adaptive_coloring.ptx"));
-        let ptx = Ptx::from_src(std::str::from_utf8(ptx_bytes)
-            .map_err(|e| anyhow!("Invalid PTX UTF-8: {}", e))?);
+        let ptx = Ptx::from_src(
+            std::str::from_utf8(ptx_bytes).map_err(|e| anyhow!("Invalid PTX UTF-8: {}", e))?,
+        );
 
-        device.load_ptx(
-            ptx,
-            "adaptive_coloring",
-            &["generate_thermodynamic_ordering"]
-        ).map_err(|e| anyhow!("Failed to load PTX module: {:?}", e))?;
+        device
+            .load_ptx(
+                ptx,
+                "adaptive_coloring",
+                &["generate_thermodynamic_ordering"],
+            )
+            .map_err(|e| anyhow!("Failed to load PTX module: {:?}", e))?;
 
         let generate_kernel = Arc::new(
-            device.get_func("adaptive_coloring", "generate_thermodynamic_ordering")
-                .ok_or_else(|| anyhow!("Failed to load generate_thermodynamic_ordering kernel"))?
+            device
+                .get_func("adaptive_coloring", "generate_thermodynamic_ordering")
+                .ok_or_else(|| anyhow!("Failed to load generate_thermodynamic_ordering kernel"))?,
         );
 
         println!("[ENSEMBLE] GPU ensemble generator initialized");
@@ -79,7 +82,10 @@ impl GpuEnsembleGenerator {
     ) -> Result<Ensemble> {
         let n = degrees.len();
 
-        println!("[ENSEMBLE] Generating {} replicas for {} vertices", ensemble_size, n);
+        println!(
+            "[ENSEMBLE] Generating {} replicas for {} vertices",
+            ensemble_size, n
+        );
         println!("[ENSEMBLE]   Base temperature: {:.2}", base_temperature);
 
         // Upload degrees to GPU
@@ -117,7 +123,10 @@ impl GpuEnsembleGenerator {
             shared_mem_bytes: 0,
         };
 
-        println!("[ENSEMBLE] Launching GPU kernel: {} blocks x {} threads", num_blocks, threads_per_block);
+        println!(
+            "[ENSEMBLE] Launching GPU kernel: {} blocks x {} threads",
+            num_blocks, threads_per_block
+        );
 
         let n_i32 = n as i32;
         let ensemble_size_i32 = ensemble_size as i32;
@@ -135,7 +144,7 @@ impl GpuEnsembleGenerator {
                     &mut energies_gpu,
                     n_i32,
                     ensemble_size_i32,
-                )
+                ),
             )?;
         }
 
@@ -157,9 +166,17 @@ impl GpuEnsembleGenerator {
             .collect();
 
         println!("[ENSEMBLE] ✅ Generated {} replicas", ensemble_size);
-        println!("[ENSEMBLE]   Energy range: [{:.2}, {:.2}]",
-                 energies.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap_or(&0.0),
-                 energies.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap_or(&0.0));
+        println!(
+            "[ENSEMBLE]   Energy range: [{:.2}, {:.2}]",
+            energies
+                .iter()
+                .min_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap_or(&0.0),
+            energies
+                .iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap_or(&0.0)
+        );
 
         Ok(Ensemble {
             orderings,
@@ -195,7 +212,7 @@ mod tests {
     use ndarray::Array2;
 
     #[test]
-    #[ignore]  // Requires GPU
+    #[ignore] // Requires GPU
     fn test_ensemble_generation() {
         let generator = GpuEnsembleGenerator::new().expect("GPU required");
 
@@ -208,7 +225,8 @@ mod tests {
         adj[[0, 2]] = true;
         adj[[2, 0]] = true;
 
-        let ensemble = generator.generate_from_adjacency(&adj, 10, 1.0)
+        let ensemble = generator
+            .generate_from_adjacency(&adj, 10, 1.0)
             .expect("Ensemble generation failed");
 
         assert_eq!(ensemble.orderings.len(), 10);

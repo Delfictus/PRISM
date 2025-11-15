@@ -5,8 +5,8 @@
 //! WORLD-FIRST #7: Geodesic descent on probability manifold
 //! Features: Manifold optimization, natural gradient, hybrid quantum-classical
 
-use ndarray::Array1;
 use anyhow::Result;
+use ndarray::Array1;
 
 /// Causal Manifold Optimizer (WORLD-FIRST #7)
 ///
@@ -55,7 +55,11 @@ impl CausalManifoldOptimizer {
             *w = w.max(0.0);
         }
         let sum: f64 = weights.iter().sum();
-        if sum > 0.0 { weights / sum } else { weights }
+        if sum > 0.0 {
+            weights / sum
+        } else {
+            weights
+        }
     }
 }
 
@@ -91,9 +95,15 @@ impl NaturalGradientOptimizer {
     }
 
     fn project_simplex(&self, mut w: Array1<f64>) -> Array1<f64> {
-        for val in w.iter_mut() { *val = val.max(0.0); }
+        for val in w.iter_mut() {
+            *val = val.max(0.0);
+        }
         let s: f64 = w.iter().sum();
-        if s > 0.0 { w / s } else { w }
+        if s > 0.0 {
+            w / s
+        } else {
+            w
+        }
     }
 }
 

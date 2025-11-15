@@ -1,26 +1,17 @@
 // Information Theory Module
 // Constitution: Phase 1 Task 1.2
 
-pub mod transfer_entropy;
 pub mod advanced_transfer_entropy;
+pub mod transfer_entropy;
 
 pub use transfer_entropy::{
-    TransferEntropy,
-    TransferEntropyResult,
-    CausalDirection,
-    detect_causal_direction,
+    detect_causal_direction, CausalDirection, TransferEntropy, TransferEntropyResult,
 };
 
 pub use advanced_transfer_entropy::{
-    AdvancedTransferEntropy,
-    KozachenkoLeonenkoEstimator,
-    SymbolicTransferEntropy,
-    RenyiTransferEntropy,
-    ConditionalTransferEntropy,
-    LocalTransferEntropy,
-    SurrogateDataGenerator,
-    PartialInformationDecomposition,
-    SurrogateMethod,
+    AdvancedTransferEntropy, ConditionalTransferEntropy, KozachenkoLeonenkoEstimator,
+    LocalTransferEntropy, PartialInformationDecomposition, RenyiTransferEntropy,
+    SurrogateDataGenerator, SurrogateMethod, SymbolicTransferEntropy,
 };
 
 // GPU-accelerated transfer entropy

@@ -80,8 +80,7 @@ fn main() -> Result<()> {
     println!();
 
     // Create output directory
-    std::fs::create_dir_all(&args.output)
-        .context("Failed to create output directory")?;
+    std::fs::create_dir_all(&args.output).context("Failed to create output directory")?;
 
     // Process based on file type
     match file_type.as_str() {
@@ -184,10 +183,19 @@ fn process_mtx_file(args: &Args) -> Result<()> {
 
     println!("  ✓ Loaded {} edges", edges.len());
     println!();
-    println!("🚀 Running PRISM optimization with {} attempts...", args.attempts);
+    println!(
+        "🚀 Running PRISM optimization with {} attempts...",
+        args.attempts
+    );
 
     // Run optimization with chosen algorithm
-    run_optimization(num_vertices, &edges, args.attempts, args.gpu, &args.algorithm)?;
+    run_optimization(
+        num_vertices,
+        &edges,
+        args.attempts,
+        args.gpu,
+        &args.algorithm,
+    )?;
 
     Ok(())
 }
@@ -220,7 +228,13 @@ fn process_protein_file(args: &Args) -> Result<()> {
     let edges = contact_graph.get_edges();
 
     // Run graph coloring optimization
-    run_optimization(num_vertices, &edges, args.attempts, args.gpu, &args.algorithm)?;
+    run_optimization(
+        num_vertices,
+        &edges,
+        args.attempts,
+        args.gpu,
+        &args.algorithm,
+    )?;
 
     Ok(())
 }
@@ -271,9 +285,18 @@ fn process_dimacs_file(args: &Args) -> Result<()> {
 
     println!("  ✓ Loaded {} edges", edges.len());
     println!();
-    println!("🚀 Running PRISM optimization with {} attempts...", args.attempts);
+    println!(
+        "🚀 Running PRISM optimization with {} attempts...",
+        args.attempts
+    );
 
-    run_optimization(num_vertices, &edges, args.attempts, args.gpu, &args.algorithm)?;
+    run_optimization(
+        num_vertices,
+        &edges,
+        args.attempts,
+        args.gpu,
+        &args.algorithm,
+    )?;
 
     Ok(())
 }
@@ -286,9 +309,15 @@ fn process_tabular_file(args: &Args) -> Result<()> {
     Ok(())
 }
 
-fn run_optimization(num_vertices: usize, edges: &[(usize, usize)], attempts: usize, use_gpu: bool, algorithm: &str) -> Result<()> {
-    use std::time::Instant;
+fn run_optimization(
+    num_vertices: usize,
+    edges: &[(usize, usize)],
+    attempts: usize,
+    use_gpu: bool,
+    algorithm: &str,
+) -> Result<()> {
     use std::collections::HashMap;
+    use std::time::Instant;
 
     let start = Instant::now();
 
@@ -326,7 +355,7 @@ fn run_optimization(num_vertices: usize, edges: &[(usize, usize)], attempts: usi
     for &(u, v) in edges {
         if u < num_vertices && v < num_vertices {
             adjacency[u].push(v);
-            adjacency[v].push(u);  // Undirected graph
+            adjacency[v].push(u); // Undirected graph
         }
     }
     println!("      ✓ Adjacency list created");
@@ -336,12 +365,15 @@ fn run_optimization(num_vertices: usize, edges: &[(usize, usize)], attempts: usi
 
     // Create ensemble generator for parallel search
     use prism_ai::cuda::EnsembleGenerator;
-    let num_replicas = (attempts / 100).max(10).min(1000);  // Smart replica count
+    let num_replicas = (attempts / 100).max(10).min(1000); // Smart replica count
     let temperature = 1.0;
 
     let ensemble_gen = EnsembleGenerator::new(num_replicas, temperature)
         .context("Failed to create ensemble generator")?;
-    println!("      ✓ Ensemble generator ready ({} replicas)", num_replicas);
+    println!(
+        "      ✓ Ensemble generator ready ({} replicas)",
+        num_replicas
+    );
 
     // Initialize coloring engine based on algorithm choice
     use prism_ai::cuda::gpu_coloring::GpuColoringEngine;
@@ -375,12 +407,16 @@ fn run_optimization(num_vertices: usize, edges: &[(usize, usize)], attempts: usi
 
     // Phase 3: Generate diverse solution ensemble
     println!("  [3/5] Generating solution ensemble...");
-    let orderings = ensemble_gen.generate(&adjacency)
+    let orderings = ensemble_gen
+        .generate(&adjacency)
         .context("Failed to generate ensemble")?;
     println!("      ✓ Generated {} diverse orderings", orderings.len());
 
     // Phase 4: Parallel coloring optimization
-    println!("  [4/5] Running {} coloring...", if use_prct { "PRCT" } else { "greedy" });
+    println!(
+        "  [4/5] Running {} coloring...",
+        if use_prct { "PRCT" } else { "greedy" }
+    );
     let mut best_coloring: Option<Vec<usize>> = None;
     let mut best_num_colors = usize::MAX;
     let mut valid_attempts = 0;
@@ -410,8 +446,12 @@ fn run_optimization(num_vertices: usize, edges: &[(usize, usize)], attempts: usi
                 if num_colors < best_num_colors && num_colors > 0 {
                     best_num_colors = num_colors;
                     best_coloring = Some(coloring.clone());
-                    println!("      → New best: {} colors (attempt {}/{})",
-                             best_num_colors, i + 1, orderings.len().min(attempts));
+                    println!(
+                        "      → New best: {} colors (attempt {}/{})",
+                        best_num_colors,
+                        i + 1,
+                        orderings.len().min(attempts)
+                    );
                 }
 
                 valid_attempts += 1;
@@ -424,8 +464,13 @@ fn run_optimization(num_vertices: usize, edges: &[(usize, usize)], attempts: usi
         // Progress indicator
         if i > 0 && i % progress_interval == 0 {
             let progress = (i as f64 / orderings.len().min(attempts) as f64) * 100.0;
-            println!("      Progress: {:.1}% ({}/{}) - Best: {} colors",
-                     progress, i, orderings.len().min(attempts), best_num_colors);
+            println!(
+                "      Progress: {:.1}% ({}/{}) - Best: {} colors",
+                progress,
+                i,
+                orderings.len().min(attempts),
+                best_num_colors
+            );
         }
     }
 
@@ -478,7 +523,10 @@ fn run_optimization(num_vertices: usize, edges: &[(usize, usize)], attempts: usi
         (max_color + 1, true)
     };
 
-    println!("      ✓ Solution validated: {}", if is_valid { "VALID ✓" } else { "INVALID ✗" });
+    println!(
+        "      ✓ Solution validated: {}",
+        if is_valid { "VALID ✓" } else { "INVALID ✗" }
+    );
 
     let duration = start.elapsed();
 
@@ -488,16 +536,32 @@ fn run_optimization(num_vertices: usize, edges: &[(usize, usize)], attempts: usi
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!();
     println!("  🎯 Best coloring: {} colors", final_colors);
-    println!("  ✅ Status: {}", if is_valid { "Valid" } else { "Invalid (conflicts detected)" });
+    println!(
+        "  ✅ Status: {}",
+        if is_valid {
+            "Valid"
+        } else {
+            "Invalid (conflicts detected)"
+        }
+    );
     println!("  🔍 Attempts evaluated: {}/{}", valid_attempts, attempts);
     println!("  ⏱️  Total time: {:.2}s", duration.as_secs_f64());
-    println!("  🚀 Throughput: {:.0} attempts/sec", valid_attempts as f64 / duration.as_secs_f64());
+    println!(
+        "  🚀 Throughput: {:.0} attempts/sec",
+        valid_attempts as f64 / duration.as_secs_f64()
+    );
     println!();
 
     // Save results if we have a valid coloring
     if let Some(coloring) = best_coloring {
         println!("  💾 Saving results...");
-        save_coloring_results(num_vertices, edges.len(), final_colors, &coloring, duration.as_secs_f64())?;
+        save_coloring_results(
+            num_vertices,
+            edges.len(),
+            final_colors,
+            &coloring,
+            duration.as_secs_f64(),
+        )?;
         println!("      ✓ Results saved to output/coloring_result.json");
     }
 

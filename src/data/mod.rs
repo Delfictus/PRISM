@@ -2,7 +2,7 @@
 
 mod dimacs_parser;
 
-pub use dimacs_parser::{DimacsGraph, GraphType, DensityClass, GraphCharacteristics, StrategyMix};
+pub use dimacs_parser::{DensityClass, DimacsGraph, GraphCharacteristics, GraphType, StrategyMix};
 
 use anyhow::Result;
 use std::fs::File;
