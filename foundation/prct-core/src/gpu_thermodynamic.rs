@@ -50,13 +50,10 @@ pub fn equilibrate_thermodynamic_gpu(
     steps_per_temp: usize,
     ai_uncertainty: Option<&Vec<f64>>,
     telemetry: Option<&Arc<crate::telemetry::TelemetryHandle>>,
-<<<<<<< HEAD
     fluxnet_config: Option<&crate::fluxnet::FluxNetConfig>,
     difficulty_scores: Option<&Vec<f32>>,
-=======
     force_start_temp: f64,
     force_full_strength_temp: f64,
->>>>>>> main
 ) -> Result<Vec<ColoringSolution>> {
     // Note: cudarc 0.9 doesn't support async stream execution, but we accept the parameter
     // for API consistency and future cudarc 0.17+ upgrade
@@ -363,6 +360,15 @@ pub fn equilibrate_thermodynamic_gpu(
         println!("[FLUXNET] No FluxNet config provided, running baseline thermodynamic");
     }
 
+    // Create identity force buffers for when FluxNet is disabled
+    // These are reused across all temperatures to avoid repeated allocation
+    let identity_f_strong = cuda_device
+        .htod_copy(vec![1.0f32; n])
+        .map_err(|e| PRCTError::GpuError(format!("Failed to allocate identity f_strong: {}", e)))?;
+    let identity_f_weak = cuda_device
+        .htod_copy(vec![1.0f32; n])
+        .map_err(|e| PRCTError::GpuError(format!("Failed to allocate identity f_weak: {}", e)))?;
+
     // Process each temperature
     for (temp_idx, &temp) in temperatures.iter().enumerate() {
         let temp_start = std::time::Instant::now();
@@ -398,9 +404,14 @@ pub fn equilibrate_thermodynamic_gpu(
         // FluxNet RL: Select and apply force command at start of temperature
         let mut fluxnet_command: Option<crate::fluxnet::ForceCommand> = None;
         let mut rl_state_before: Option<crate::fluxnet::RLState> = None;
+        let mut rl_telemetry: Option<(f32, bool)> = None; // (q_value, was_exploration)
+        let mut force_band_stats_before: Option<crate::fluxnet::ForceBandStats> = None;
 
         if let Some((ref mut force_profile, ref mut rl_controller)) = fluxnet_state {
             if let Some((chromatic_before, conflicts_before, compaction_before)) = telemetry_before {
+                // Capture force band stats before RL action
+                force_band_stats_before = Some(force_profile.compute_stats());
+
                 // Create RL state from previous telemetry
                 let state = crate::fluxnet::RLState::from_telemetry(
                     conflicts_before,
@@ -411,20 +422,25 @@ pub fn equilibrate_thermodynamic_gpu(
                 );
 
                 // Store state for Q-table update at end of temperature
-                rl_state_before = Some(state.clone());
+                rl_state_before = Some(state);
 
-                // Select action via epsilon-greedy
-                let command = rl_controller.select_action(&state);
+                // Select action via epsilon-greedy with telemetry capture
+                let (command, q_value, was_exploration) = rl_controller.select_action_with_telemetry(&state);
+
+                // Store telemetry data
+                rl_telemetry = Some((q_value, was_exploration));
 
                 println!(
                     "[FLUXNET][T={}] State: conflicts={}, chromatic={}, compaction={:.2}",
                     temp_idx, conflicts_before, chromatic_before, compaction_before
                 );
                 println!(
-                    "[FLUXNET][T={}] Action: {} (ε={:.3})",
+                    "[FLUXNET][T={}] Action: {} (Q={:.3}, ε={:.3}, explore={})",
                     temp_idx,
                     command.description(),
-                    rl_controller.epsilon()
+                    q_value,
+                    rl_controller.epsilon(),
+                    was_exploration
                 );
 
                 // Apply command to force profile
@@ -541,28 +557,62 @@ pub fn equilibrate_thermodynamic_gpu(
                     })?;
             }
 
-            // Evolve oscillators
-            unsafe {
-                (*evolve_osc)
-                    .clone()
-                    .launch(
-                        LaunchConfig {
-                            grid_dim: (blocks as u32, 1, 1),
-                            block_dim: (threads as u32, 1, 1),
-                            shared_mem_bytes: 0,
-                        },
-                        (
-                            &d_phases,
-                            &d_velocities,
-                            &d_coupling_forces,
-                            n as i32,
-                            dt,
-                            temp as f32,
-                        ),
-                    )
-                    .map_err(|e| {
-                        PRCTError::GpuError(format!("Evolve kernel failed at step {}: {}", step, e))
-                    })?;
+            // Evolve oscillators with FluxNet force modulation if enabled
+            // FluxNet: Pass force buffers if available, otherwise pass zero-length dummy slices
+            // CUDA kernel checks for NULL pointer and uses multiplier=1.0 when NULL
+            if let Some((ref force_profile, ref _rl_controller)) = fluxnet_state {
+                // FluxNet enabled: use actual force buffers
+                unsafe {
+                    (*evolve_osc)
+                        .clone()
+                        .launch(
+                            LaunchConfig {
+                                grid_dim: (blocks as u32, 1, 1),
+                                block_dim: (threads as u32, 1, 1),
+                                shared_mem_bytes: 0,
+                            },
+                            (
+                                &d_phases,
+                                &d_velocities,
+                                &d_coupling_forces,
+                                n as i32,
+                                dt,
+                                temp as f32,
+                                &force_profile.device_f_strong,
+                                &force_profile.device_f_weak,
+                            ),
+                        )
+                        .map_err(|e| {
+                            PRCTError::GpuError(format!("Evolve kernel with FluxNet failed at step {}: {}", step, e))
+                        })?;
+                }
+            } else {
+                // FluxNet disabled: use pre-allocated identity multiplier buffers (all 1.0f)
+                // This ensures forces remain unchanged when FluxNet is not active
+                unsafe {
+                    (*evolve_osc)
+                        .clone()
+                        .launch(
+                            LaunchConfig {
+                                grid_dim: (blocks as u32, 1, 1),
+                                block_dim: (threads as u32, 1, 1),
+                                shared_mem_bytes: 0,
+                            },
+                            (
+                                &d_phases,
+                                &d_velocities,
+                                &d_coupling_forces,
+                                n as i32,
+                                dt,
+                                temp as f32,
+                                &identity_f_strong,
+                                &identity_f_weak,
+                            ),
+                        )
+                        .map_err(|e| {
+                            PRCTError::GpuError(format!("Evolve kernel failed at step {}: {}", step, e))
+                        })?;
+                }
             }
 
             // Periodic energy computation (every 100 steps)
@@ -1029,6 +1079,7 @@ pub fn equilibrate_thermodynamic_gpu(
 
             // Color mapping metrics
             params.insert("color_range".to_string(), json!(color_range));
+            params.insert("chromatic_before_compaction".to_string(), json!(color_range));
             params.insert("chromatic_after_compaction".to_string(), json!(chromatic_number));
             params.insert("compaction_ratio".to_string(), json!(compaction_ratio));
             params.insert("max_vertex_conflicts".to_string(), json!(max_vertex_conflicts));
@@ -1036,6 +1087,8 @@ pub fn equilibrate_thermodynamic_gpu(
             params.insert("issue_detected".to_string(), json!(issue_detected));
             params.insert("unique_buckets".to_string(), json!(unique_buckets));
             params.insert("bucket_collapse_risk".to_string(), json!(bucket_collapse_risk));
+            params.insert("coupling_modulation".to_string(), json!(temp as f64 / t_max));
+            params.insert("natural_freq_enabled".to_string(), json!(true));
             params.insert("compaction_guard_triggered".to_string(), json!(compaction_guard_triggered));
 
             // Force and coupling metrics
@@ -1068,6 +1121,39 @@ pub fn equilibrate_thermodynamic_gpu(
             params.insert("reheat_stall_counter".to_string(), json!(stall_counter));
             params.insert("reheat_recommended".to_string(), json!(reheat_recommended));
             params.insert("chromatic_improved".to_string(), json!(chromatic_improved));
+
+            // Add FluxNet telemetry if enabled
+            if let (Some((ref force_profile, ref rl_controller)), Some(cmd), Some(state), Some((q_value, was_exploration)), Some(stats_before)) =
+                (&fluxnet_state, fluxnet_command, rl_state_before, rl_telemetry, force_band_stats_before) {
+
+                if let Some(config) = fluxnet_config {
+                    use crate::fluxnet::telemetry::*;
+
+                    let force_bands = ForceBandTelemetry::from_force_band_stats(&force_profile.compute_stats());
+
+                    let rl_decision = RLDecisionTelemetry::new(
+                        temp_idx,
+                        &state,
+                        cmd,
+                        q_value,
+                        rl_controller.epsilon(),
+                        was_exploration,
+                    );
+
+                    let config_snapshot = FluxNetConfigSnapshot::from_config(config);
+
+                    let fluxnet_telem = FluxNetTelemetry::new(
+                        force_bands,
+                        rl_decision,
+                        None, // Q-update telemetry will be added after RL update below
+                        config_snapshot,
+                    );
+
+                    if let Ok(fluxnet_json) = serde_json::to_value(&fluxnet_telem) {
+                        params.insert("fluxnet".to_string(), fluxnet_json);
+                    }
+                }
+            }
 
             telemetry.record(
                 RunMetric::new(
@@ -1110,12 +1196,18 @@ pub fn equilibrate_thermodynamic_gpu(
                 // Determine if this is a terminal state (last temperature)
                 let is_terminal = temp_idx == num_temps - 1;
 
-                // Update Q-table with experience
-                rl_controller.update(state_before, cmd, reward, next_state, is_terminal);
+                // Update Q-table with experience and capture telemetry
+                let (q_old, q_new, q_delta) = rl_controller.update_with_telemetry(
+                    state_before,
+                    cmd,
+                    reward,
+                    next_state,
+                    is_terminal
+                );
 
                 println!(
-                    "[FLUXNET][T={}] Reward: {:.3}, Q-table updated (ε={:.3})",
-                    temp_idx, reward, rl_controller.epsilon()
+                    "[FLUXNET][T={}] Reward: {:.3}, Q: {:.3} → {:.3} (Δ={:.3}), ε={:.3}",
+                    temp_idx, reward, q_old, q_new, q_delta, rl_controller.epsilon()
                 );
 
                 // Save Q-table at intervals if configured
@@ -1149,7 +1241,6 @@ pub fn equilibrate_thermodynamic_gpu(
         elapsed.as_secs_f64() * 1000.0
     );
 
-<<<<<<< HEAD
     // FluxNet RL: Save final Q-table after equilibration completes
     if let Some((ref _force_profile, ref mut rl_controller)) = fluxnet_state {
         if let Some(config) = fluxnet_config {
@@ -1168,14 +1259,14 @@ pub fn equilibrate_thermodynamic_gpu(
                 rl_controller.epsilon()
             );
         }
-=======
+    }
+
     // TWEAK 6: Report best snapshot found
     if let Some((best_idx, best_sol, best_q)) = &best_snapshot {
         println!(
             "[THERMO-GPU][TWEAK-6] Best snapshot: temp {} with {} colors, {} conflicts (quality={:.6})",
             best_idx, best_sol.chromatic_number, best_sol.conflicts, best_q
         );
->>>>>>> main
     }
 
     Ok(equilibrium_states)

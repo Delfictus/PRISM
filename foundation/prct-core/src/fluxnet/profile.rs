@@ -77,6 +77,12 @@ pub struct ForceBandStats {
 
     /// Standard deviation of force values
     pub std_force: f32,
+
+    /// Minimum force value
+    pub min_force: f32,
+
+    /// Maximum force value
+    pub max_force: f32,
 }
 
 impl ForceBandStats {
@@ -92,6 +98,8 @@ impl ForceBandStats {
         let mut weak_count = 0;
         let mut sum = 0.0;
         let mut sum_sq = 0.0;
+        let mut min_val = f32::INFINITY;
+        let mut max_val = f32::NEG_INFINITY;
 
         for i in 0..n {
             // Classify based on force values
@@ -107,6 +115,8 @@ impl ForceBandStats {
 
             sum += force;
             sum_sq += force * force;
+            min_val = min_val.min(force);
+            max_val = max_val.max(force);
         }
 
         let mean = sum / n as f32;
@@ -119,6 +129,8 @@ impl ForceBandStats {
             weak_fraction: weak_count as f32 / n as f32,
             mean_force: mean,
             std_force: std,
+            min_force: if min_val.is_finite() { min_val } else { 1.0 },
+            max_force: if max_val.is_finite() { max_val } else { 1.0 },
         }
     }
 }
@@ -131,6 +143,8 @@ impl Default for ForceBandStats {
             weak_fraction: 0.0,
             mean_force: 1.0,
             std_force: 0.0,
+            min_force: 1.0,
+            max_force: 1.0,
         }
     }
 }
