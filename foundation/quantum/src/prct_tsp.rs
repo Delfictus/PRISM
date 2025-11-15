@@ -3,9 +3,9 @@
 //! Implements Traveling Salesperson Problem solver optimized for phase coherence
 //! maximization in quantum systems. Uses Lin-Kernighan heuristic with 2-opt improvements.
 
+use anyhow::{Context, Result};
 use ndarray::Array2;
 use num_complex::Complex64;
-use anyhow::{Result, Context};
 use std::collections::HashSet;
 
 /// TSP path optimizer for PRCT algorithm
@@ -243,8 +243,8 @@ impl TSPPathOptimizer {
         }
 
         // Quality = 1 / (1 + normalized_length)
-        let max_possible_length = self.n_vertices as f64 * self.distance_matrix.iter()
-            .fold(0.0f64, |a, &b| a.max(b));
+        let max_possible_length =
+            self.n_vertices as f64 * self.distance_matrix.iter().fold(0.0f64, |a, &b| a.max(b));
 
         if max_possible_length < 1e-10 {
             return 1.0;
@@ -370,10 +370,7 @@ mod tests {
         let mut coupling = Array2::zeros((8, 8));
         for i in 0..8 {
             for j in 0..8 {
-                coupling[[i, j]] = Complex64::new(
-                    (1.0 + (i + j) as f64).recip(),
-                    0.0,
-                );
+                coupling[[i, j]] = Complex64::new((1.0 + (i + j) as f64).recip(), 0.0);
             }
         }
 

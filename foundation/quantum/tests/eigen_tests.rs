@@ -3,10 +3,10 @@
 //! These tests validate the mathematical correctness and numerical stability
 //! of the eigenvalue solver across various matrix types and sizes.
 
-use quantum_engine::robust_eigen::{RobustEigenSolver, RobustEigenConfig, SolverMethod};
+use approx::assert_abs_diff_eq;
 use ndarray::{Array1, Array2};
 use num_complex::Complex64;
-use approx::assert_abs_diff_eq;
+use quantum_engine::robust_eigen::{RobustEigenConfig, RobustEigenSolver, SolverMethod};
 
 // ============================================================================
 // TEST UTILITIES
@@ -37,10 +37,10 @@ fn create_tridiagonal(n: usize, diagonal: f64, off_diagonal: f64) -> Array2<Comp
     for i in 0..n {
         matrix[[i, i]] = Complex64::new(diagonal, 0.0);
         if i > 0 {
-            matrix[[i, i-1]] = Complex64::new(off_diagonal, 0.0);
+            matrix[[i, i - 1]] = Complex64::new(off_diagonal, 0.0);
         }
-        if i < n-1 {
-            matrix[[i, i+1]] = Complex64::new(off_diagonal, 0.0);
+        if i < n - 1 {
+            matrix[[i, i + 1]] = Complex64::new(off_diagonal, 0.0);
         }
     }
     matrix
@@ -51,12 +51,13 @@ fn validate_eigenpair(
     matrix: &Array2<Complex64>,
     eigenvalue: f64,
     eigenvector: &Array1<Complex64>,
-    tolerance: f64
+    tolerance: f64,
 ) -> bool {
     let hv = matrix.dot(eigenvector);
     let lambda_v = eigenvector.mapv(|x| x * eigenvalue);
 
-    let residual: f64 = hv.iter()
+    let residual: f64 = hv
+        .iter()
         .zip(lambda_v.iter())
         .map(|(a, b)| (a - b).norm_sqr())
         .sum::<f64>()
@@ -79,12 +80,10 @@ fn check_orthonormality(eigenvectors: &Array2<Complex64>, tolerance: f64) -> boo
         }
 
         // Check orthogonality
-        for j in i+1..n {
+        for j in i + 1..n {
             let v_j = eigenvectors.column(j);
-            let inner_product: Complex64 = v_i.iter()
-                .zip(v_j.iter())
-                .map(|(a, b)| a.conj() * b)
-                .sum();
+            let inner_product: Complex64 =
+                v_i.iter().zip(v_j.iter()).map(|(a, b)| a.conj() * b).sum();
 
             if inner_product.norm() > tolerance {
                 return false;
@@ -114,7 +113,12 @@ fn test_2x2_identity() {
 
     // Check eigenvectors
     for i in 0..2 {
-        assert!(validate_eigenpair(&matrix, eigenvalues[i], &eigenvectors.column(i).to_owned(), 1e-10));
+        assert!(validate_eigenpair(
+            &matrix,
+            eigenvalues[i],
+            &eigenvectors.column(i).to_owned(),
+            1e-10
+        ));
     }
 }
 
@@ -122,10 +126,16 @@ fn test_2x2_identity() {
 fn test_2x2_simple_hermitian() {
     // Matrix: [[2, 1], [1, 3]]
     // Eigenvalues: (5 ± √5)/2 ≈ 3.618, 1.382
-    let matrix = Array2::from_shape_vec((2, 2), vec![
-        Complex64::new(2.0, 0.0), Complex64::new(1.0, 0.0),
-        Complex64::new(1.0, 0.0), Complex64::new(3.0, 0.0),
-    ]).unwrap();
+    let matrix = Array2::from_shape_vec(
+        (2, 2),
+        vec![
+            Complex64::new(2.0, 0.0),
+            Complex64::new(1.0, 0.0),
+            Complex64::new(1.0, 0.0),
+            Complex64::new(3.0, 0.0),
+        ],
+    )
+    .unwrap();
 
     let mut solver = RobustEigenSolver::default();
     let (eigenvalues, eigenvectors) = solver.solve(&matrix).unwrap();
@@ -133,7 +143,7 @@ fn test_2x2_simple_hermitian() {
     assert_eq!(eigenvalues.len(), 2);
 
     // Check eigenvalues (sorted ascending)
-    let expected_low = (5.0 - 5.0_f64.sqrt()) / 2.0;  // ≈ 1.382
+    let expected_low = (5.0 - 5.0_f64.sqrt()) / 2.0; // ≈ 1.382
     let expected_high = (5.0 + 5.0_f64.sqrt()) / 2.0; // ≈ 3.618
 
     assert_abs_diff_eq!(eigenvalues[0], expected_low, epsilon = 1e-8);
@@ -141,7 +151,12 @@ fn test_2x2_simple_hermitian() {
 
     // Validate eigenpairs
     for i in 0..2 {
-        assert!(validate_eigenpair(&matrix, eigenvalues[i], &eigenvectors.column(i).to_owned(), 1e-8));
+        assert!(validate_eigenpair(
+            &matrix,
+            eigenvalues[i],
+            &eigenvectors.column(i).to_owned(),
+            1e-8
+        ));
     }
 }
 
@@ -157,7 +172,9 @@ fn test_3x3_diagonal() {
 
     // Eigenvalues should match (possibly reordered)
     for &expected in &eigenvals {
-        let found = computed_eigenvalues.iter().any(|&computed| (computed - expected).abs() < 1e-10);
+        let found = computed_eigenvalues
+            .iter()
+            .any(|&computed| (computed - expected).abs() < 1e-10);
         assert!(found, "Expected eigenvalue {} not found", expected);
     }
 
@@ -176,7 +193,12 @@ fn test_5x5_tridiagonal() {
 
     // Validate all eigenpairs
     for i in 0..5 {
-        assert!(validate_eigenpair(&matrix, eigenvalues[i], &eigenvectors.column(i).to_owned(), 1e-8));
+        assert!(validate_eigenpair(
+            &matrix,
+            eigenvalues[i],
+            &eigenvectors.column(i).to_owned(),
+            1e-8
+        ));
     }
 
     // Check orthonormality
@@ -195,9 +217,9 @@ fn test_10x10_harmonic_oscillator() {
     }
 
     // Off-diagonal coupling
-    for i in 0..n-1 {
-        matrix[[i, i+1]] = Complex64::new(0.05, 0.0);
-        matrix[[i+1, i]] = Complex64::new(0.05, 0.0);
+    for i in 0..n - 1 {
+        matrix[[i, i + 1]] = Complex64::new(0.05, 0.0);
+        matrix[[i + 1, i]] = Complex64::new(0.05, 0.0);
     }
 
     let mut solver = RobustEigenSolver::default();
@@ -209,13 +231,18 @@ fn test_10x10_harmonic_oscillator() {
     assert!((eigenvalues[0] - 0.5).abs() < 0.1);
 
     // Eigenvalues should be increasing
-    for i in 0..n-1 {
-        assert!(eigenvalues[i] < eigenvalues[i+1]);
+    for i in 0..n - 1 {
+        assert!(eigenvalues[i] < eigenvalues[i + 1]);
     }
 
     // Validate eigenpairs
     for i in 0..n {
-        assert!(validate_eigenpair(&matrix, eigenvalues[i], &eigenvectors.column(i).to_owned(), 1e-7));
+        assert!(validate_eigenpair(
+            &matrix,
+            eigenvalues[i],
+            &eigenvectors.column(i).to_owned(),
+            1e-7
+        ));
     }
 }
 
@@ -237,14 +264,22 @@ fn test_50x50_banded() {
     assert_eq!(eigenvalues.len(), n);
 
     // Sample validation (check first, middle, last)
-    let indices = [0, n/2, n-1];
+    let indices = [0, n / 2, n - 1];
     for &i in &indices {
-        assert!(validate_eigenpair(&matrix, eigenvalues[i], &eigenvectors.column(i).to_owned(), 1e-6));
+        assert!(validate_eigenpair(
+            &matrix,
+            eigenvalues[i],
+            &eigenvectors.column(i).to_owned(),
+            1e-6
+        ));
     }
 
     // Check method used
     let diag = solver.get_diagnostics();
-    println!("50×50: Method = {:?}, Time = {:.2}ms", diag.method, diag.compute_time_ms);
+    println!(
+        "50×50: Method = {:?}, Time = {:.2}ms",
+        diag.method, diag.compute_time_ms
+    );
 }
 
 #[test]
@@ -258,9 +293,9 @@ fn test_100x100_diagonal_dominant() {
     }
 
     // Weak off-diagonal
-    for i in 0..n-1 {
-        matrix[[i, i+1]] = Complex64::new(0.01, 0.0);
-        matrix[[i+1, i]] = Complex64::new(0.01, 0.0);
+    for i in 0..n - 1 {
+        matrix[[i, i + 1]] = Complex64::new(0.01, 0.0);
+        matrix[[i + 1, i]] = Complex64::new(0.01, 0.0);
     }
 
     let mut solver = RobustEigenSolver::default();
@@ -272,11 +307,18 @@ fn test_100x100_diagonal_dominant() {
     assert!((eigenvalues[0] - 10.0).abs() < 1.0);
 
     // Validate ground state
-    assert!(validate_eigenpair(&matrix, eigenvalues[0], &eigenvectors.column(0).to_owned(), 1e-5));
+    assert!(validate_eigenpair(
+        &matrix,
+        eigenvalues[0],
+        &eigenvectors.column(0).to_owned(),
+        1e-5
+    ));
 
     let diag = solver.get_diagnostics();
-    println!("100×100: Method = {:?}, Time = {:.2}ms, κ = {:.2e}",
-        diag.method, diag.compute_time_ms, diag.condition_number);
+    println!(
+        "100×100: Method = {:?}, Time = {:.2}ms, κ = {:.2e}",
+        diag.method, diag.compute_time_ms, diag.condition_number
+    );
 }
 
 #[test]
@@ -289,10 +331,10 @@ fn test_200x200_sparse() {
         matrix[[i, i]] = Complex64::new(1.0 + (i as f64 / n as f64), 0.0);
 
         if i > 0 {
-            matrix[[i, i-1]] = Complex64::new(0.1, 0.0);
+            matrix[[i, i - 1]] = Complex64::new(0.1, 0.0);
         }
-        if i < n-1 {
-            matrix[[i, i+1]] = Complex64::new(0.1, 0.0);
+        if i < n - 1 {
+            matrix[[i, i + 1]] = Complex64::new(0.1, 0.0);
         }
     }
 
@@ -307,7 +349,12 @@ fn test_200x200_sparse() {
     assert_eq!(eigenvalues.len(), n);
 
     // Validate ground state
-    assert!(validate_eigenpair(&matrix, eigenvalues[0], &eigenvectors.column(0).to_owned(), 1e-4));
+    assert!(validate_eigenpair(
+        &matrix,
+        eigenvalues[0],
+        &eigenvectors.column(0).to_owned(),
+        1e-4
+    ));
 
     println!("200×200: Solved in {:.2}ms", elapsed.as_millis());
 
@@ -338,12 +385,18 @@ fn test_ill_conditioned_small_eigenvalues() {
             let rel_error = ((computed - expected) / expected).abs();
             rel_error < 0.01
         });
-        assert!(found, "Expected eigenvalue {} not found accurately", expected);
+        assert!(
+            found,
+            "Expected eigenvalue {} not found accurately",
+            expected
+        );
     }
 
     let diag = solver.get_diagnostics();
-    println!("Ill-conditioned: κ = {:.2e}, preconditioned = {}",
-        diag.condition_number, diag.preconditioned);
+    println!(
+        "Ill-conditioned: κ = {:.2e}, preconditioned = {}",
+        diag.condition_number, diag.preconditioned
+    );
     assert!(diag.condition_number > 1e10);
 }
 
@@ -362,8 +415,10 @@ fn test_near_singular() {
     let (_eigenvalues, _) = result.unwrap();
 
     let diag = solver.get_diagnostics();
-    println!("Near-singular: Method = {:?}, preconditioned = {}",
-        diag.method, diag.preconditioned);
+    println!(
+        "Near-singular: Method = {:?}, preconditioned = {}",
+        diag.method, diag.preconditioned
+    );
 }
 
 // ============================================================================
@@ -372,11 +427,21 @@ fn test_near_singular() {
 
 #[test]
 fn test_slightly_non_hermitian() {
-    let mut matrix = Array2::from_shape_vec((3, 3), vec![
-        Complex64::new(1.0, 0.0), Complex64::new(0.2, 0.0), Complex64::new(0.0, 0.0),
-        Complex64::new(0.21, 0.0), Complex64::new(2.0, 0.0), Complex64::new(0.3, 0.0),  // Slightly asymmetric
-        Complex64::new(0.0, 0.0), Complex64::new(0.31, 0.0), Complex64::new(3.0, 0.0),  // Slightly asymmetric
-    ]).unwrap();
+    let mut matrix = Array2::from_shape_vec(
+        (3, 3),
+        vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.2, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.21, 0.0),
+            Complex64::new(2.0, 0.0),
+            Complex64::new(0.3, 0.0), // Slightly asymmetric
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.31, 0.0),
+            Complex64::new(3.0, 0.0), // Slightly asymmetric
+        ],
+    )
+    .unwrap();
 
     let mut solver = RobustEigenSolver::default();
     let result = solver.solve(&matrix);
@@ -385,29 +450,49 @@ fn test_slightly_non_hermitian() {
 
     let diag = solver.get_diagnostics();
     assert!(diag.symmetrized, "Matrix should have been symmetrized");
-    println!("Non-Hermitian: Hermitian error = {:.2e}, symmetrized = {}",
-        diag.hermitian_error, diag.symmetrized);
+    println!(
+        "Non-Hermitian: Hermitian error = {:.2e}, symmetrized = {}",
+        diag.hermitian_error, diag.symmetrized
+    );
 }
 
 #[test]
 fn test_complex_hermitian() {
     // Hermitian matrix with complex off-diagonals
-    let matrix = Array2::from_shape_vec((3, 3), vec![
-        Complex64::new(1.0, 0.0),  Complex64::new(0.5, 0.5),   Complex64::new(0.0, 0.3),
-        Complex64::new(0.5, -0.5), Complex64::new(2.0, 0.0),   Complex64::new(0.2, 0.1),
-        Complex64::new(0.0, -0.3), Complex64::new(0.2, -0.1),  Complex64::new(3.0, 0.0),
-    ]).unwrap();
+    let matrix = Array2::from_shape_vec(
+        (3, 3),
+        vec![
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.5, 0.5),
+            Complex64::new(0.0, 0.3),
+            Complex64::new(0.5, -0.5),
+            Complex64::new(2.0, 0.0),
+            Complex64::new(0.2, 0.1),
+            Complex64::new(0.0, -0.3),
+            Complex64::new(0.2, -0.1),
+            Complex64::new(3.0, 0.0),
+        ],
+    )
+    .unwrap();
 
     let mut solver = RobustEigenSolver::default();
     let (eigenvalues, eigenvectors) = solver.solve(&matrix).unwrap();
 
     // Eigenvalues should all be real (Hermitian property)
     for i in 0..3 {
-        assert!(validate_eigenpair(&matrix, eigenvalues[i], &eigenvectors.column(i).to_owned(), 1e-8));
+        assert!(validate_eigenpair(
+            &matrix,
+            eigenvalues[i],
+            &eigenvectors.column(i).to_owned(),
+            1e-8
+        ));
     }
 
     let diag = solver.get_diagnostics();
-    println!("Complex Hermitian: Hermitian error = {:.2e}", diag.hermitian_error);
+    println!(
+        "Complex Hermitian: Hermitian error = {:.2e}",
+        diag.hermitian_error
+    );
     assert!(diag.hermitian_error < 1e-10, "Should be exactly Hermitian");
 }
 
@@ -426,10 +511,10 @@ fn test_known_solution_hydrogen_atom() {
     for i in 0..n {
         matrix[[i, i]] = Complex64::new(2.0, 0.0);
         if i > 0 {
-            matrix[[i, i-1]] = Complex64::new(-1.0, 0.0);
+            matrix[[i, i - 1]] = Complex64::new(-1.0, 0.0);
         }
-        if i < n-1 {
-            matrix[[i, i+1]] = Complex64::new(-1.0, 0.0);
+        if i < n - 1 {
+            matrix[[i, i + 1]] = Complex64::new(-1.0, 0.0);
         }
     }
 
@@ -445,7 +530,10 @@ fn test_known_solution_hydrogen_atom() {
     // Ground state should be negative (bound state)
     assert!(eigenvalues[0] < 0.0, "Ground state should be bound (E < 0)");
 
-    println!("Hydrogen-like ground state: E₀ = {:.6} Hartree", eigenvalues[0]);
+    println!(
+        "Hydrogen-like ground state: E₀ = {:.6} Hartree",
+        eigenvalues[0]
+    );
 }
 
 #[test]
@@ -494,7 +582,12 @@ fn benchmark_scaling() {
         assert!(result.is_ok());
 
         let diag = solver.get_diagnostics();
-        println!("N={:3}: {:6.2}ms, Method={:?}, κ={:.2e}",
-            n, elapsed.as_micros() as f64 / 1000.0, diag.method, diag.condition_number);
+        println!(
+            "N={:3}: {:6.2}ms, Method={:?}, κ={:.2e}",
+            n,
+            elapsed.as_micros() as f64 / 1000.0,
+            diag.method,
+            diag.condition_number
+        );
     }
 }

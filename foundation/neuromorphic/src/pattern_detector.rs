@@ -2,12 +2,12 @@
 //! COMPLETE IMPLEMENTATION - ALL 322+ LINES PRESERVED
 //! ADVANCED PATTERN RECOGNITION WITH CIRCUIT BREAKER PROTECTION
 
-use crate::types::{SpikePattern, PatternMetadata};
+use crate::types::{PatternMetadata, SpikePattern};
 use anyhow::Result;
-use std::collections::{VecDeque, HashMap};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use serde::{Deserialize, Serialize};
 
 /// Circuit breaker constants for robust pattern detection
 const MAX_CONSECUTIVE_FAILURES: usize = 10;
@@ -229,7 +229,10 @@ impl std::fmt::Debug for PatternDetector {
         f.debug_struct("PatternDetector")
             .field("config", &self.config)
             .field("oscillators_count", &self.oscillators.len())
-            .field("pattern_id_counter", &self.pattern_id_counter.load(Ordering::Relaxed))
+            .field(
+                "pattern_id_counter",
+                &self.pattern_id_counter.load(Ordering::Relaxed),
+            )
             .field("failure_count", &self.failure_count.load(Ordering::Relaxed))
             .field("success_count", &self.success_count.load(Ordering::Relaxed))
             .finish()
@@ -245,8 +248,8 @@ impl PatternDetector {
         for i in 0..config.num_oscillators {
             // Distribute frequencies across the specified range
             let freq_range = config.frequency_range.1 - config.frequency_range.0;
-            let frequency = config.frequency_range.0 +
-                (i as f64 / config.num_oscillators as f64) * freq_range;
+            let frequency =
+                config.frequency_range.0 + (i as f64 / config.num_oscillators as f64) * freq_range;
             oscillators.push(NeuralOscillator::new(i, frequency));
         }
 
@@ -360,7 +363,10 @@ impl PatternDetector {
         self.last_failure_time.store(now, Ordering::Relaxed);
 
         if failure_count >= MAX_CONSECUTIVE_FAILURES {
-            eprintln!("Pattern detector circuit breaker OPENED after {} failures", failure_count);
+            eprintln!(
+                "Pattern detector circuit breaker OPENED after {} failures",
+                failure_count
+            );
         }
     }
 
@@ -370,7 +376,10 @@ impl PatternDetector {
         let previous_failures = self.failure_count.swap(0, Ordering::Relaxed);
 
         if previous_failures > 0 && success_count % SUCCESS_THRESHOLD_TO_CLOSE == 0 {
-            println!("Pattern detector circuit breaker CLOSED after {} successes", success_count);
+            println!(
+                "Pattern detector circuit breaker CLOSED after {} successes",
+                success_count
+            );
         }
     }
 
@@ -482,7 +491,8 @@ impl PatternDetector {
         let gradient_consistency = gradient
             .iter()
             .map(|&g| if g * mean_gradient > 0.0 { 1.0 } else { 0.0 })
-            .sum::<f64>() / gradient.len() as f64;
+            .sum::<f64>()
+            / gradient.len() as f64;
 
         let threshold = *self.adaptive_threshold.lock().unwrap();
         if gradient_consistency > threshold {
@@ -531,17 +541,19 @@ impl PatternDetector {
 
             if !temporal_values.is_empty() {
                 let mean = temporal_values.iter().sum::<f64>() / temporal_values.len() as f64;
-                let variance = temporal_values.iter()
+                let variance = temporal_values
+                    .iter()
                     .map(|v| (v - mean).powi(2))
-                    .sum::<f64>() / temporal_values.len() as f64;
+                    .sum::<f64>()
+                    / temporal_values.len() as f64;
                 variances[i] = variance;
             }
         }
 
         // Look for nodes (low variance) and antinodes (high variance)
         let mean_variance = variances.iter().sum::<f64>() / variances.len() as f64;
-        let variance_range = variances.iter().cloned().fold(0.0, f64::max) -
-                           variances.iter().cloned().fold(f64::INFINITY, f64::min);
+        let variance_range = variances.iter().cloned().fold(0.0, f64::max)
+            - variances.iter().cloned().fold(f64::INFINITY, f64::min);
 
         if variance_range / mean_variance > 2.0 {
             let id = self.pattern_id_counter.fetch_add(1, Ordering::Relaxed) + 1;
@@ -573,9 +585,11 @@ impl PatternDetector {
 
         // Calculate global vs local complexity
         let global_mean = outputs.iter().sum::<f64>() / outputs.len() as f64;
-        let global_variance = outputs.iter()
+        let global_variance = outputs
+            .iter()
             .map(|&v| (v - global_mean).powi(2))
-            .sum::<f64>() / outputs.len() as f64;
+            .sum::<f64>()
+            / outputs.len() as f64;
 
         // Calculate local complexities
         let window_size = 8;
@@ -583,14 +597,14 @@ impl PatternDetector {
 
         for chunk in outputs.chunks(window_size) {
             let local_mean = chunk.iter().sum::<f64>() / chunk.len() as f64;
-            let local_var = chunk.iter()
-                .map(|&v| (v - local_mean).powi(2))
-                .sum::<f64>() / chunk.len() as f64;
+            let local_var =
+                chunk.iter().map(|&v| (v - local_mean).powi(2)).sum::<f64>() / chunk.len() as f64;
             local_complexities.push(local_var);
         }
 
         // High local complexity with structured global pattern indicates emergence
-        let mean_local_complexity = local_complexities.iter().sum::<f64>() / local_complexities.len() as f64;
+        let mean_local_complexity =
+            local_complexities.iter().sum::<f64>() / local_complexities.len() as f64;
         let emergence_score = mean_local_complexity / (global_variance + 1e-6);
 
         if emergence_score > 2.0 {
@@ -626,14 +640,16 @@ impl PatternDetector {
         // Calculate inter-spike intervals
         let mut intervals = Vec::new();
         for i in 1..pattern.spikes.len() {
-            intervals.push(pattern.spikes[i].time_ms - pattern.spikes[i-1].time_ms);
+            intervals.push(pattern.spikes[i].time_ms - pattern.spikes[i - 1].time_ms);
         }
 
         // Calculate coefficient of variation for regularity
         let mean_interval = intervals.iter().sum::<f64>() / intervals.len() as f64;
-        let variance = intervals.iter()
+        let variance = intervals
+            .iter()
             .map(|&i| (i - mean_interval).powi(2))
-            .sum::<f64>() / intervals.len() as f64;
+            .sum::<f64>()
+            / intervals.len() as f64;
         let cv = variance.sqrt() / mean_interval;
 
         // Low CV indicates rhythmic pattern
@@ -671,7 +687,8 @@ impl PatternDetector {
         let spike_rate = pattern.spike_rate(); // spikes per second
         let expected_rate = 50.0; // Expected baseline rate (Hz)
 
-        if spike_rate < expected_rate * 0.3 { // Less than 30% of expected
+        if spike_rate < expected_rate * 0.3 {
+            // Less than 30% of expected
             let id = self.pattern_id_counter.fetch_add(1, Ordering::Relaxed) + 1;
             let sparsity = 1.0 - (spike_rate / expected_rate).min(1.0);
 
@@ -712,11 +729,12 @@ impl PatternDetector {
             if i == 0 {
                 current_burst.push(&pattern.spikes[i]);
             } else {
-                let interval = pattern.spikes[i].time_ms - pattern.spikes[i-1].time_ms;
+                let interval = pattern.spikes[i].time_ms - pattern.spikes[i - 1].time_ms;
                 if interval <= burst_threshold {
                     current_burst.push(&pattern.spikes[i]);
                 } else {
-                    if current_burst.len() >= 3 { // Minimum burst size
+                    if current_burst.len() >= 3 {
+                        // Minimum burst size
                         bursts.push(current_burst.clone());
                     }
                     current_burst.clear();
@@ -732,21 +750,26 @@ impl PatternDetector {
 
         if !bursts.is_empty() {
             let id = self.pattern_id_counter.fetch_add(1, Ordering::Relaxed) + 1;
-            let burst_fraction = bursts.iter().map(|b| b.len()).sum::<usize>() as f64 / pattern.spikes.len() as f64;
+            let burst_fraction =
+                bursts.iter().map(|b| b.len()).sum::<usize>() as f64 / pattern.spikes.len() as f64;
 
             // Calculate burst frequencies
-            let burst_frequencies: Vec<f64> = bursts.iter().map(|burst| {
-                if burst.len() > 1 {
-                    let duration = burst.last().unwrap().time_ms - burst.first().unwrap().time_ms;
-                    if duration > 0.0 {
-                        (burst.len() - 1) as f64 * 1000.0 / duration
+            let burst_frequencies: Vec<f64> = bursts
+                .iter()
+                .map(|burst| {
+                    if burst.len() > 1 {
+                        let duration =
+                            burst.last().unwrap().time_ms - burst.first().unwrap().time_ms;
+                        if duration > 0.0 {
+                            (burst.len() - 1) as f64 * 1000.0 / duration
+                        } else {
+                            0.0
+                        }
                     } else {
                         0.0
                     }
-                } else {
-                    0.0
-                }
-            }).collect();
+                })
+                .collect();
 
             Some(DetectedPattern {
                 id,
@@ -770,32 +793,49 @@ impl PatternDetector {
     }
 
     /// Update pattern statistics and adaptive threshold
-    fn update_statistics(&self, patterns: &[DetectedPattern], processing_time: std::time::Duration) -> Result<()> {
+    fn update_statistics(
+        &self,
+        patterns: &[DetectedPattern],
+        processing_time: std::time::Duration,
+    ) -> Result<()> {
         let mut stats = self.pattern_statistics.lock().unwrap();
 
         // Update pattern counts by type
         for pattern in patterns {
-            *stats.patterns_by_type.entry(pattern.pattern_type).or_insert(0) += 1;
+            *stats
+                .patterns_by_type
+                .entry(pattern.pattern_type)
+                .or_insert(0) += 1;
 
             // Update average strength
-            let current_avg = *stats.avg_strength_by_type.entry(pattern.pattern_type).or_insert(0.0);
+            let current_avg = *stats
+                .avg_strength_by_type
+                .entry(pattern.pattern_type)
+                .or_insert(0.0);
             let count = stats.patterns_by_type[&pattern.pattern_type] as f64;
             let new_avg = (current_avg * (count - 1.0) + pattern.strength) / count;
-            stats.avg_strength_by_type.insert(pattern.pattern_type, new_avg);
+            stats
+                .avg_strength_by_type
+                .insert(pattern.pattern_type, new_avg);
         }
 
         // Update latency statistics
         let latency_ms = processing_time.as_secs_f64() * 1000.0;
         stats.avg_latency_ms = (stats.avg_latency_ms * 0.9) + (latency_ms * 0.1); // Exponential moving average
         stats.max_latency_ms = stats.max_latency_ms.max(latency_ms);
-        stats.min_latency_ms = if stats.min_latency_ms == 0.0 { latency_ms } else { stats.min_latency_ms.min(latency_ms) };
+        stats.min_latency_ms = if stats.min_latency_ms == 0.0 {
+            latency_ms
+        } else {
+            stats.min_latency_ms.min(latency_ms)
+        };
 
         // Adaptive threshold adjustment
         if self.config.adaptive_threshold {
             let mut threshold = self.adaptive_threshold.lock().unwrap();
 
             // Increase threshold if too many weak patterns detected
-            let weak_pattern_ratio = patterns.iter().filter(|p| p.strength < 0.5).count() as f64 / patterns.len().max(1) as f64;
+            let weak_pattern_ratio = patterns.iter().filter(|p| p.strength < 0.5).count() as f64
+                / patterns.len().max(1) as f64;
             if weak_pattern_ratio > 0.5 {
                 *threshold = (*threshold * 1.01).min(0.95);
             } else if weak_pattern_ratio < 0.2 {
@@ -878,7 +918,9 @@ mod tests {
         let detected = detector.detect(&pattern).unwrap();
 
         // Should detect rhythmic pattern
-        let rhythmic_detected = detected.iter().any(|p| p.pattern_type == PatternType::Rhythmic);
+        let rhythmic_detected = detected
+            .iter()
+            .any(|p| p.pattern_type == PatternType::Rhythmic);
         assert!(rhythmic_detected || !rhythmic_detected); // Test structure verification
     }
 
@@ -893,7 +935,9 @@ mod tests {
 
         let detected = detector.detect(&pattern).unwrap();
 
-        let sparse_detected = detected.iter().any(|p| p.pattern_type == PatternType::Sparse);
+        let sparse_detected = detected
+            .iter()
+            .any(|p| p.pattern_type == PatternType::Sparse);
         assert!(sparse_detected || !sparse_detected); // Test structure verification
     }
 
@@ -913,7 +957,9 @@ mod tests {
 
         let detected = detector.detect(&pattern).unwrap();
 
-        let burst_detected = detected.iter().any(|p| p.pattern_type == PatternType::Burst);
+        let burst_detected = detected
+            .iter()
+            .any(|p| p.pattern_type == PatternType::Burst);
         assert!(burst_detected || !burst_detected); // Test structure verification
     }
 

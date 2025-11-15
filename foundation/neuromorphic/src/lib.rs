@@ -21,23 +21,23 @@
 //! neuromorphic-engine = "0.1.0"
 //! ```
 
-pub mod types;
-pub mod spike_encoder;
-pub mod reservoir;
 pub mod pattern_detector;
+pub mod reservoir;
+pub mod spike_encoder;
 pub mod stdp_profiles;
 pub mod transfer_entropy;
+pub mod types;
 
 // GPU acceleration modules - RTX 5070 with CUDA 12.0 support
 // Only compiled when 'cuda' feature is enabled
 #[cfg(feature = "cuda")]
-pub mod gpu_reservoir;
+pub mod cuda_kernels;
 #[cfg(feature = "cuda")]
 pub mod gpu_memory;
 #[cfg(feature = "cuda")]
-pub mod cuda_kernels;
-#[cfg(feature = "cuda")]
 pub mod gpu_optimization;
+#[cfg(feature = "cuda")]
+pub mod gpu_reservoir;
 
 // GPU simulation for performance testing
 // Only compiled when 'simulation' feature is enabled
@@ -45,23 +45,25 @@ pub mod gpu_optimization;
 pub mod gpu_simulation;
 
 // Re-export main types
-pub use types::*;
-pub use spike_encoder::{SpikeEncoder, EncodingParameters};
-pub use reservoir::ReservoirComputer;
 pub use pattern_detector::PatternDetector;
-pub use stdp_profiles::{STDPProfile, STDPConfig, LearningStats};
-pub use transfer_entropy::{TransferEntropyEngine, TransferEntropyConfig, TimeSeriesBuffer};
+pub use reservoir::ReservoirComputer;
+pub use spike_encoder::{EncodingParameters, SpikeEncoder};
+pub use stdp_profiles::{LearningStats, STDPConfig, STDPProfile};
+pub use transfer_entropy::{TimeSeriesBuffer, TransferEntropyConfig, TransferEntropyEngine};
+pub use types::*;
 
 // GPU acceleration exports for RTX 5070
 // Only available when 'cuda' feature is enabled
 #[cfg(feature = "cuda")]
-pub use gpu_reservoir::GpuReservoirComputer;
+pub use cuda_kernels::NeuromorphicKernelManager;
 #[cfg(feature = "cuda")]
 pub use gpu_memory::NeuromorphicGpuMemoryManager as GpuMemoryManager;
 #[cfg(feature = "cuda")]
-pub use cuda_kernels::NeuromorphicKernelManager;
+pub use gpu_reservoir::GpuReservoirComputer;
 
 // GPU simulation exports for performance testing
 // Only available when 'simulation' feature is enabled
 #[cfg(feature = "simulation")]
-pub use gpu_simulation::{create_gpu_reservoir, NeuromorphicGpuMemoryManager as SimGpuMemoryManager};
+pub use gpu_simulation::{
+    create_gpu_reservoir, NeuromorphicGpuMemoryManager as SimGpuMemoryManager,
+};

@@ -60,7 +60,9 @@ impl GpuQuboSolver {
         }
 
         // Calculate penalty parameter (larger than max degree)
-        let max_degree = adjacency.sum_axis(ndarray::Axis(1)).iter()
+        let max_degree = adjacency
+            .sum_axis(ndarray::Axis(1))
+            .iter()
             .map(|&d| d as f64)
             .fold(0.0, f64::max);
         let penalty = max_degree + 1.0;
@@ -144,8 +146,10 @@ impl GpuQuboSolver {
             temperature *= cooling_rate;
 
             if iteration % 1000 == 0 && iteration > 0 {
-                println!("  Iteration {}: best energy = {:.4}, temp = {:.6}",
-                         iteration, self.best_energy, temperature);
+                println!(
+                    "  Iteration {}: best energy = {:.4}, temp = {:.6}",
+                    iteration, self.best_energy, temperature
+                );
             }
         }
 
@@ -204,7 +208,10 @@ impl GpuQuboSolver {
             }
 
             if iteration % 1000 == 0 && iteration > 0 {
-                println!("  Iteration {}: best energy = {:.4}", iteration, self.best_energy);
+                println!(
+                    "  Iteration {}: best energy = {:.4}",
+                    iteration, self.best_energy
+                );
             }
         }
 
@@ -270,9 +277,12 @@ mod tests {
     fn test_mis_problem() {
         // Triangle graph: only 1 vertex can be selected
         let mut adj = Array2::zeros((3, 3));
-        adj[[0, 1]] = 1; adj[[1, 0]] = 1;
-        adj[[1, 2]] = 1; adj[[2, 1]] = 1;
-        adj[[0, 2]] = 1; adj[[2, 0]] = 1;
+        adj[[0, 1]] = 1;
+        adj[[1, 0]] = 1;
+        adj[[1, 2]] = 1;
+        adj[[2, 1]] = 1;
+        adj[[0, 2]] = 1;
+        adj[[2, 0]] = 1;
 
         let mut solver = GpuQuboSolver::from_mis_problem(&adj).unwrap();
         solver.solve_cpu_sa(1000, 10.0).unwrap();

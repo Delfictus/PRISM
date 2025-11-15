@@ -41,19 +41,29 @@ impl ForceFieldParams {
         let mut vdw_coeffs = HashMap::new();
 
         // Default carbon parameters (CHARMM36-like)
-        lj_params.insert("CA".to_string(), LJParams {
-            epsilon: 0.07,    // kcal/mol
-            sigma: 3.55,      // Å
-        });
+        lj_params.insert(
+            "CA".to_string(),
+            LJParams {
+                epsilon: 0.07, // kcal/mol
+                sigma: 3.55,   // Å
+            },
+        );
 
         charges.insert("CA".to_string(), -0.1);
 
-        vdw_coeffs.insert("CA".to_string(), VdWParams {
-            c6: 100.0,
-            c8: 1000.0,
-        });
+        vdw_coeffs.insert(
+            "CA".to_string(),
+            VdWParams {
+                c6: 100.0,
+                c8: 1000.0,
+            },
+        );
 
-        Self { lj_params, charges, vdw_coeffs }
+        Self {
+            lj_params,
+            charges,
+            vdw_coeffs,
+        }
     }
 
     /// Get LJ parameters for atom type

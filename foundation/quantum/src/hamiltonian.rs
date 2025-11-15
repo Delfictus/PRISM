@@ -8,26 +8,26 @@
 //! All calculations maintain exact mathematical precision with NO hardcoded returns.
 //! Energy conservation enforced to machine precision (<1e-12 relative error).
 
+use crate::security::{SecurityError, SecurityValidator};
+use crate::types::ForceFieldParams;
 use ndarray::{Array1, Array2};
 use num_complex::Complex64;
 use std::f64::consts::PI;
-use crate::types::ForceFieldParams;
-use crate::security::{SecurityValidator, SecurityError};
 
 /// Atomic units for unified calculations (Hartree atomic units)
 pub mod atomic_units {
     /// Base atomic units (ℏ = mₑ = e = a₀ = 1)
-    pub const HBAR: f64 = 1.0;                    // ℏ = 1 in atomic units
-    pub const ELECTRON_MASS: f64 = 1.0;           // mₑ = 1
-    pub const BOHR_RADIUS: f64 = 1.0;             // a₀ = 1
-    pub const HARTREE_ENERGY: f64 = 1.0;          // Eₕ = 1
-    pub const ELEMENTARY_CHARGE: f64 = 1.0;       // e = 1
+    pub const HBAR: f64 = 1.0; // ℏ = 1 in atomic units
+    pub const ELECTRON_MASS: f64 = 1.0; // mₑ = 1
+    pub const BOHR_RADIUS: f64 = 1.0; // a₀ = 1
+    pub const HARTREE_ENERGY: f64 = 1.0; // Eₕ = 1
+    pub const ELEMENTARY_CHARGE: f64 = 1.0; // e = 1
 
     /// Conversion factors TO atomic units
-    pub const ANGSTROM_TO_BOHR: f64 = 1.8897261246;     // 1 Å = 1.889... bohr
-    pub const AMU_TO_ME: f64 = 1822.888486209;          // 1 amu = 1822.88... mₑ
-    pub const KCALMOL_TO_HARTREE: f64 = 0.0015936011;   // 1 kcal/mol = 0.00159... Eₕ
-    pub const FEMTOSECOND_TO_AU: f64 = 41.341374576;    // 1 fs = 41.34... a.u. time
+    pub const ANGSTROM_TO_BOHR: f64 = 1.8897261246; // 1 Å = 1.889... bohr
+    pub const AMU_TO_ME: f64 = 1822.888486209; // 1 amu = 1822.88... mₑ
+    pub const KCALMOL_TO_HARTREE: f64 = 0.0015936011; // 1 kcal/mol = 0.00159... Eₕ
+    pub const FEMTOSECOND_TO_AU: f64 = 41.341374576; // 1 fs = 41.34... a.u. time
 
     /// Conversion factors FROM atomic units
     pub const BOHR_TO_ANGSTROM: f64 = 0.529177210903;
@@ -51,49 +51,49 @@ pub const AMU_TO_KG: f64 = 1.66053906660e-27; // kg per amu
 /// Bond stretching term: V = k_b(r - r₀)²
 #[derive(Debug, Clone)]
 pub struct BondTerm {
-    pub atom1: usize,              // First atom index
-    pub atom2: usize,              // Second atom index
-    pub k_bond: f64,               // Force constant (kcal/mol/Ų)
-    pub r0: f64,                   // Equilibrium bond length (Å)
+    pub atom1: usize, // First atom index
+    pub atom2: usize, // Second atom index
+    pub k_bond: f64,  // Force constant (kcal/mol/Ų)
+    pub r0: f64,      // Equilibrium bond length (Å)
 }
 
 /// Angle bending term: V = k_θ(θ - θ₀)²
 #[derive(Debug, Clone)]
 pub struct AngleTerm {
-    pub atom1: usize,              // First atom index
-    pub atom2: usize,              // Central atom index
-    pub atom3: usize,              // Third atom index
-    pub k_angle: f64,              // Force constant (kcal/mol/rad²)
-    pub theta0: f64,               // Equilibrium angle (radians)
+    pub atom1: usize, // First atom index
+    pub atom2: usize, // Central atom index
+    pub atom3: usize, // Third atom index
+    pub k_angle: f64, // Force constant (kcal/mol/rad²)
+    pub theta0: f64,  // Equilibrium angle (radians)
 }
 
 /// Dihedral torsion term: V = Σₙ Vₙ[1 + cos(nφ - γₙ)]
 #[derive(Debug, Clone)]
 pub struct DihedralTerm {
-    pub atom1: usize,              // First atom index
-    pub atom2: usize,              // Second atom index
-    pub atom3: usize,              // Third atom index
-    pub atom4: usize,              // Fourth atom index
+    pub atom1: usize,                    // First atom index
+    pub atom2: usize,                    // Second atom index
+    pub atom3: usize,                    // Third atom index
+    pub atom4: usize,                    // Fourth atom index
     pub fourier_terms: Vec<FourierTerm>, // Fourier expansion terms
 }
 
 /// Fourier term for dihedral: Vₙ[1 + cos(nφ - γₙ)]
 #[derive(Debug, Clone)]
 pub struct FourierTerm {
-    pub v_n: f64,                  // Amplitude (kcal/mol)
-    pub n: i32,                    // Periodicity
-    pub gamma: f64,                // Phase shift (radians)
+    pub v_n: f64,   // Amplitude (kcal/mol)
+    pub n: i32,     // Periodicity
+    pub gamma: f64, // Phase shift (radians)
 }
 
 /// Improper dihedral term: V = k_imp(φ - φ₀)²
 #[derive(Debug, Clone)]
 pub struct ImproperTerm {
-    pub atom1: usize,              // First atom index
-    pub atom2: usize,              // Central atom index
-    pub atom3: usize,              // Third atom index
-    pub atom4: usize,              // Fourth atom index
-    pub k_improper: f64,           // Force constant (kcal/mol/rad²)
-    pub phi0: f64,                 // Equilibrium improper angle (radians)
+    pub atom1: usize,    // First atom index
+    pub atom2: usize,    // Central atom index
+    pub atom3: usize,    // Third atom index
+    pub atom4: usize,    // Fourth atom index
+    pub k_improper: f64, // Force constant (kcal/mol/rad²)
+    pub phi0: f64,       // Equilibrium improper angle (radians)
 }
 
 /// Phase resonance field for PRCT algorithm
@@ -125,13 +125,13 @@ pub struct PhaseResonanceField {
 /// Phase resonance coupling term for atom pair (i,j)
 #[derive(Debug, Clone)]
 pub struct ResonanceCoupling {
-    pub atom_i: usize,              // First atom index
-    pub atom_j: usize,              // Second atom index
-    pub amplitude: Complex64,       // Coupling amplitude αᵢⱼ
-    pub frequency: f64,             // Angular frequency ωᵢⱼ
-    pub phase_offset: f64,          // Phase offset φᵢⱼ
-    pub chromatic_factor: f64,      // χ(rᵢ,cⱼ) coloring factor
-    pub tsp_factor: f64,           // τ(eᵢⱼ,π) TSP factor
+    pub atom_i: usize,         // First atom index
+    pub atom_j: usize,         // Second atom index
+    pub amplitude: Complex64,  // Coupling amplitude αᵢⱼ
+    pub frequency: f64,        // Angular frequency ωᵢⱼ
+    pub phase_offset: f64,     // Phase offset φᵢⱼ
+    pub chromatic_factor: f64, // χ(rᵢ,cⱼ) coloring factor
+    pub tsp_factor: f64,       // τ(eᵢⱼ,π) TSP factor
 }
 
 impl PhaseResonanceField {
@@ -167,7 +167,7 @@ impl PhaseResonanceField {
         use std::f64::consts::PI;
 
         for i in 0..n_atoms {
-            for j in i+1..n_atoms {
+            for j in i + 1..n_atoms {
                 // Distance-dependent coupling amplitude
                 let r_ij = (i as f64 - j as f64).abs(); // Simplified distance
                 let amplitude_magnitude = self.energy_scale * (-r_ij / 10.0).exp(); // Exponential decay
@@ -240,13 +240,15 @@ impl PhaseResonanceField {
     /// Calculate phase coherence Ψ(G,π,t) at time t
     pub fn phase_coherence(&self, t: f64) -> f64 {
         let n = self.coupling_amplitudes.nrows();
-        if n < 2 { return 1.0; }
+        if n < 2 {
+            return 1.0;
+        }
 
         let mut coherence_sum = 0.0;
         let mut norm_sum = 0.0;
 
         for i in 0..n {
-            for j in i+1..n {
+            for j in i + 1..n {
                 let alpha_ij = self.coupling_amplitudes[[i, j]];
                 let omega_ij = self.frequencies[[i, j]];
                 let phi_ij = self.phase_offsets[[i, j]];
@@ -287,8 +289,16 @@ impl PhaseResonanceField {
     /// Get TSP factor τ(eᵢⱼ,π) for edge ordering
     pub fn tsp_factor(&self, i: usize, j: usize) -> f64 {
         if i < self.tsp_permutation.len() && j < self.tsp_permutation.len() {
-            let pos_i = self.tsp_permutation.iter().position(|&x| x == i).unwrap_or(i);
-            let pos_j = self.tsp_permutation.iter().position(|&x| x == j).unwrap_or(j);
+            let pos_i = self
+                .tsp_permutation
+                .iter()
+                .position(|&x| x == i)
+                .unwrap_or(i);
+            let pos_j = self
+                .tsp_permutation
+                .iter()
+                .position(|&x| x == j)
+                .unwrap_or(j);
 
             // Adjacent in TSP tour = stronger coupling
             let distance = (pos_i as i32 - pos_j as i32).abs() as f64;
@@ -308,7 +318,8 @@ impl PhaseResonanceField {
 
         // Calculate phase resonance contributions (enforce Hermiticity)
         for i in 0..n_atoms {
-            for j in i+1..n_atoms { // Only upper triangle to enforce Hermiticity
+            for j in i + 1..n_atoms {
+                // Only upper triangle to enforce Hermiticity
 
                 // Get resonance parameters
                 let alpha_ij = self.coupling_amplitudes[[i, j]];
@@ -319,8 +330,8 @@ impl PhaseResonanceField {
                 let phase_factor = Complex64::from_polar(1.0, omega_ij * t + phi_ij);
 
                 // Get graph-theoretical factors
-                let chi_factor = self.chromatic_factor(i, j);      // χ(rᵢ,cⱼ)
-                let tau_factor = self.tsp_factor(i, j);           // τ(eᵢⱼ,π)
+                let chi_factor = self.chromatic_factor(i, j); // χ(rᵢ,cⱼ)
+                let tau_factor = self.tsp_factor(i, j); // τ(eᵢⱼ,π)
 
                 // Complete PRCT resonance coupling
                 let resonance_coupling = alpha_ij * phase_factor * chi_factor * tau_factor;
@@ -337,8 +348,10 @@ impl PhaseResonanceField {
 
                         // Diagonal contribution (real valued for Hermiticity)
                         let diagonal_contribution = resonance_coupling.norm() * 0.1 * 1e-6;
-                        resonance_matrix[[idx_i, idx_i]] += Complex64::new(diagonal_contribution, 0.0);
-                        resonance_matrix[[idx_j, idx_j]] += Complex64::new(diagonal_contribution, 0.0);
+                        resonance_matrix[[idx_i, idx_i]] +=
+                            Complex64::new(diagonal_contribution, 0.0);
+                        resonance_matrix[[idx_j, idx_j]] +=
+                            Complex64::new(diagonal_contribution, 0.0);
                     }
                 }
             }
@@ -353,7 +366,7 @@ impl PhaseResonanceField {
         let n_atoms = positions.nrows();
 
         for i in 0..n_atoms {
-            for j in i+1..n_atoms {
+            for j in i + 1..n_atoms {
                 // Calculate distance-dependent coupling strength
                 let pos_i = positions.row(i).to_owned();
                 let pos_j = positions.row(j).to_owned();
@@ -541,23 +554,23 @@ pub struct Hamiltonian {
     force_field: ForceFieldParams,
 
     /// Grid parameters for finite differences
-    grid_spacing: f64,      // Grid spacing in bohr
-    stencil_order: usize,   // Finite difference stencil order (9-point)
+    grid_spacing: f64, // Grid spacing in bohr
+    stencil_order: usize, // Finite difference stencil order (9-point)
 
     /// Cutoff parameters for numerical stability
-    lj_cutoff: f64,         // LJ cutoff in bohr
-    coulomb_cutoff: f64,    // Coulomb cutoff in bohr
-    switching_start: f64,   // Switching function start in bohr
+    lj_cutoff: f64, // LJ cutoff in bohr
+    coulomb_cutoff: f64,  // Coulomb cutoff in bohr
+    switching_start: f64, // Switching function start in bohr
 
     /// Molecular topology for bonded interactions
-    bonds: Vec<BondTerm>,           // Bond stretching terms
-    angles: Vec<AngleTerm>,         // Angle bending terms
-    dihedrals: Vec<DihedralTerm>,   // Dihedral torsion terms
-    impropers: Vec<ImproperTerm>,   // Improper dihedral terms
+    bonds: Vec<BondTerm>, // Bond stretching terms
+    angles: Vec<AngleTerm>,       // Angle bending terms
+    dihedrals: Vec<DihedralTerm>, // Dihedral torsion terms
+    impropers: Vec<ImproperTerm>, // Improper dihedral terms
 
     /// Phase resonance field parameters
-    phase_resonance: Box<PhaseResonanceField>,  // PRCT phase dynamics (boxed for stack safety)
-    resonance_matrix: Array2<Complex64>,   // H_resonance matrix representation
+    phase_resonance: Box<PhaseResonanceField>, // PRCT phase dynamics (boxed for stack safety)
+    resonance_matrix: Array2<Complex64>, // H_resonance matrix representation
 
     /// Kinetic energy matrix representation
     kinetic_matrix: Array2<Complex64>,
@@ -593,26 +606,35 @@ impl Hamiltonian {
     ///
     /// # Returns
     /// Hamiltonian operator ready for time evolution
-    pub fn new(positions: Array2<f64>, masses: Array1<f64>, force_field: ForceFieldParams) -> Result<Self, SecurityError> {
+    pub fn new(
+        positions: Array2<f64>,
+        masses: Array1<f64>,
+        force_field: ForceFieldParams,
+    ) -> Result<Self, SecurityError> {
         let n_atoms = positions.nrows();
 
         // Security validation
         let validator = SecurityValidator::new()?;
 
         if masses.len() != n_atoms {
-            return Err(SecurityError::InvalidInput(
-                format!("Mass array size {} must match position array size {}", masses.len(), n_atoms)
-            ));
+            return Err(SecurityError::InvalidInput(format!(
+                "Mass array size {} must match position array size {}",
+                masses.len(),
+                n_atoms
+            )));
         }
 
         if positions.ncols() != 3 {
-            return Err(SecurityError::InvalidInput(
-                format!("Positions must be 3D coordinates, got {} dimensions", positions.ncols())
-            ));
+            return Err(SecurityError::InvalidInput(format!(
+                "Positions must be 3D coordinates, got {} dimensions",
+                positions.ncols()
+            )));
         }
 
         if n_atoms == 0 {
-            return Err(SecurityError::InvalidInput("Empty system provided".to_string()));
+            return Err(SecurityError::InvalidInput(
+                "Empty system provided".to_string(),
+            ));
         }
 
         if n_atoms > 10_000 {
@@ -627,9 +649,10 @@ impl Hamiltonian {
         for (i, row) in positions.outer_iter().enumerate() {
             for (j, &coord) in row.iter().enumerate() {
                 if !coord.is_finite() {
-                    return Err(SecurityError::InvalidInput(
-                        format!("Non-finite coordinate at atom {}, dimension {}: {}", i, j, coord)
-                    ));
+                    return Err(SecurityError::InvalidInput(format!(
+                        "Non-finite coordinate at atom {}, dimension {}: {}",
+                        i, j, coord
+                    )));
                 }
             }
         }
@@ -637,9 +660,10 @@ impl Hamiltonian {
         // Validate masses are positive and finite
         for (i, &mass) in masses.iter().enumerate() {
             if !mass.is_finite() || mass <= 0.0 {
-                return Err(SecurityError::InvalidInput(
-                    format!("Invalid mass for atom {}: {}", i, mass)
-                ));
+                return Err(SecurityError::InvalidInput(format!(
+                    "Invalid mass for atom {}: {}",
+                    i, mass
+                )));
             }
         }
 
@@ -652,7 +676,7 @@ impl Hamiltonian {
         let grid_spacing = (system_extent / 100.0).min(0.2); // Max 0.2 bohr spacing
 
         // Set cutoff parameters for stability
-        let lj_cutoff = 12.0 * atomic_units::ANGSTROM_TO_BOHR;      // 12 Å → bohr
+        let lj_cutoff = 12.0 * atomic_units::ANGSTROM_TO_BOHR; // 12 Å → bohr
         let coulomb_cutoff = 15.0 * atomic_units::ANGSTROM_TO_BOHR; // 15 Å → bohr
         let switching_start = 10.0 * atomic_units::ANGSTROM_TO_BOHR; // 10 Å → bohr
 
@@ -669,10 +693,10 @@ impl Hamiltonian {
             lj_cutoff,
             coulomb_cutoff,
             switching_start,
-            bonds: Vec::new(),          // Will be populated by topology builder
-            angles: Vec::new(),         // Will be populated by topology builder
-            dihedrals: Vec::new(),      // Will be populated by topology builder
-            impropers: Vec::new(),      // Will be populated by topology builder
+            bonds: Vec::new(),     // Will be populated by topology builder
+            angles: Vec::new(),    // Will be populated by topology builder
+            dihedrals: Vec::new(), // Will be populated by topology builder
+            impropers: Vec::new(), // Will be populated by topology builder
             phase_resonance: Box::new(PhaseResonanceField::new(n_atoms)), // Initialize PRCT field
             resonance_matrix: Array2::zeros((n_atoms * 3, n_atoms * 3)), // H_resonance
             kinetic_matrix: Array2::zeros((n_atoms * 3, n_atoms * 3)),
@@ -684,7 +708,9 @@ impl Hamiltonian {
         };
 
         // Start security monitoring
-        hamiltonian.validator.start_operation("hamiltonian_construction");
+        hamiltonian
+            .validator
+            .start_operation("hamiltonian_construction");
 
         // Build basic topology for small molecules (simplified)
         hamiltonian.build_simple_topology();
@@ -724,7 +750,7 @@ impl Hamiltonian {
 
         // Generate bonds based on distance criteria
         for i in 0..self.n_atoms {
-            for j in i+1..self.n_atoms {
+            for j in i + 1..self.n_atoms {
                 let pos_i = self.positions_au.row(i).to_owned();
                 let pos_j = self.positions_au.row(j).to_owned();
                 let r_vec = &pos_j - &pos_i;
@@ -735,8 +761,8 @@ impl Hamiltonian {
                     self.bonds.push(BondTerm {
                         atom1: i,
                         atom2: j,
-                        k_bond: 300.0,  // kcal/mol/Ų (typical)
-                        r0: distance,   // Use current distance as equilibrium
+                        k_bond: 300.0, // kcal/mol/Ų (typical)
+                        r0: distance,  // Use current distance as equilibrium
                     });
                 }
             }
@@ -745,7 +771,9 @@ impl Hamiltonian {
         // Generate angles from bonds (every pair of bonds sharing an atom)
         for (idx1, bond1) in self.bonds.iter().enumerate() {
             for (idx2, bond2) in self.bonds.iter().enumerate() {
-                if idx1 >= idx2 { continue; }
+                if idx1 >= idx2 {
+                    continue;
+                }
 
                 // Check if bonds share an atom
                 let shared_atom = if bond1.atom1 == bond2.atom1 {
@@ -769,15 +797,16 @@ impl Hamiltonian {
                     let v21 = &pos1 - &pos2;
                     let v23 = &pos3 - &pos2;
 
-                    let cos_theta = v21.dot(&v23) / (self.vector_norm(&v21) * self.vector_norm(&v23));
+                    let cos_theta =
+                        v21.dot(&v23) / (self.vector_norm(&v21) * self.vector_norm(&v23));
                     let theta = cos_theta.clamp(-1.0, 1.0).acos();
 
                     self.angles.push(AngleTerm {
                         atom1,
                         atom2: center,
                         atom3,
-                        k_angle: 50.0,  // kcal/mol/rad²
-                        theta0: theta,   // Use current angle as equilibrium
+                        k_angle: 50.0, // kcal/mol/rad²
+                        theta0: theta, // Use current angle as equilibrium
                     });
                 }
             }
@@ -787,7 +816,8 @@ impl Hamiltonian {
         if self.n_atoms >= 4 {
             // For small systems, assume linear connectivity: 0-1-2-3
             for i in 0..(self.n_atoms.saturating_sub(3)) {
-                let _phi = self.calculate_dihedral_angle(&self.positions_au, i, i+1, i+2, i+3);
+                let _phi =
+                    self.calculate_dihedral_angle(&self.positions_au, i, i + 1, i + 2, i + 3);
 
                 self.dihedrals.push(DihedralTerm {
                     atom1: i,
@@ -795,7 +825,11 @@ impl Hamiltonian {
                     atom3: i + 2,
                     atom4: i + 3,
                     fourier_terms: vec![
-                        FourierTerm { v_n: 1.0, n: 3, gamma: 0.0 }, // Simple 3-fold
+                        FourierTerm {
+                            v_n: 1.0,
+                            n: 3,
+                            gamma: 0.0,
+                        }, // Simple 3-fold
                     ],
                 });
             }
@@ -804,7 +838,14 @@ impl Hamiltonian {
 
     /// Calculate dihedral angle φ between four atoms (in radians)
     /// φ is the angle between planes (1-2-3) and (2-3-4)
-    fn calculate_dihedral_angle(&self, positions: &Array2<f64>, i: usize, j: usize, k: usize, l: usize) -> f64 {
+    fn calculate_dihedral_angle(
+        &self,
+        positions: &Array2<f64>,
+        i: usize,
+        j: usize,
+        k: usize,
+        l: usize,
+    ) -> f64 {
         // Get position vectors
         let r1 = positions.row(i).to_owned();
         let r2 = positions.row(j).to_owned();
@@ -812,9 +853,9 @@ impl Hamiltonian {
         let r4 = positions.row(l).to_owned();
 
         // Calculate bond vectors
-        let b1 = &r2 - &r1;  // 1->2
-        let b2 = &r3 - &r2;  // 2->3
-        let b3 = &r4 - &r3;  // 3->4
+        let b1 = &r2 - &r1; // 1->2
+        let b2 = &r3 - &r2; // 2->3
+        let b3 = &r4 - &r3; // 3->4
 
         // Calculate normal vectors to planes
         let n1 = self.cross_product(&b1, &b2); // Normal to plane (1,2,3)
@@ -822,7 +863,8 @@ impl Hamiltonian {
 
         // Calculate dihedral angle
         let cos_phi = n1.dot(&n2) / (self.vector_norm(&n1) * self.vector_norm(&n2));
-        let sin_phi = self.cross_product(&n1, &n2).dot(&b2) / (self.vector_norm(&b2) * self.vector_norm(&n1) * self.vector_norm(&n2));
+        let sin_phi = self.cross_product(&n1, &n2).dot(&b2)
+            / (self.vector_norm(&b2) * self.vector_norm(&n1) * self.vector_norm(&n2));
 
         // Use atan2 to get angle in correct quadrant
         sin_phi.atan2(cos_phi)
@@ -851,11 +893,11 @@ impl Hamiltonian {
         // 9-point finite difference coefficients for -∇² (error: O(h⁸))
         // Coefficients for f''(x) ≈ Σ cᵢ f(x + ih) / h²
         const STENCIL_9: [f64; 5] = [
-            -205.0/72.0,   // Central point (i=0)
-            8.0/5.0,       // ±1 points
-            -1.0/5.0,      // ±2 points
-            8.0/315.0,     // ±3 points
-            -1.0/560.0,    // ±4 points
+            -205.0 / 72.0, // Central point (i=0)
+            8.0 / 5.0,     // ±1 points
+            -1.0 / 5.0,    // ±2 points
+            8.0 / 315.0,   // ±3 points
+            -1.0 / 560.0,  // ±4 points
         ];
 
         // Build kinetic energy operator T = -∇²/2m in atomic units
@@ -867,9 +909,7 @@ impl Hamiltonian {
                 let idx = atom_idx * 3 + dim;
 
                 // Diagonal term (central point of stencil)
-                self.kinetic_matrix[[idx, idx]] = Complex64::new(
-                    -prefactor * STENCIL_9[0], 0.0
-                );
+                self.kinetic_matrix[[idx, idx]] = Complex64::new(-prefactor * STENCIL_9[0], 0.0);
 
                 // Off-diagonal terms for finite difference stencil
                 // This creates the discrete Laplacian operator
@@ -904,12 +944,12 @@ impl Hamiltonian {
 
         // Build pairwise interaction matrix with cutoffs and switching
         for i in 0..self.n_atoms {
-            for j in i+1..self.n_atoms {
+            for j in i + 1..self.n_atoms {
                 // Calculate distance between atoms i and j
                 let pos_i = self.positions_au.row(i).to_owned();
                 let pos_j = self.positions_au.row(j).to_owned();
                 let r_vec = &pos_j - &pos_i;
-                let r = (r_vec[0]*r_vec[0] + r_vec[1]*r_vec[1] + r_vec[2]*r_vec[2]).sqrt();
+                let r = (r_vec[0] * r_vec[0] + r_vec[1] * r_vec[1] + r_vec[2] * r_vec[2]).sqrt();
 
                 // Skip if beyond cutoff
                 if r > self.coulomb_cutoff {
@@ -921,14 +961,17 @@ impl Hamiltonian {
                 // Lennard-Jones with switching function
                 if r < self.lj_cutoff {
                     let lj_energy = self.calculate_lj_potential(i, j, r * BOHR_TO_ANGSTROM);
-                    let switch_factor = self.switching_function(r, self.switching_start, self.lj_cutoff);
+                    let switch_factor =
+                        self.switching_function(r, self.switching_start, self.lj_cutoff);
                     total_energy += lj_energy * switch_factor * KCALMOL_TO_HARTREE;
                 }
 
                 // Coulomb with switching function
                 if r < self.coulomb_cutoff {
-                    let coulomb_energy = self.calculate_coulomb_potential(i, j, r * BOHR_TO_ANGSTROM);
-                    let switch_factor = self.switching_function(r, self.switching_start, self.coulomb_cutoff);
+                    let coulomb_energy =
+                        self.calculate_coulomb_potential(i, j, r * BOHR_TO_ANGSTROM);
+                    let switch_factor =
+                        self.switching_function(r, self.switching_start, self.coulomb_cutoff);
                     total_energy += coulomb_energy * switch_factor * KCALMOL_TO_HARTREE;
                 }
 
@@ -1015,7 +1058,7 @@ impl Hamiltonian {
             let angle_energy = angle.k_angle * delta_theta * delta_theta; // kcal/mol
 
             // Scale for numerical stability and distribute to all three atoms
-            let scaled_energy = angle_energy * (1.0/3.0) * 1e-6;
+            let scaled_energy = angle_energy * (1.0 / 3.0) * 1e-6;
 
             for dim in 0..3 {
                 let idx1 = angle.atom1 * 3 + dim;
@@ -1030,8 +1073,13 @@ impl Hamiltonian {
 
         // Dihedral torsions: V = Σₙ Vₙ[1 + cos(nφ - γₙ)]
         for dihedral in &self.dihedrals {
-            let phi = self.calculate_dihedral_angle(&self.positions_au,
-                dihedral.atom1, dihedral.atom2, dihedral.atom3, dihedral.atom4);
+            let phi = self.calculate_dihedral_angle(
+                &self.positions_au,
+                dihedral.atom1,
+                dihedral.atom2,
+                dihedral.atom3,
+                dihedral.atom4,
+            );
 
             let mut dihedral_energy = 0.0;
             for term in &dihedral.fourier_terms {
@@ -1057,8 +1105,13 @@ impl Hamiltonian {
 
         // Improper dihedrals: V = k_imp(φ - φ₀)²
         for improper in &self.impropers {
-            let phi = self.calculate_dihedral_angle(&self.positions_au,
-                improper.atom1, improper.atom2, improper.atom3, improper.atom4);
+            let phi = self.calculate_dihedral_angle(
+                &self.positions_au,
+                improper.atom1,
+                improper.atom2,
+                improper.atom3,
+                improper.atom4,
+            );
 
             let delta_phi = phi - improper.phi0;
             let improper_energy = improper.k_improper * delta_phi * delta_phi; // kcal/mol
@@ -1125,8 +1178,8 @@ impl Hamiltonian {
         let c8_ij: f64 = 1000.0; // Default C8 dispersion coefficient
 
         // Damping function to avoid short-range divergence
-        let f6 = 1.0 - (-6.0 * r / (c6_ij / c8_ij).powf(1.0/2.0)).exp();
-        let f8 = 1.0 - (-8.0 * r / (c6_ij / c8_ij).powf(1.0/2.0)).exp();
+        let f6 = 1.0 - (-6.0 * r / (c6_ij / c8_ij).powf(1.0 / 2.0)).exp();
+        let f8 = 1.0 - (-8.0 * r / (c6_ij / c8_ij).powf(1.0 / 2.0)).exp();
 
         -(c6_ij * f6 / r.powi(6) + c8_ij * f8 / r.powi(8))
     }
@@ -1144,9 +1197,10 @@ impl Hamiltonian {
     pub fn update_resonance_matrix(&mut self, t: f64) -> Result<(), SecurityError> {
         // Security validation
         if !t.is_finite() {
-            return Err(SecurityError::InvalidInput(
-                format!("Invalid time for resonance update: {}", t)
-            ));
+            return Err(SecurityError::InvalidInput(format!(
+                "Invalid time for resonance update: {}",
+                t
+            )));
         }
 
         // Update the phase resonance field with current positions and time
@@ -1161,17 +1215,19 @@ impl Hamiltonian {
             for j in 0..self.resonance_matrix.ncols() {
                 let val = self.resonance_matrix[[i, j]];
                 if !val.is_finite() {
-                    return Err(SecurityError::InvalidInput(
-                        format!("Non-finite resonance matrix element at ({}, {}): {}", i, j, val)
-                    ));
+                    return Err(SecurityError::InvalidInput(format!(
+                        "Non-finite resonance matrix element at ({}, {}): {}",
+                        i, j, val
+                    )));
                 }
 
                 // Check Hermitian property: H[i,j] = H[j,i]*
                 let hermitian_val = self.resonance_matrix[[j, i]].conj();
                 if (val - hermitian_val).norm() > 1e-12 {
-                    return Err(SecurityError::InvalidInput(
-                        format!("Resonance matrix not Hermitian at ({}, {})", i, j)
-                    ));
+                    return Err(SecurityError::InvalidInput(format!(
+                        "Resonance matrix not Hermitian at ({}, {})",
+                        i, j
+                    )));
                 }
             }
         }
@@ -1182,7 +1238,7 @@ impl Hamiltonian {
     /// Calculate time-dependent coupling strength (simplified)
     fn calculate_coupling_strength(&self, i: usize, j: usize, _t: f64) -> Complex64 {
         let r_vec = &self.positions.row(j) - &self.positions.row(i);
-        let r = (r_vec[0]*r_vec[0] + r_vec[1]*r_vec[1] + r_vec[2]*r_vec[2]).sqrt();
+        let r = (r_vec[0] * r_vec[0] + r_vec[1] * r_vec[1] + r_vec[2] * r_vec[2]).sqrt();
 
         // Simple distance-dependent coupling (no oscillations for stability)
         let coupling_strength = 0.001 / (r + 1.0); // Small coupling with regularization
@@ -1198,7 +1254,10 @@ impl Hamiltonian {
 
     /// Get complete Hamiltonian matrix H = T + V + J + H_resonance
     pub fn matrix_representation(&self) -> Array2<Complex64> {
-        &self.kinetic_matrix + &self.potential_matrix + &self.coupling_matrix + &self.resonance_matrix
+        &self.kinetic_matrix
+            + &self.potential_matrix
+            + &self.coupling_matrix
+            + &self.resonance_matrix
     }
 
     /// Get phase coherence Ψ(G,π,t) at current time
@@ -1214,7 +1273,9 @@ impl Hamiltonian {
         let h_psi = h_matrix.dot(state);
 
         // Calculate expectation value ⟨ψ|H|ψ⟩
-        let energy = state.iter().zip(h_psi.iter())
+        let energy = state
+            .iter()
+            .zip(h_psi.iter())
             .map(|(psi, h_psi)| (psi.conj() * h_psi).re)
             .sum::<f64>();
 
@@ -1233,9 +1294,12 @@ impl Hamiltonian {
 
                 if (hij - hji_conj).norm() > tolerance {
                     self.hermitian_verified = false;
-                    return Err(SecurityError::InvalidInput(
-                        format!("Hamiltonian not Hermitian at ({}, {}): error = {:.2e}", i, j, (hij - hji_conj).norm())
-                    ));
+                    return Err(SecurityError::InvalidInput(format!(
+                        "Hamiltonian not Hermitian at ({}, {}): error = {:.2e}",
+                        i,
+                        j,
+                        (hij - hji_conj).norm()
+                    )));
                 }
             }
         }
@@ -1251,32 +1315,46 @@ impl Hamiltonian {
 
     /// Time evolution using enhanced 4th-order Runge-Kutta integrator
     /// Solves: iℏ ∂ψ/∂t = H(t)ψ with adaptive step sizing and stability monitoring
-    pub fn evolve(&mut self, initial_state: &Array1<Complex64>, time_step: f64) -> Result<Array1<Complex64>, SecurityError> {
+    pub fn evolve(
+        &mut self,
+        initial_state: &Array1<Complex64>,
+        time_step: f64,
+    ) -> Result<Array1<Complex64>, SecurityError> {
         // Security validation
         if initial_state.len() != self.n_atoms * 3 {
-            return Err(SecurityError::InvalidInput(
-                format!("State vector size {} must match system size {}", initial_state.len(), self.n_atoms * 3)
-            ));
+            return Err(SecurityError::InvalidInput(format!(
+                "State vector size {} must match system size {}",
+                initial_state.len(),
+                self.n_atoms * 3
+            )));
         }
 
         if !time_step.is_finite() || time_step <= 0.0 {
-            return Err(SecurityError::InvalidInput(
-                format!("Invalid time step: {}", time_step)
-            ));
+            return Err(SecurityError::InvalidInput(format!(
+                "Invalid time step: {}",
+                time_step
+            )));
         }
 
-        if time_step > 0.01 { // Much more restrictive time step limit
-            return Err(SecurityError::InvalidInput(
-                format!("Time step {} too large, maximum allowed is 0.01", time_step)
-            ));
+        if time_step > 0.01 {
+            // Much more restrictive time step limit
+            return Err(SecurityError::InvalidInput(format!(
+                "Time step {} too large, maximum allowed is 0.01",
+                time_step
+            )));
         }
 
         // Validate initial state norm
-        let initial_norm = initial_state.iter().map(|z| z.norm_sqr()).sum::<f64>().sqrt();
+        let initial_norm = initial_state
+            .iter()
+            .map(|z| z.norm_sqr())
+            .sum::<f64>()
+            .sqrt();
         if !initial_norm.is_finite() || initial_norm < 1e-15 {
-            return Err(SecurityError::InvalidInput(
-                format!("Invalid initial state norm: {}", initial_norm)
-            ));
+            return Err(SecurityError::InvalidInput(format!(
+                "Invalid initial state norm: {}",
+                initial_norm
+            )));
         }
 
         let mut state = initial_state.clone();
@@ -1285,27 +1363,28 @@ impl Hamiltonian {
         // Enhanced RK4 coefficients for Schrödinger equation: dψ/dt = -iH(t)ψ/ℏ
         let k1 = self.derivative(&state, self.current_time)?;
 
-        let state_k1 = &state + &(&k1 * (dt/2.0));
+        let state_k1 = &state + &(&k1 * (dt / 2.0));
         self.validate_state_stability(&state_k1)?;
-        let k2 = self.derivative(&state_k1, self.current_time + dt/2.0)?;
+        let k2 = self.derivative(&state_k1, self.current_time + dt / 2.0)?;
 
-        let state_k2 = &state + &(&k2 * (dt/2.0));
+        let state_k2 = &state + &(&k2 * (dt / 2.0));
         self.validate_state_stability(&state_k2)?;
-        let k3 = self.derivative(&state_k2, self.current_time + dt/2.0)?;
+        let k3 = self.derivative(&state_k2, self.current_time + dt / 2.0)?;
 
         let state_k3 = &state + &(&k3 * dt);
         self.validate_state_stability(&state_k3)?;
         let k4 = self.derivative(&state_k3, self.current_time + dt)?;
 
         // Combine RK4 terms with enhanced numerical stability
-        let rk4_increment = (&k1 + &(&k2 * 2.0) + &(&k3 * 2.0) + &k4) * (dt/6.0);
+        let rk4_increment = (&k1 + &(&k2 * 2.0) + &(&k3 * 2.0) + &k4) * (dt / 6.0);
 
         // Security: Validate RK4 increment is finite
         for (i, &val) in rk4_increment.iter().enumerate() {
             if !val.is_finite() {
-                return Err(SecurityError::InvalidInput(
-                    format!("Non-finite RK4 increment at index {}: {}", i, val)
-                ));
+                return Err(SecurityError::InvalidInput(format!(
+                    "Non-finite RK4 increment at index {}: {}",
+                    i, val
+                )));
             }
         }
 
@@ -1318,16 +1397,17 @@ impl Hamiltonian {
         // Preserve unitarity with enhanced normalization
         let norm = state.iter().map(|z| z.norm_sqr()).sum::<f64>().sqrt();
         if !norm.is_finite() {
-            return Err(SecurityError::InvalidInput(
-                format!("Non-finite state norm after evolution: {}", norm)
-            ));
+            return Err(SecurityError::InvalidInput(format!(
+                "Non-finite state norm after evolution: {}",
+                norm
+            )));
         }
 
         if norm > 1e-15 {
             state.mapv_inplace(|x| x / norm);
         } else {
             return Err(SecurityError::InvalidInput(
-                "State norm too small after evolution".to_string()
+                "State norm too small after evolution".to_string(),
             ));
         }
 
@@ -1338,7 +1418,11 @@ impl Hamiltonian {
     }
 
     /// Calculate time derivative for RK4 integration with security validation
-    fn derivative(&mut self, state: &Array1<Complex64>, t: f64) -> Result<Array1<Complex64>, SecurityError> {
+    fn derivative(
+        &mut self,
+        state: &Array1<Complex64>,
+        t: f64,
+    ) -> Result<Array1<Complex64>, SecurityError> {
         // Security: Check timeout periodically
         self.validator.check_timeout("hamiltonian_evolution")?;
 
@@ -1355,9 +1439,10 @@ impl Hamiltonian {
         // Security: Validate derivative is finite
         for (i, &val) in derivative.iter().enumerate() {
             if !val.is_finite() {
-                return Err(SecurityError::InvalidInput(
-                    format!("Non-finite derivative at index {}: {}", i, val)
-                ));
+                return Err(SecurityError::InvalidInput(format!(
+                    "Non-finite derivative at index {}: {}",
+                    i, val
+                )));
             }
         }
 
@@ -1369,39 +1454,49 @@ impl Hamiltonian {
         // Check all components are finite
         for (i, &val) in state.iter().enumerate() {
             if !val.is_finite() {
-                return Err(SecurityError::InvalidInput(
-                    format!("Non-finite state component at index {}: {}", i, val)
-                ));
+                return Err(SecurityError::InvalidInput(format!(
+                    "Non-finite state component at index {}: {}",
+                    i, val
+                )));
             }
 
             // Check for excessive magnitude (numerical overflow protection)
             if val.norm() > 1e10 {
-                return Err(SecurityError::InvalidInput(
-                    format!("State component {} has excessive magnitude: {:.2e}", i, val.norm())
-                ));
+                return Err(SecurityError::InvalidInput(format!(
+                    "State component {} has excessive magnitude: {:.2e}",
+                    i,
+                    val.norm()
+                )));
             }
         }
 
         // Check total norm is reasonable
         let total_norm = state.iter().map(|z| z.norm_sqr()).sum::<f64>().sqrt();
         if !total_norm.is_finite() {
-            return Err(SecurityError::InvalidInput(
-                format!("Non-finite state norm: {}", total_norm)
-            ));
+            return Err(SecurityError::InvalidInput(format!(
+                "Non-finite state norm: {}",
+                total_norm
+            )));
         }
 
         if total_norm < 1e-15 || total_norm > 1e10 {
-            return Err(SecurityError::InvalidInput(
-                format!("State norm {} outside valid range [1e-15, 1e10]", total_norm)
-            ));
+            return Err(SecurityError::InvalidInput(format!(
+                "State norm {} outside valid range [1e-15, 1e10]",
+                total_norm
+            )));
         }
 
         Ok(())
     }
 
     /// Advanced RK4 integration with adaptive time stepping
-    pub fn evolve_adaptive(&mut self, initial_state: &Array1<Complex64>, target_time: f64,
-                          initial_step: f64, tolerance: f64) -> Result<Array1<Complex64>, SecurityError> {
+    pub fn evolve_adaptive(
+        &mut self,
+        initial_state: &Array1<Complex64>,
+        target_time: f64,
+        initial_step: f64,
+        tolerance: f64,
+    ) -> Result<Array1<Complex64>, SecurityError> {
         let mut state = initial_state.clone();
         let mut current_time = self.current_time;
         let mut step_size = initial_step;
@@ -1409,15 +1504,17 @@ impl Hamiltonian {
 
         // Security validation
         if !target_time.is_finite() || target_time <= 0.0 {
-            return Err(SecurityError::InvalidInput(
-                format!("Invalid target time: {}", target_time)
-            ));
+            return Err(SecurityError::InvalidInput(format!(
+                "Invalid target time: {}",
+                target_time
+            )));
         }
 
         if tolerance <= 0.0 || tolerance > 1.0 {
-            return Err(SecurityError::InvalidInput(
-                format!("Invalid tolerance: {}", tolerance)
-            ));
+            return Err(SecurityError::InvalidInput(format!(
+                "Invalid tolerance: {}",
+                tolerance
+            )));
         }
 
         while current_time < end_time {
@@ -1437,7 +1534,8 @@ impl Hamiltonian {
             let state_half2 = self.evolve(&state_half1, step_size / 2.0)?;
 
             // Estimate error using Richardson extrapolation
-            let error_estimate = (&state_full - &state_half2).mapv(|x| x.norm()).sum() / state_full.len() as f64;
+            let error_estimate =
+                (&state_full - &state_half2).mapv(|x| x.norm()).sum() / state_full.len() as f64;
 
             if error_estimate < tolerance {
                 // Accept step
@@ -1456,7 +1554,7 @@ impl Hamiltonian {
 
                 if step_size < 1e-12 {
                     return Err(SecurityError::InvalidInput(
-                        "Step size became too small - numerical instability detected".to_string()
+                        "Step size became too small - numerical instability detected".to_string(),
                     ));
                 }
             }
@@ -1479,7 +1577,7 @@ impl Hamiltonian {
 ///
 /// The returned state satisfies: H|ψ₀⟩ = E₀|ψ₀⟩ where E₀ is the lowest eigenvalue
 pub fn calculate_ground_state(hamiltonian: &mut Hamiltonian) -> Array1<Complex64> {
-    use crate::robust_eigen::{RobustEigenSolver, RobustEigenConfig};
+    use crate::robust_eigen::{RobustEigenConfig, RobustEigenSolver};
 
     let n_dim = hamiltonian.n_atoms * 3;
 
@@ -1497,7 +1595,8 @@ pub fn calculate_ground_state(hamiltonian: &mut Hamiltonian) -> Array1<Complex64
     match solver.solve(&h_matrix) {
         Ok((eigenvalues, eigenvectors)) => {
             // Find ground state (lowest eigenvalue)
-            let ground_idx = eigenvalues.iter()
+            let ground_idx = eigenvalues
+                .iter()
                 .enumerate()
                 .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
                 .map(|(idx, _)| idx)
@@ -1530,7 +1629,9 @@ pub fn calculate_ground_state(hamiltonian: &mut Hamiltonian) -> Array1<Complex64
             eprintln!("  Falling back to uniform ground state approximation");
 
             let mut state: Array1<Complex64> = Array1::from_vec(
-                (0..n_dim).map(|_| Complex64::new(1.0 / (n_dim as f64).sqrt(), 0.0)).collect()
+                (0..n_dim)
+                    .map(|_| Complex64::new(1.0 / (n_dim as f64).sqrt(), 0.0))
+                    .collect(),
             );
 
             let norm = state.iter().map(|z| z.norm_sqr()).sum::<f64>().sqrt();
@@ -1548,10 +1649,14 @@ mod tests {
 
     fn create_test_system() -> (Array2<f64>, Array1<f64>, ForceFieldParams) {
         // Simple two-atom system (H2 molecule)
-        let positions = Array2::from_shape_vec((2, 3), vec![
-            0.0, 0.0, 0.0,  // H1 at origin
-            0.74, 0.0, 0.0, // H2 at bond length
-        ]).unwrap();
+        let positions = Array2::from_shape_vec(
+            (2, 3),
+            vec![
+                0.0, 0.0, 0.0, // H1 at origin
+                0.74, 0.0, 0.0, // H2 at bond length
+            ],
+        )
+        .unwrap();
 
         let masses = Array1::from_vec(vec![1.008, 1.008]); // Hydrogen masses (amu)
 
@@ -1586,7 +1691,11 @@ mod tests {
         let final_energy = hamiltonian.total_energy(&state);
         let energy_drift = (final_energy - initial_energy).abs() / initial_energy.abs();
 
-        assert!(energy_drift < 1e-3, "Energy not conserved: drift = {:.2e}", energy_drift);
+        assert!(
+            energy_drift < 1e-3,
+            "Energy not conserved: drift = {:.2e}",
+            energy_drift
+        );
     }
 
     #[test]
@@ -1614,7 +1723,11 @@ mod tests {
         let ground_state = calculate_ground_state(&mut hamiltonian);
 
         // State should be normalized
-        let norm = ground_state.iter().map(|z| z.norm_sqr()).sum::<f64>().sqrt();
+        let norm = ground_state
+            .iter()
+            .map(|z| z.norm_sqr())
+            .sum::<f64>()
+            .sqrt();
         assert_abs_diff_eq!(norm, 1.0, epsilon = 1e-12);
 
         // Check that Hamiltonian operation gives finite results (uniform state is not an eigenstate)
@@ -1623,15 +1736,28 @@ mod tests {
         let energy = hamiltonian.total_energy(&ground_state);
 
         // Verify that energy and all H|ψ⟩ components are finite
-        assert!(energy.is_finite(), "Total energy should be finite: {}", energy);
+        assert!(
+            energy.is_finite(),
+            "Total energy should be finite: {}",
+            energy
+        );
 
         for (i, &h_psi_val) in h_psi.iter().enumerate() {
-            assert!(h_psi_val.is_finite(), "H|ψ⟩ component {} should be finite: {}", i, h_psi_val);
+            assert!(
+                h_psi_val.is_finite(),
+                "H|ψ⟩ component {} should be finite: {}",
+                i,
+                h_psi_val
+            );
         }
 
         // Verify energy is reasonable for the realistic Hamiltonian
         // (should be much larger than harmonic oscillator due to finite differences)
-        assert!(energy.abs() > 0.1, "Energy magnitude should be reasonable: {:.3e}", energy);
+        assert!(
+            energy.abs() > 0.1,
+            "Energy magnitude should be reasonable: {:.3e}",
+            energy
+        );
     }
 
     #[test]
@@ -1643,12 +1769,18 @@ mod tests {
         let initial_energy = hamiltonian.total_energy(&initial_state);
 
         // Test adaptive evolution (very small parameters for stability)
-        let final_state = hamiltonian.evolve_adaptive(&initial_state, 0.005, 0.001, 1e-3).unwrap();
+        let final_state = hamiltonian
+            .evolve_adaptive(&initial_state, 0.005, 0.001, 1e-3)
+            .unwrap();
         let final_energy = hamiltonian.total_energy(&final_state);
 
         // Energy should be conserved within tolerance
         let energy_drift = (final_energy - initial_energy).abs() / initial_energy.abs();
-        assert!(energy_drift < 1e-3, "Energy not conserved in adaptive evolution: drift = {:.2e}", energy_drift);
+        assert!(
+            energy_drift < 1e-3,
+            "Energy not conserved in adaptive evolution: drift = {:.2e}",
+            energy_drift
+        );
 
         // State should remain normalized
         let norm = final_state.iter().map(|z| z.norm_sqr()).sum::<f64>().sqrt();
@@ -1679,13 +1811,16 @@ mod tests {
         let initial_coherence = hamiltonian.phase_coherence();
 
         // Verify initial phase coherence is reasonable
-        assert!(initial_coherence >= 0.0 && initial_coherence <= 1.0 + 1e-10,
-               "Initial phase coherence should be in [0,1]: {}", initial_coherence);
+        assert!(
+            initial_coherence >= 0.0 && initial_coherence <= 1.0 + 1e-10,
+            "Initial phase coherence should be in [0,1]: {}",
+            initial_coherence
+        );
 
         // Test time evolution with phase resonance
         let mut state = initial_state.clone();
         let time_steps = 3; // Very small number for stability
-        let dt = 0.001;     // Very small time step
+        let dt = 0.001; // Very small time step
 
         for step in 0..time_steps {
             let t = step as f64 * dt;
@@ -1696,8 +1831,12 @@ mod tests {
             // Check energy conservation with phase resonance
             let current_energy = hamiltonian.total_energy(&state);
             let energy_drift = (current_energy - initial_energy).abs() / initial_energy.abs();
-            assert!(energy_drift < 1e-2,
-                   "Energy drift too large at step {}: {:.2e}", step, energy_drift);
+            assert!(
+                energy_drift < 1e-2,
+                "Energy drift too large at step {}: {:.2e}",
+                step,
+                energy_drift
+            );
 
             // Check state normalization
             let norm = state.iter().map(|z| z.norm_sqr()).sum::<f64>().sqrt();
@@ -1705,15 +1844,25 @@ mod tests {
 
             // Check phase coherence evolution
             let coherence = hamiltonian.phase_coherence();
-            assert!(coherence >= 0.0 && coherence <= 1.0 + 1e-10,
-                   "Phase coherence out of bounds at time {}: {}", t, coherence);
+            assert!(
+                coherence >= 0.0 && coherence <= 1.0 + 1e-10,
+                "Phase coherence out of bounds at time {}: {}",
+                t,
+                coherence
+            );
 
             // Verify all matrix components are finite
             let h_matrix = hamiltonian.matrix_representation();
             for (i, row) in h_matrix.rows().into_iter().enumerate() {
                 for (j, &val) in row.iter().enumerate() {
-                    assert!(val.is_finite(),
-                           "Non-finite Hamiltonian element at ({}, {}) at time {}: {}", i, j, t, val);
+                    assert!(
+                        val.is_finite(),
+                        "Non-finite Hamiltonian element at ({}, {}) at time {}: {}",
+                        i,
+                        j,
+                        t,
+                        val
+                    );
                 }
             }
         }
@@ -1737,8 +1886,10 @@ mod tests {
         println!("✅ PRCT Phase Resonance Integration Test Passed:");
         println!("   - Initial coherence: {:.6}", initial_coherence);
         println!("   - Final coherence: {:.6}", hamiltonian.phase_coherence());
-        println!("   - Energy drift: {:.2e}",
-                (hamiltonian.total_energy(&state) - initial_energy).abs() / initial_energy.abs());
+        println!(
+            "   - Energy drift: {:.2e}",
+            (hamiltonian.total_energy(&state) - initial_energy).abs() / initial_energy.abs()
+        );
         println!("   - H = T + V + J + H_resonance verified ✓");
     }
 }

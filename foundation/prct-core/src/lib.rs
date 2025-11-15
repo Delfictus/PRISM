@@ -17,6 +17,7 @@ pub mod simulated_annealing;
 pub mod tsp;
 pub mod errors;
 pub mod dimacs_parser;
+pub mod dsatur_backtracking;
 
 // Re-export main types
 pub use ports::*;
@@ -27,6 +28,7 @@ pub use coloring::*;
 pub use simulated_annealing::*;
 pub use errors::*;
 pub use dimacs_parser::{parse_dimacs_file, parse_mtx_file, parse_graph_file};
+pub use dsatur_backtracking::{ColoringSolution, DSaturSolver};
 
 // Re-export shared types for convenience
 pub use shared_types::*;

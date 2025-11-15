@@ -107,7 +107,7 @@ impl STDPProfile {
             },
             STDPProfile::Optical => STDPConfig {
                 learning_rate: 0.015,
-                time_constant_pos: 8.0,  // Fast adaptation for calibration
+                time_constant_pos: 8.0, // Fast adaptation for calibration
                 time_constant_neg: 12.0,
                 max_weight: 6.0,
                 min_weight: 0.01,

@@ -1,9 +1,9 @@
 //! Security validation for quantum operations
 //! Simplified from PRCT engine security framework
 
-use thiserror::Error;
-use std::time::{Instant, Duration};
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
+use thiserror::Error;
 
 /// Security error types
 #[derive(Error, Debug)]
@@ -11,7 +11,9 @@ pub enum SecurityError {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
-    #[error("Resource exhaustion: {resource_type} has {current_count} but max allowed is {max_allowed}")]
+    #[error(
+        "Resource exhaustion: {resource_type} has {current_count} but max allowed is {max_allowed}"
+    )]
     ResourceExhaustion {
         resource_type: String,
         current_count: usize,
@@ -45,7 +47,8 @@ impl SecurityValidator {
 
     /// Start monitoring an operation
     pub fn start_operation(&mut self, operation_name: &str) {
-        self.operation_starts.insert(operation_name.to_string(), Instant::now());
+        self.operation_starts
+            .insert(operation_name.to_string(), Instant::now());
     }
 
     /// Check if an operation has timed out
@@ -62,15 +65,21 @@ impl SecurityValidator {
     /// Validate numerical input
     pub fn validate_numerical_input(&self, value: f64, name: &str) -> Result<(), SecurityError> {
         if !value.is_finite() {
-            return Err(SecurityError::InvalidInput(
-                format!("{} must be finite, got: {}", name, value)
-            ));
+            return Err(SecurityError::InvalidInput(format!(
+                "{} must be finite, got: {}",
+                name, value
+            )));
         }
         Ok(())
     }
 
     /// Validate array dimensions
-    pub fn validate_array_dimensions(&self, rows: usize, cols: usize, max_size: usize) -> Result<(), SecurityError> {
+    pub fn validate_array_dimensions(
+        &self,
+        rows: usize,
+        cols: usize,
+        max_size: usize,
+    ) -> Result<(), SecurityError> {
         if rows * cols > max_size {
             return Err(SecurityError::ResourceExhaustion {
                 resource_type: "array elements".to_string(),
