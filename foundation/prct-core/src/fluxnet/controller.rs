@@ -68,7 +68,8 @@ use super::config::RLConfig;
 /// - compaction_ratio: Convergence health metric
 ///
 /// State is discretized into bins for tabular Q-learning.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// Raw values are stored for telemetry reporting.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct RLState {
     /// Discretized conflict count (0-255)
     pub conflict_bin: u8,
@@ -78,6 +79,34 @@ pub struct RLState {
 
     /// Discretized compaction ratio (0-255)
     pub compaction_bin: u8,
+
+    /// Raw conflict count (for telemetry)
+    pub conflicts: usize,
+
+    /// Raw chromatic number (for telemetry)
+    pub chromatic_number: usize,
+
+    /// Raw compaction ratio (for telemetry)
+    pub compaction_ratio: f32,
+}
+
+// Manual PartialEq and Eq implementations that only compare bins (for hashing/Q-table lookup)
+impl PartialEq for RLState {
+    fn eq(&self, other: &Self) -> bool {
+        self.conflict_bin == other.conflict_bin
+            && self.chromatic_bin == other.chromatic_bin
+            && self.compaction_bin == other.compaction_bin
+    }
+}
+
+impl Eq for RLState {}
+
+impl std::hash::Hash for RLState {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.conflict_bin.hash(state);
+        self.chromatic_bin.hash(state);
+        self.compaction_bin.hash(state);
+    }
 }
 
 impl RLState {
@@ -112,6 +141,9 @@ impl RLState {
             conflict_bin,
             chromatic_bin,
             compaction_bin,
+            conflicts,
+            chromatic_number: chromatic,
+            compaction_ratio,
         }
     }
 
@@ -185,6 +217,11 @@ impl QTable {
         } else {
             0.0 // Out of bounds → default to 0
         }
+    }
+
+    /// Get Q-value for state-action pair (alias for get, used by telemetry)
+    pub fn get_q_value(&self, state_idx: usize, action_idx: usize) -> f32 {
+        self.get(state_idx, action_idx)
     }
 
     /// Set Q-value for state-action pair
@@ -418,6 +455,94 @@ impl RLController {
         self.config.reward_conflict_weight * delta_conflicts
             + self.config.reward_color_weight * delta_chromatic
             + self.config.reward_compaction_weight * delta_compaction
+    }
+
+    /// Get current epsilon value (for telemetry)
+    pub fn epsilon(&self) -> f32 {
+        self.epsilon
+    }
+
+    /// Get Q-value for a specific state-action pair (for telemetry)
+    pub fn get_q_value(&self, state: &RLState, action: &ForceCommand) -> f32 {
+        let state_idx = state.to_index(self.compact);
+        let action_idx = action.to_action_index();
+        self.qtable.get_q_value(state_idx, action_idx)
+    }
+
+    /// Select action with telemetry metadata
+    ///
+    /// Returns (action, q_value, was_exploration)
+    pub fn select_action_with_telemetry(&mut self, state: &RLState) -> (ForceCommand, f32, bool) {
+        use rand::Rng;
+
+        let state_idx = state.to_index(self.compact);
+        let mut rng = rand::thread_rng();
+
+        let was_exploration = rng.gen::<f32>() < self.epsilon;
+
+        let (action, q_value) = if was_exploration {
+            // Explore: random action
+            let action_idx = rng.gen_range(0..ForceCommand::ACTION_SPACE_SIZE);
+            let action = ForceCommand::from_action_index(action_idx);
+            let q_val = self.qtable.get_q_value(state_idx, action_idx);
+            (action, q_val)
+        } else {
+            // Exploit: best action from Q-table
+            let action_idx = self.qtable.best_action(state_idx);
+            let action = ForceCommand::from_action_index(action_idx);
+            let q_val = self.qtable.get_q_value(state_idx, action_idx);
+            (action, q_val)
+        };
+
+        (action, q_value, was_exploration)
+    }
+
+    /// Update with telemetry capture
+    ///
+    /// Returns (q_old, q_new, q_delta) for telemetry reporting
+    pub fn update_with_telemetry(
+        &mut self,
+        state: RLState,
+        action: ForceCommand,
+        reward: f32,
+        next_state: RLState,
+        done: bool,
+    ) -> (f32, f32, f32) {
+        let state_idx = state.to_index(self.compact);
+        let action_idx = action.to_action_index();
+        let next_state_idx = next_state.to_index(self.compact);
+
+        // Get Q-value before update
+        let q_old = self.qtable.get_q_value(state_idx, action_idx);
+
+        // Store experience in replay buffer
+        self.replay_buffer.push(Experience {
+            state,
+            action,
+            reward,
+            next_state,
+            done,
+        });
+
+        // Q-learning update
+        self.qtable.update(
+            state_idx,
+            action_idx,
+            reward,
+            next_state_idx,
+            self.config.learning_rate,
+            self.config.discount_factor,
+        );
+
+        // Get Q-value after update
+        let q_new = self.qtable.get_q_value(state_idx, action_idx);
+        let q_delta = q_new - q_old;
+
+        // Decay epsilon
+        self.epsilon *= self.config.epsilon_decay;
+        self.epsilon = self.epsilon.max(self.config.epsilon_min);
+
+        (q_old, q_new, q_delta)
     }
 
     /// Load pre-trained Q-table
