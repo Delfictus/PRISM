@@ -10,17 +10,17 @@
 //! - Automatic quality-cost trade-off optimization
 //! - Novel thermodynamic framework for AI orchestration
 
-use anyhow::Result;
-use std::sync::Arc;
-use cudarc::driver::{CudaDevice, LaunchAsync};
 use crate::gpu::GpuKernelExecutor;
+use anyhow::Result;
+use cudarc::driver::{CudaDevice, LaunchAsync};
+use std::sync::Arc;
 
 /// LLM Model with cost and quality metadata
 #[derive(Debug, Clone)]
 pub struct LLMModel {
     pub name: String,
     pub cost_per_1k_tokens: f64,
-    pub quality_score: f64,  // 0-1, higher is better
+    pub quality_score: f64, // 0-1, higher is better
     pub latency_ms: f64,
     pub max_tokens: usize,
 }
@@ -58,7 +58,7 @@ pub struct GpuThermodynamicConsensus {
     state: ThermodynamicState,
 
     /// Historical selections for learning
-    selection_history: Vec<(usize, f64)>,  // (model_idx, actual_quality)
+    selection_history: Vec<(usize, f64)>, // (model_idx, actual_quality)
 }
 
 impl GpuThermodynamicConsensus {
@@ -74,7 +74,7 @@ impl GpuThermodynamicConsensus {
             model_probabilities: vec![1.0 / n_models as f64; n_models],
             temperature: 1.0,
             free_energy: 0.0,
-            entropy: (n_models as f64).ln(),  // Maximum entropy initially
+            entropy: (n_models as f64).ln(), // Maximum entropy initially
         };
 
         Ok(Self {
@@ -97,7 +97,7 @@ impl GpuThermodynamicConsensus {
     pub fn select_optimal_model(
         &mut self,
         query_complexity: f64,  // 0-1, estimate of query difficulty
-        budget_constraint: f64,  // Max acceptable cost
+        budget_constraint: f64, // Max acceptable cost
     ) -> Result<usize> {
         println!("\n🌡️  THERMODYNAMIC LLM SELECTION");
         println!("   Query complexity: {:.2}", query_complexity);
@@ -117,8 +117,14 @@ impl GpuThermodynamicConsensus {
         // Select model (stochastic at high T, deterministic at low T)
         let selected_idx = self.sample_from_distribution(&probabilities)?;
 
-        println!("   Selected: {} (T={:.3})", self.models[selected_idx].name, self.state.temperature);
-        println!("   Probability: {:.1}%", probabilities[selected_idx] * 100.0);
+        println!(
+            "   Selected: {} (T={:.3})",
+            self.models[selected_idx].name, self.state.temperature
+        );
+        println!(
+            "   Probability: {:.1}%",
+            probabilities[selected_idx] * 100.0
+        );
         println!("   Free Energy: {:.4}", self.state.free_energy);
         println!("   Entropy: {:.4}\n", self.state.entropy);
 
@@ -137,9 +143,21 @@ impl GpuThermodynamicConsensus {
         let quality_weight = query_complexity * 10.0;
 
         // Prepare vectors for GPU computation
-        let costs: Vec<f32> = self.models.iter().map(|m| (m.cost_per_1k_tokens / budget) as f32).collect();
-        let qualities: Vec<f32> = self.models.iter().map(|m| (quality_weight * m.quality_score) as f32).collect();
-        let latencies: Vec<f32> = self.models.iter().map(|m| (m.latency_ms / 1000.0) as f32).collect();
+        let costs: Vec<f32> = self
+            .models
+            .iter()
+            .map(|m| (m.cost_per_1k_tokens / budget) as f32)
+            .collect();
+        let qualities: Vec<f32> = self
+            .models
+            .iter()
+            .map(|m| (quality_weight * m.quality_score) as f32)
+            .collect();
+        let latencies: Vec<f32> = self
+            .models
+            .iter()
+            .map(|m| (m.latency_ms / 1000.0) as f32)
+            .collect();
 
         // GPU computation: energies = costs - qualities + latencies
         let executor = self.gpu_executor.lock().unwrap();
@@ -148,11 +166,13 @@ impl GpuThermodynamicConsensus {
         let neg_qualities: Vec<f32> = qualities.iter().map(|&q| -q).collect();
 
         // Add cost + (-quality) on GPU
-        let cost_quality = executor.vector_add(&costs, &neg_qualities)
+        let cost_quality = executor
+            .vector_add(&costs, &neg_qualities)
             .expect("GPU energy computation failed - NO CPU FALLBACK");
 
         // Add latency penalty on GPU
-        let energies = executor.vector_add(&cost_quality, &latencies)
+        let energies = executor
+            .vector_add(&cost_quality, &latencies)
             .expect("GPU energy computation failed - NO CPU FALLBACK");
 
         energies
@@ -166,26 +186,26 @@ impl GpuThermodynamicConsensus {
         let temp = self.state.temperature as f32;
 
         // Divide by temperature: -E/kT
-        let neg_e_over_kt: Vec<f32> = energies.iter()
-            .map(|&e| -e / temp)
-            .collect();
+        let neg_e_over_kt: Vec<f32> = energies.iter().map(|&e| -e / temp).collect();
 
         // FUSED GPU KERNEL: exp + normalize in SINGLE call
         let executor = self.gpu_executor.lock().unwrap();
         let probabilities_f32 = self.fused_exp_normalize_gpu(&executor, &neg_e_over_kt)?;
 
         // Convert to f64
-        let probabilities: Vec<f64> = probabilities_f32.iter()
-            .map(|&p| p as f64)
-            .collect();
+        let probabilities: Vec<f64> = probabilities_f32.iter().map(|&p| p as f64).collect();
 
         Ok(probabilities)
     }
 
     /// Fused exp + normalize using optimized GPU kernel
     /// ONE kernel call instead of TWO - eliminates transfer overhead
-    fn fused_exp_normalize_gpu(&self, executor: &GpuKernelExecutor, input: &[f32]) -> Result<Vec<f32>> {
-        use cudarc::driver::{LaunchConfig};
+    fn fused_exp_normalize_gpu(
+        &self,
+        executor: &GpuKernelExecutor,
+        input: &[f32],
+    ) -> Result<Vec<f32>> {
+        use cudarc::driver::LaunchConfig;
 
         let n = input.len();
         let context = executor.context();
@@ -204,7 +224,9 @@ impl GpuThermodynamicConsensus {
 
         let n_i32 = n as i32;
         unsafe {
-            kernel.clone().launch(cfg, (&input_dev, &mut output_dev, n_i32))?;
+            kernel
+                .clone()
+                .launch(cfg, (&input_dev, &mut output_dev, n_i32))?;
         }
 
         // Download result
@@ -220,7 +242,8 @@ impl GpuThermodynamicConsensus {
 
         // Average energy: ⟨E⟩ = Σ P_i * E_i - GPU DOT PRODUCT
         let executor = self.gpu_executor.lock().unwrap();
-        let avg_energy = executor.dot_product(energies, &probs_f32)
+        let avg_energy = executor
+            .dot_product(energies, &probs_f32)
             .expect("GPU dot product failed - NO CPU FALLBACK") as f64;
 
         // Entropy: S = -Σ P_i log P_i - GPU KERNEL
@@ -241,7 +264,8 @@ impl GpuThermodynamicConsensus {
 
         // GPU KERNEL EXECUTION - NO CPU LOOPS
         let executor = self.gpu_executor.lock().unwrap();
-        let entropy = executor.shannon_entropy(&probs_f32)
+        let entropy = executor
+            .shannon_entropy(&probs_f32)
             .expect("GPU entropy computation failed - NO CPU FALLBACK");
 
         entropy as f64
@@ -255,7 +279,8 @@ impl GpuThermodynamicConsensus {
 
         // GPU SAMPLING using cuRAND
         let executor = self.gpu_executor.lock().unwrap();
-        let selected = executor.sample_categorical_gpu(&probs_f32)
+        let selected = executor
+            .sample_categorical_gpu(&probs_f32)
             .expect("GPU categorical sampling failed - NO CPU FALLBACK");
 
         Ok(selected)
@@ -267,14 +292,17 @@ impl GpuThermodynamicConsensus {
 
         // Update model quality score (Bayesian update)
         if self.selection_history.len() > 10 {
-            let recent_quality: f64 = self.selection_history.iter()
+            let recent_quality: f64 = self
+                .selection_history
+                .iter()
                 .rev()
                 .take(10)
                 .filter(|(idx, _)| *idx == model_idx)
                 .map(|(_, q)| q)
-                .sum::<f64>() / 10.0;
+                .sum::<f64>()
+                / 10.0;
 
-            let alpha = 0.1;  // Learning rate
+            let alpha = 0.1; // Learning rate
             self.models[model_idx].quality_score =
                 (1.0 - alpha) * self.models[model_idx].quality_score + alpha * recent_quality;
         }
@@ -296,14 +324,14 @@ pub fn create_default_models() -> Vec<LLMModel> {
     vec![
         LLMModel {
             name: "GPT-4".to_string(),
-            cost_per_1k_tokens: 0.03,  // $0.03 per 1K tokens
+            cost_per_1k_tokens: 0.03, // $0.03 per 1K tokens
             quality_score: 0.95,
             latency_ms: 1500.0,
             max_tokens: 8192,
         },
         LLMModel {
             name: "GPT-3.5-Turbo".to_string(),
-            cost_per_1k_tokens: 0.002,  // 15x cheaper
+            cost_per_1k_tokens: 0.002, // 15x cheaper
             quality_score: 0.75,
             latency_ms: 800.0,
             max_tokens: 4096,
@@ -410,7 +438,7 @@ mod tests {
         let mut total_quality = 0.0;
 
         for i in 0..100 {
-            let complexity = (i as f64 / 100.0).sin().abs();  // Varying complexity
+            let complexity = (i as f64 / 100.0).sin().abs(); // Varying complexity
             let budget = 0.01;
 
             let selected = consensus.select_optimal_model(complexity, budget)?;
@@ -430,11 +458,14 @@ mod tests {
         println!("\n💰 COST OPTIMIZATION RESULTS:");
         println!("   Average cost: ${:.4} per query", avg_cost);
         println!("   Average quality: {:.2}", avg_quality);
-        println!("   Cost efficiency: {:.1} quality/cent", avg_quality / avg_cost);
+        println!(
+            "   Cost efficiency: {:.1} quality/cent",
+            avg_quality / avg_cost
+        );
 
         // Should achieve good quality at reasonable cost
-        assert!(avg_cost < 0.02);  // Less than always using GPT-4
-        assert!(avg_quality > 0.65);  // Better than always using cheapest
+        assert!(avg_cost < 0.02); // Less than always using GPT-4
+        assert!(avg_quality > 0.65); // Better than always using cheapest
 
         Ok(())
     }

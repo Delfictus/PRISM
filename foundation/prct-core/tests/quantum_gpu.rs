@@ -4,9 +4,9 @@
 
 #[cfg(all(feature = "cuda", test))]
 mod quantum_gpu_tests {
+    use cudarc::driver::CudaDevice;
     use prct_core::*;
     use shared_types::*;
-    use cudarc::driver::CudaDevice;
     use std::sync::Arc;
 
     /// Create a small test graph (triangle)
@@ -79,9 +79,9 @@ mod quantum_gpu_tests {
 
         // 3 vertices, 2 colors
         let solution = vec![
-            true, false,  // v0 -> c0
-            false, true,  // v1 -> c1
-            true, false,  // v2 -> c0
+            true, false, // v0 -> c0
+            false, true, // v1 -> c1
+            true, false, // v2 -> c0
         ];
 
         let coloring = qubo_solution_to_coloring(&solution, 3, 2).unwrap();
@@ -94,9 +94,9 @@ mod quantum_gpu_tests {
 
         // 3 vertices, 2 colors - multiple colors per vertex
         let solution = vec![
-            true, true,   // v0 -> both colors (conflict)
-            false, true,  // v1 -> c1
-            true, false,  // v2 -> c0
+            true, true, // v0 -> both colors (conflict)
+            false, true, // v1 -> c1
+            true, false, // v2 -> c0
         ];
 
         let coloring = qubo_solution_to_coloring(&solution, 3, 2).unwrap();
@@ -110,9 +110,9 @@ mod quantum_gpu_tests {
 
         // 3 vertices, 2 colors - missing color for v1
         let solution = vec![
-            true, false,  // v0 -> c0
+            true, false, // v0 -> c0
             false, false, // v1 -> no color (will assign c0 as fallback)
-            true, false,  // v2 -> c0
+            true, false, // v2 -> c0
         ];
 
         let coloring = qubo_solution_to_coloring(&solution, 3, 2).unwrap();
@@ -133,7 +133,10 @@ mod quantum_gpu_tests {
         // Just verify it doesn't panic
         match result {
             Ok(_) => println!("GPU QUBO solver initialized successfully"),
-            Err(e) => println!("GPU QUBO solver init failed (expected if PTX missing): {}", e),
+            Err(e) => println!(
+                "GPU QUBO solver init failed (expected if PTX missing): {}",
+                e
+            ),
         }
     }
 
@@ -147,7 +150,11 @@ mod quantum_gpu_tests {
 
         assert_eq!(qubo.num_variables(), graph.num_vertices * num_colors);
         assert!(qubo.nnz() > 0);
-        println!("Triangle QUBO: {} vars, {} nnz", qubo.num_variables(), qubo.nnz());
+        println!(
+            "Triangle QUBO: {} vars, {} nnz",
+            qubo.num_variables(),
+            qubo.nnz()
+        );
     }
 
     #[test]
@@ -159,7 +166,11 @@ mod quantum_gpu_tests {
         let qubo = SparseQUBO::from_graph_coloring(&graph, num_colors).unwrap();
 
         assert_eq!(qubo.num_variables(), graph.num_vertices * num_colors);
-        println!("Bipartite QUBO: {} vars, {} nnz", qubo.num_variables(), qubo.nnz());
+        println!(
+            "Bipartite QUBO: {} vars, {} nnz",
+            qubo.num_variables(),
+            qubo.nnz()
+        );
     }
 
     #[test]
@@ -181,10 +192,10 @@ mod quantum_gpu_tests {
             &device,
             &qubo,
             &initial_state,
-            5000,  // iterations
-            1.0,   // T_initial
-            0.01,  // T_final
-            42,    // seed
+            5000, // iterations
+            1.0,  // T_initial
+            0.01, // T_final
+            42,   // seed
         );
 
         match result {
@@ -193,21 +204,26 @@ mod quantum_gpu_tests {
                     &solution,
                     graph.num_vertices,
                     num_colors,
-                ).unwrap();
+                )
+                .unwrap();
 
                 println!("Triangle coloring: {:?}", coloring);
 
                 // Verify no conflicts
                 let mut conflicts = 0;
                 for u in 0..graph.num_vertices {
-                    for v in (u+1)..graph.num_vertices {
-                        if graph.adjacency[u * graph.num_vertices + v] && coloring[u] == coloring[v] {
+                    for v in (u + 1)..graph.num_vertices {
+                        if graph.adjacency[u * graph.num_vertices + v] && coloring[u] == coloring[v]
+                        {
                             conflicts += 1;
                         }
                     }
                 }
 
-                assert_eq!(conflicts, 0, "Triangle should be 3-colorable without conflicts");
+                assert_eq!(
+                    conflicts, 0,
+                    "Triangle should be 3-colorable without conflicts"
+                );
             }
             Err(e) => {
                 panic!("GPU QUBO SA failed: {}", e);
@@ -252,7 +268,8 @@ mod quantum_gpu_tests {
                     &solution,
                     graph.num_vertices,
                     num_colors,
-                ).unwrap();
+                )
+                .unwrap();
 
                 println!("Bipartite coloring: {:?}", coloring);
 
@@ -263,8 +280,9 @@ mod quantum_gpu_tests {
                 // Verify no conflicts
                 let mut conflicts = 0;
                 for u in 0..graph.num_vertices {
-                    for v in (u+1)..graph.num_vertices {
-                        if graph.adjacency[u * graph.num_vertices + v] && coloring[u] == coloring[v] {
+                    for v in (u + 1)..graph.num_vertices {
+                        if graph.adjacency[u * graph.num_vertices + v] && coloring[u] == coloring[v]
+                        {
                             conflicts += 1;
                         }
                     }
@@ -304,12 +322,17 @@ mod quantum_gpu_tests {
 
         match result {
             Ok(solution) => {
-                println!("Triangle colored with {} colors, {} conflicts",
-                    solution.chromatic_number, solution.conflicts);
+                println!(
+                    "Triangle colored with {} colors, {} conflicts",
+                    solution.chromatic_number, solution.conflicts
+                );
                 assert_eq!(solution.conflicts, 0);
             }
             Err(e) => {
-                println!("Coloring failed (may be expected if PTX not compiled): {}", e);
+                println!(
+                    "Coloring failed (may be expected if PTX not compiled): {}",
+                    e
+                );
             }
         }
     }

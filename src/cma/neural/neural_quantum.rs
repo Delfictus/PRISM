@@ -12,8 +12,8 @@
 
 use anyhow::Result;
 use rand::Rng;
-use rand_chacha::ChaCha20Rng;
 use rand::SeedableRng;
+use rand_chacha::ChaCha20Rng;
 use std::sync::Arc;
 
 // GPU support (cudarc will be conditionally compiled)
@@ -23,15 +23,14 @@ use cudarc::driver::CudaDevice;
 /// Device abstraction - GPU ONLY
 #[derive(Clone)]
 pub enum Device {
-    Cpu,  // Kept for backward compatibility but GPU always used
+    Cpu, // Kept for backward compatibility but GPU always used
     Cuda(Arc<CudaDevice>),
 }
 
 impl Device {
     pub fn cuda_if_available(_device_id: usize) -> Result<Self> {
         // GPU ONLY - NO CPU FALLBACK
-        let device = CudaDevice::new(_device_id)
-            .expect("GPU REQUIRED - NO CPU FALLBACK");
+        let device = CudaDevice::new(_device_id).expect("GPU REQUIRED - NO CPU FALLBACK");
         Ok(Device::Cuda(device))
     }
 }
@@ -48,7 +47,7 @@ impl Tensor {
     }
 
     pub fn randn(mean: f32, std: f32, shape: Vec<usize>, _device: &Device) -> Result<Self> {
-        use rand_distr::{Normal, Distribution};
+        use rand_distr::{Distribution, Normal};
         let normal = Normal::new(mean, std)?;
         let mut rng = rand::thread_rng();
         let size: usize = shape.iter().product();
@@ -65,28 +64,50 @@ impl Tensor {
 
     pub fn tanh(&self) -> Result<Self> {
         let data: Vec<f32> = self.data.iter().map(|x| x.tanh()).collect();
-        Ok(Tensor { data, shape: self.shape.clone() })
+        Ok(Tensor {
+            data,
+            shape: self.shape.clone(),
+        })
     }
 
     pub fn add(&self, other: &Tensor) -> Result<Self> {
         if self.shape != other.shape {
             anyhow::bail!("Shape mismatch");
         }
-        let data: Vec<f32> = self.data.iter().zip(&other.data).map(|(a, b)| a + b).collect();
-        Ok(Tensor { data, shape: self.shape.clone() })
+        let data: Vec<f32> = self
+            .data
+            .iter()
+            .zip(&other.data)
+            .map(|(a, b)| a + b)
+            .collect();
+        Ok(Tensor {
+            data,
+            shape: self.shape.clone(),
+        })
     }
 
     pub fn sub(&self, other: &Tensor) -> Result<Self> {
         if self.shape != other.shape {
             anyhow::bail!("Shape mismatch");
         }
-        let data: Vec<f32> = self.data.iter().zip(&other.data).map(|(a, b)| a - b).collect();
-        Ok(Tensor { data, shape: self.shape.clone() })
+        let data: Vec<f32> = self
+            .data
+            .iter()
+            .zip(&other.data)
+            .map(|(a, b)| a - b)
+            .collect();
+        Ok(Tensor {
+            data,
+            shape: self.shape.clone(),
+        })
     }
 
     pub fn mul(&self, scalar: f32) -> Result<Self> {
         let data: Vec<f32> = self.data.iter().map(|x| x * scalar).collect();
-        Ok(Tensor { data, shape: self.shape.clone() })
+        Ok(Tensor {
+            data,
+            shape: self.shape.clone(),
+        })
     }
 }
 
@@ -107,7 +128,12 @@ impl Linear {
             .map(|_| rng.gen_range(-scale..scale))
             .collect();
         let bias = vec![0.0; out_features];
-        Linear { weight, bias, in_features, out_features }
+        Linear {
+            weight,
+            bias,
+            in_features,
+            out_features,
+        }
     }
 
     pub fn forward(&self, input: &Tensor) -> Result<Tensor> {
@@ -141,17 +167,24 @@ pub struct LayerNorm {
 
 impl LayerNorm {
     pub fn new(normalized_shape: usize, eps: f32) -> Self {
-        LayerNorm { normalized_shape, eps }
+        LayerNorm {
+            normalized_shape,
+            eps,
+        }
     }
 
     pub fn forward(&self, input: &Tensor) -> Result<Tensor> {
         // Simple layer norm implementation
         let mean = input.data.iter().sum::<f32>() / input.data.len() as f32;
-        let variance = input.data.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / input.data.len() as f32;
+        let variance =
+            input.data.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / input.data.len() as f32;
         let std = (variance + self.eps).sqrt();
 
         let data: Vec<f32> = input.data.iter().map(|x| (x - mean) / std).collect();
-        Ok(Tensor { data, shape: input.shape.clone() })
+        Ok(Tensor {
+            data,
+            shape: input.shape.clone(),
+        })
     }
 }
 
@@ -212,11 +245,8 @@ impl NeuralQuantumState {
             }
 
             // Stochastic reconfiguration update
-            current_params = self.stochastic_reconfiguration_step(
-                &current_params,
-                &samples,
-                &local_energies,
-            )?;
+            current_params =
+                self.stochastic_reconfiguration_step(&current_params, &samples, &local_energies)?;
 
             // Early stopping
             if iteration % 10 == 0 && energy < initial.cost * 0.5 {
@@ -263,11 +293,7 @@ impl NeuralQuantumState {
     }
 
     /// Metropolis-Hastings step for sampling from |ψ|²
-    fn metropolis_step(
-        &self,
-        current: &[f64],
-        rng: &mut ChaCha20Rng,
-    ) -> Result<Vec<f64>> {
+    fn metropolis_step(&self, current: &[f64], rng: &mut ChaCha20Rng) -> Result<Vec<f64>> {
         // Propose move
         let mut proposed = current.to_vec();
         let idx = rng.gen_range(0..current.len());
@@ -360,10 +386,7 @@ impl NeuralQuantumState {
 
     fn vec_to_tensor(&self, data: &[f64]) -> Result<Tensor> {
         let float_data: Vec<f32> = data.iter().map(|&x| x as f32).collect();
-        Tensor::from_vec(
-            float_data,
-            vec![1, data.len()],
-        )
+        Tensor::from_vec(float_data, vec![1, data.len()])
     }
 }
 
@@ -393,11 +416,7 @@ impl ResNet {
         let mut layer_norms = Vec::new();
 
         for _ in 0..num_layers {
-            let block = ResidualLayer::new(
-                hidden_dim,
-                hidden_dim,
-                device.clone(),
-            )?;
+            let block = ResidualLayer::new(hidden_dim, hidden_dim, device.clone())?;
             residual_blocks.push(block);
 
             let ln = LayerNorm::new(hidden_dim, 1e-5);
@@ -444,11 +463,7 @@ struct ResidualLayer {
 }
 
 impl ResidualLayer {
-    fn new(
-        input_dim: usize,
-        hidden_dim: usize,
-        device: Device,
-    ) -> Result<Self> {
+    fn new(input_dim: usize, hidden_dim: usize, device: Device) -> Result<Self> {
         let linear1 = Linear::new(input_dim, hidden_dim);
         let linear2 = Linear::new(hidden_dim, hidden_dim);
 
@@ -463,7 +478,7 @@ impl ResidualLayer {
     fn forward(&self, x: &Tensor) -> Result<Tensor> {
         let residual = Tensor {
             data: x.data.clone(),
-            shape: x.shape.clone()
+            shape: x.shape.clone(),
         };
 
         // First layer
@@ -493,12 +508,7 @@ impl VariationalMonteCarlo {
         num_layers: usize,
         device: Device,
     ) -> Result<Self> {
-        let neural_state = NeuralQuantumState::new(
-            solution_dim,
-            hidden_dim,
-            num_layers,
-            device,
-        )?;
+        let neural_state = NeuralQuantumState::new(solution_dim, hidden_dim, num_layers, device)?;
 
         Ok(Self {
             neural_state,
@@ -535,7 +545,9 @@ impl VariationalMonteCarlo {
         hamiltonian: &ProblemHamiltonian,
         params: &[f64],
     ) -> Result<f64> {
-        let samples = self.neural_state.sample_wavefunction(params, self.num_samples)?;
+        let samples = self
+            .neural_state
+            .sample_wavefunction(params, self.num_samples)?;
 
         // Create identity metric tensor as Vec<Vec<f64>>
         let dim = params.len();
@@ -550,7 +562,9 @@ impl VariationalMonteCarlo {
             metric_tensor,
         };
 
-        let energies = self.neural_state.compute_local_energies(&samples, &manifold)?;
+        let energies = self
+            .neural_state
+            .compute_local_energies(&samples, &manifold)?;
         let energy = energies.iter().sum::<f64>() / energies.len() as f64;
 
         Ok(energy)

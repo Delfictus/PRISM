@@ -2,14 +2,14 @@
 //!
 //! Mission Charlie: Task 1.2
 
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use tokio::time::{sleep, timeout, Duration, Instant};
+use anyhow::{bail, Context, Result};
 use dashmap::DashMap;
 use parking_lot::Mutex;
-use anyhow::{Result, Context, bail};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::SystemTime;
+use tokio::time::{sleep, timeout, Duration, Instant};
 
 use super::{LLMResponse, Usage};
 
@@ -87,9 +87,7 @@ impl ClaudeClient {
     pub fn new(api_key: String) -> Result<Self> {
         Ok(Self {
             api_key,
-            http_client: Client::builder()
-                .timeout(Duration::from_secs(60))
-                .build()?,
+            http_client: Client::builder().timeout(Duration::from_secs(60)).build()?,
             base_url: "https://api.anthropic.com/v1".to_string(),
             cache: Arc::new(DashMap::new()),
             token_counter: Arc::new(Mutex::new(TokenCounter::new())),
@@ -118,17 +116,22 @@ impl ClaudeClient {
                     response.latency = start.elapsed();
 
                     // Cache response
-                    self.cache.insert(cache_key, CachedResponse {
-                        response: response.clone(),
-                        timestamp: SystemTime::now(),
-                    });
+                    self.cache.insert(
+                        cache_key,
+                        CachedResponse {
+                            response: response.clone(),
+                            timestamp: SystemTime::now(),
+                        },
+                    );
 
                     // Track cost
                     let cost = self.calculate_cost(&response.usage);
-                    self.token_counter.lock().add_usage(response.usage.total_tokens, cost);
+                    self.token_counter
+                        .lock()
+                        .add_usage(response.usage.total_tokens, cost);
 
                     return Ok(response);
-                },
+                }
                 Err(e) => {
                     if attempt < self.max_retries - 1 {
                         let delay = self.retry_delay_ms * 2_u64.pow(attempt as u32);
@@ -162,8 +165,9 @@ impl ClaudeClient {
                 .header("anthropic-version", "2023-06-01")
                 .header("content-type", "application/json")
                 .json(&request)
-                .send()
-        ).await??;
+                .send(),
+        )
+        .await??;
 
         if !response.status().is_success() {
             bail!("Claude API error: {}", response.status());
@@ -171,7 +175,9 @@ impl ClaudeClient {
 
         let api_response: ClaudeResponse = response.json().await?;
 
-        let text = api_response.content.iter()
+        let text = api_response
+            .content
+            .iter()
             .filter(|c| c.content_type == "text")
             .map(|c| c.text.clone())
             .collect::<Vec<_>>()
@@ -195,8 +201,8 @@ impl ClaudeClient {
         const PROMPT_COST_PER_1K: f64 = 0.003;
         const COMPLETION_COST_PER_1K: f64 = 0.015;
 
-        (usage.prompt_tokens as f64 / 1000.0) * PROMPT_COST_PER_1K +
-        (usage.completion_tokens as f64 / 1000.0) * COMPLETION_COST_PER_1K
+        (usage.prompt_tokens as f64 / 1000.0) * PROMPT_COST_PER_1K
+            + (usage.completion_tokens as f64 / 1000.0) * COMPLETION_COST_PER_1K
     }
 
     pub fn get_total_cost(&self) -> f64 {

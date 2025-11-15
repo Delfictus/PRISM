@@ -6,14 +6,14 @@
 //! - Fused kernels
 //! - Zero unnecessary transfers
 
-use std::sync::Arc;
-use cudarc::driver::{CudaDevice, CudaSlice, LaunchConfig, LaunchAsync, DevicePtr, DeviceSlice};
 use crate::gpu::GpuKernelExecutor;
 use anyhow::Result;
+use cudarc::driver::{CudaDevice, CudaSlice, DevicePtr, DeviceSlice, LaunchAsync, LaunchConfig};
+use std::sync::Arc;
 
 /// GPU Tensor - Data LIVES ON GPU
 pub struct GpuTensorOpt {
-    pub(crate) data: CudaSlice<f32>,  // DATA STAYS ON GPU
+    pub(crate) data: CudaSlice<f32>, // DATA STAYS ON GPU
     pub shape: Vec<usize>,
     device: Arc<CudaDevice>,
     executor: Arc<std::sync::Mutex<GpuKernelExecutor>>,
@@ -29,7 +29,12 @@ impl GpuTensorOpt {
     ) -> Result<Self, cudarc::driver::DriverError> {
         let data = device.htod_copy(cpu_data)?;
 
-        Ok(Self { data, shape, device, executor })
+        Ok(Self {
+            data,
+            shape,
+            device,
+            executor,
+        })
     }
 
     /// Allocate zeros directly on GPU - ZERO CPU involvement
@@ -41,7 +46,12 @@ impl GpuTensorOpt {
         let size: usize = shape.iter().product();
         let data = device.alloc_zeros::<f32>(size)?;
 
-        Ok(Self { data, shape, device, executor })
+        Ok(Self {
+            data,
+            shape,
+            device,
+            executor,
+        })
     }
 
     /// Download to CPU - ONLY when needed
@@ -56,7 +66,10 @@ impl GpuTensorOpt {
         let n = other.shape[1];
 
         let kernel = {
-            let exec = self.executor.lock().map_err(|e| anyhow::anyhow!("executor mutex poisoned: {}", e))?;
+            let exec = self
+                .executor
+                .lock()
+                .map_err(|e| anyhow::anyhow!("executor mutex poisoned: {}", e))?;
             exec.get_kernel("matmul")?.clone()
         };
 
@@ -71,10 +84,17 @@ impl GpuTensorOpt {
         };
 
         unsafe {
-            kernel.clone().launch(cfg, (
-                &self.data, &other.data, &mut output_data,
-                m as i32, k as i32, n as i32
-            ))?;
+            kernel.clone().launch(
+                cfg,
+                (
+                    &self.data,
+                    &other.data,
+                    &mut output_data,
+                    m as i32,
+                    k as i32,
+                    n as i32,
+                ),
+            )?;
         }
 
         Ok(Self {
@@ -89,7 +109,10 @@ impl GpuTensorOpt {
     pub fn relu_inplace(&mut self) -> Result<()> {
         let n = self.data.len();
         let kernel = {
-            let exec = self.executor.lock().map_err(|e| anyhow::anyhow!("executor mutex poisoned: {}", e))?;
+            let exec = self
+                .executor
+                .lock()
+                .map_err(|e| anyhow::anyhow!("executor mutex poisoned: {}", e))?;
             exec.get_kernel("relu")?.clone()
         };
 
@@ -108,7 +131,10 @@ impl GpuTensorOpt {
         let num_classes = self.shape[1];
 
         let kernel = {
-            let exec = self.executor.lock().map_err(|e| anyhow::anyhow!("executor mutex poisoned: {}", e))?;
+            let exec = self
+                .executor
+                .lock()
+                .map_err(|e| anyhow::anyhow!("executor mutex poisoned: {}", e))?;
             exec.get_kernel("softmax")?.clone()
         };
 
@@ -119,10 +145,9 @@ impl GpuTensorOpt {
         };
 
         unsafe {
-            kernel.clone().launch(cfg, (
-                &mut self.data,
-                batch_size as i32, num_classes as i32
-            ))?;
+            kernel
+                .clone()
+                .launch(cfg, (&mut self.data, batch_size as i32, num_classes as i32))?;
         }
 
         Ok(())
@@ -134,17 +159,20 @@ impl GpuTensorOpt {
         let features = self.shape[1];
 
         let kernel = {
-            let exec = self.executor.lock().map_err(|e| anyhow::anyhow!("executor mutex poisoned: {}", e))?;
+            let exec = self
+                .executor
+                .lock()
+                .map_err(|e| anyhow::anyhow!("executor mutex poisoned: {}", e))?;
             exec.get_kernel("broadcast_add")?.clone()
         };
 
         let cfg = LaunchConfig::for_num_elems((batch_size * features) as u32);
 
         unsafe {
-            kernel.clone().launch(cfg, (
-                &mut self.data, bias,
-                batch_size as i32, features as i32
-            ))?;
+            kernel.clone().launch(
+                cfg,
+                (&mut self.data, bias, batch_size as i32, features as i32),
+            )?;
         }
 
         Ok(())
@@ -153,8 +181,8 @@ impl GpuTensorOpt {
 
 /// FUSED Linear Layer - MatMul + Bias + ReLU in ONE kernel
 pub struct FusedLinearLayerOpt {
-    weights: CudaSlice<f32>,  // STAYS ON GPU
-    bias: CudaSlice<f32>,     // STAYS ON GPU
+    weights: CudaSlice<f32>, // STAYS ON GPU
+    bias: CudaSlice<f32>,    // STAYS ON GPU
     in_features: usize,
     out_features: usize,
     device: Arc<CudaDevice>,
@@ -170,7 +198,9 @@ impl FusedLinearLayerOpt {
     ) -> Result<Self> {
         // Initialize weights on GPU using cuRAND
         let weight_data = {
-            let exec = executor.lock().map_err(|e| anyhow::anyhow!("executor mutex poisoned: {}", e))?;
+            let exec = executor
+                .lock()
+                .map_err(|e| anyhow::anyhow!("executor mutex poisoned: {}", e))?;
             let scale = (2.0 / in_features as f32).sqrt();
             exec.generate_normal_gpu(in_features * out_features, 0.0, scale)?
         };
@@ -192,12 +222,17 @@ impl FusedLinearLayerOpt {
     pub fn forward_fused(&self, input: &GpuTensorOpt) -> Result<GpuTensorOpt> {
         let batch_size = input.shape[0];
         let kernel = {
-            let exec = self.executor.lock().map_err(|e| anyhow::anyhow!("executor mutex poisoned: {}", e))?;
+            let exec = self
+                .executor
+                .lock()
+                .map_err(|e| anyhow::anyhow!("executor mutex poisoned: {}", e))?;
             exec.get_kernel("fused_linear_relu")?.clone()
         };
 
         // Output stays on GPU
-        let mut output_data = self.device.alloc_zeros::<f32>(batch_size * self.out_features)?;
+        let mut output_data = self
+            .device
+            .alloc_zeros::<f32>(batch_size * self.out_features)?;
 
         let cfg = LaunchConfig {
             grid_dim: ((self.out_features as u32 + 255) / 256, batch_size as u32, 1),
@@ -207,12 +242,18 @@ impl FusedLinearLayerOpt {
 
         // FUSED: MatMul + Bias + ReLU in SINGLE kernel call
         unsafe {
-            kernel.clone().launch(cfg, (
-                &input.data, &self.weights, &self.bias, &mut output_data,
-                batch_size as i32,
-                self.in_features as i32,
-                self.out_features as i32
-            ))?;
+            kernel.clone().launch(
+                cfg,
+                (
+                    &input.data,
+                    &self.weights,
+                    &self.bias,
+                    &mut output_data,
+                    batch_size as i32,
+                    self.in_features as i32,
+                    self.out_features as i32,
+                ),
+            )?;
         }
 
         Ok(GpuTensorOpt {
@@ -226,10 +267,10 @@ impl FusedLinearLayerOpt {
 
 /// Complete GPU Neural Network - ALL ops on GPU, FUSED kernels
 pub struct OptimizedGpuNetwork {
-    layer1: FusedLinearLayerOpt,  // 100 -> 64, fused matmul+bias+relu
-    layer2: FusedLinearLayerOpt,  // 64 -> 32, fused
-    layer3: FusedLinearLayerOpt,  // 32 -> 16, fused
-    output_layer: FusedLinearLayerOpt,  // 16 -> 5, fused
+    layer1: FusedLinearLayerOpt,       // 100 -> 64, fused matmul+bias+relu
+    layer2: FusedLinearLayerOpt,       // 64 -> 32, fused
+    layer3: FusedLinearLayerOpt,       // 32 -> 16, fused
+    output_layer: FusedLinearLayerOpt, // 16 -> 5, fused
     device: Arc<CudaDevice>,
     executor: Arc<std::sync::Mutex<GpuKernelExecutor>>,
 }

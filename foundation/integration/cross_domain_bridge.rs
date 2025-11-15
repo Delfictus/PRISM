@@ -138,14 +138,30 @@ impl BridgeMetrics {
              Causal Consistency: {:.3} (target: >0.7) {}\n\
              Overall: {}\n",
             self.mutual_information,
-            if self.mutual_information > 0.5 { "✓" } else { "✗" },
+            if self.mutual_information > 0.5 {
+                "✓"
+            } else {
+                "✗"
+            },
             self.phase_coherence,
-            if self.phase_coherence > 0.8 { "✓" } else { "✗" },
+            if self.phase_coherence > 0.8 {
+                "✓"
+            } else {
+                "✗"
+            },
             self.latency_ms,
             if self.latency_ms < 1.0 { "✓" } else { "✗" },
             self.causal_consistency,
-            if self.causal_consistency > 0.7 { "✓" } else { "✗" },
-            if self.meets_criteria() { "✓ PASSED" } else { "✗ FAILED" }
+            if self.causal_consistency > 0.7 {
+                "✓"
+            } else {
+                "✗"
+            },
+            if self.meets_criteria() {
+                "✓ PASSED"
+            } else {
+                "✗ FAILED"
+            }
         )
     }
 }
@@ -208,8 +224,10 @@ impl CrossDomainBridge {
 
     /// Update state history for causal analysis
     fn update_history(&mut self) {
-        self.neuro_history.push(self.neuro_state.state_vector.clone());
-        self.quantum_history.push(self.quantum_state.state_vector.clone());
+        self.neuro_history
+            .push(self.neuro_state.state_vector.clone());
+        self.quantum_history
+            .push(self.quantum_state.state_vector.clone());
 
         // Maintain sliding window
         if self.neuro_history.len() > self.history_window {
@@ -231,15 +249,23 @@ impl CrossDomainBridge {
         // TE ≈ -0.5 * log(1 - ρ²) where ρ is lagged correlation
         let n = self.neuro_history.len().min(50); // Use last 50 samples only
 
-        let neuro_mean: f64 = self.neuro_history.iter()
-            .rev().take(n)
+        let neuro_mean: f64 = self
+            .neuro_history
+            .iter()
+            .rev()
+            .take(n)
             .map(|v| v[0])
-            .sum::<f64>() / n as f64;
+            .sum::<f64>()
+            / n as f64;
 
-        let quantum_mean: f64 = self.quantum_history.iter()
-            .rev().take(n)
+        let quantum_mean: f64 = self
+            .quantum_history
+            .iter()
+            .rev()
+            .take(n)
             .map(|v| v[0])
-            .sum::<f64>() / n as f64;
+            .sum::<f64>()
+            / n as f64;
 
         // Lagged correlation (lag 1)
         let mut cov_forward = 0.0;
@@ -247,7 +273,7 @@ impl CrossDomainBridge {
         let mut var_neuro = 0.0;
         let mut var_quantum = 0.0;
 
-        for i in 0..(n-1) {
+        for i in 0..(n - 1) {
             let idx = self.neuro_history.len() - n + i;
             let neuro_t = self.neuro_history[idx][0] - neuro_mean;
             let neuro_t1 = self.neuro_history[idx + 1][0] - neuro_mean;
@@ -260,11 +286,11 @@ impl CrossDomainBridge {
             var_quantum += quantum_t * quantum_t;
         }
 
-        let std_neuro = (var_neuro / (n-1) as f64).sqrt().max(1e-10);
-        let std_quantum = (var_quantum / (n-1) as f64).sqrt().max(1e-10);
+        let std_neuro = (var_neuro / (n - 1) as f64).sqrt().max(1e-10);
+        let std_quantum = (var_quantum / (n - 1) as f64).sqrt().max(1e-10);
 
-        let corr_forward = (cov_forward / (n-1) as f64) / (std_neuro * std_quantum);
-        let corr_backward = (cov_backward / (n-1) as f64) / (std_quantum * std_neuro);
+        let corr_forward = (cov_forward / (n - 1) as f64) / (std_neuro * std_quantum);
+        let corr_backward = (cov_backward / (n - 1) as f64) / (std_quantum * std_neuro);
 
         // TE approximation: -0.5 * log(1 - ρ²)
         let te_forward = (-0.5 * (1.0 - corr_forward.powi(2)).ln()).max(0.0);
@@ -360,7 +386,9 @@ impl CrossDomainBridge {
         let latency_ms = start.elapsed().as_secs_f64() * 1000.0;
 
         BridgeMetrics {
-            mutual_information: (forward_result.information_bits + backward_result.information_bits) / 2.0,
+            mutual_information: (forward_result.information_bits
+                + backward_result.information_bits)
+                / 2.0,
             phase_coherence: sync_metrics,
             causal_consistency,
             latency_ms,
@@ -440,8 +468,11 @@ mod tests {
         let metrics = bridge.bidirectional_step(0.01);
 
         // Must meet <1ms latency requirement
-        assert!(metrics.latency_ms < 1.0,
-            "Latency {:.3} ms exceeds 1.0 ms requirement", metrics.latency_ms);
+        assert!(
+            metrics.latency_ms < 1.0,
+            "Latency {:.3} ms exceeds 1.0 ms requirement",
+            metrics.latency_ms
+        );
     }
 
     #[test]

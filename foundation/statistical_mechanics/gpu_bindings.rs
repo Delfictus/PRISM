@@ -8,9 +8,9 @@
 //! - Energy calculation
 //! - Phase coherence calculation
 
-use anyhow::{Result, Context};
-use std::sync::Arc;
+use anyhow::{Context, Result};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[cfg(feature = "cuda")]
 use cudarc::driver::*;
@@ -74,17 +74,32 @@ impl GpuThermodynamicNetwork {
 
         // Load PTX module
         let ptx_path = "target/ptx/thermodynamic_evolution.ptx";
-        let ptx = std::fs::read_to_string(ptx_path)
-            .with_context(|| format!("Failed to load PTX from {}. Run: cargo build --release", ptx_path))?;
+        let ptx = std::fs::read_to_string(ptx_path).with_context(|| {
+            format!(
+                "Failed to load PTX from {}. Run: cargo build --release",
+                ptx_path
+            )
+        })?;
 
         // Load PTX and get all kernel functions
-        let kernel_names = ["langevin_step_kernel", "calculate_entropy_kernel", "calculate_energy_kernel", "calculate_coherence_kernel"];
+        let kernel_names = [
+            "langevin_step_kernel",
+            "calculate_entropy_kernel",
+            "calculate_energy_kernel",
+            "calculate_coherence_kernel",
+        ];
         device.load_ptx(ptx.into(), "thermodynamic_module", &kernel_names)?;
 
         let mut kernels = HashMap::new();
         for &name in &kernel_names {
-            let func = device.get_func("thermodynamic_module", name)
-                .ok_or_else(|| anyhow::anyhow!("Kernel function '{}' not found in module 'thermodynamic_module'", name))?;
+            let func = device
+                .get_func("thermodynamic_module", name)
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Kernel function '{}' not found in module 'thermodynamic_module'",
+                        name
+                    )
+                })?;
             kernels.insert(name, func);
         }
 
@@ -133,7 +148,9 @@ impl GpuThermodynamicNetwork {
         let mut states = vec![seed; n];
         for i in 0..n {
             // Linear congruential generator
-            states[i] = states[i].wrapping_mul(1664525).wrapping_add(1013904223 + i as u64);
+            states[i] = states[i]
+                .wrapping_mul(1664525)
+                .wrapping_add(1013904223 + i as u64);
         }
         states
     }
@@ -167,17 +184,20 @@ impl GpuThermodynamicNetwork {
         };
 
         unsafe {
-            cudarc::driver::CudaFunction::clone(kernel).launch(cfg, (
-                &self.d_phases,
-                &self.d_velocities,
-                &self.d_natural_frequencies,
-                &self.d_coupling_matrix,
-                &mut self.d_new_phases,
-                &mut self.d_new_velocities,
-                &mut self.d_forces,
-                params,
-                &mut self.d_rng_states,
-            ))?;
+            cudarc::driver::CudaFunction::clone(kernel).launch(
+                cfg,
+                (
+                    &self.d_phases,
+                    &self.d_velocities,
+                    &self.d_natural_frequencies,
+                    &self.d_coupling_matrix,
+                    &mut self.d_new_phases,
+                    &mut self.d_new_velocities,
+                    &mut self.d_forces,
+                    params,
+                    &mut self.d_rng_states,
+                ),
+            )?;
         }
 
         // Swap buffers
@@ -206,12 +226,10 @@ impl GpuThermodynamicNetwork {
         };
 
         unsafe {
-            kernel.clone().launch(cfg, (
-                &self.d_velocities,
-                n_i32,
-                temperature,
-                &mut self.d_entropy,
-            ))?;
+            kernel.clone().launch(
+                cfg,
+                (&self.d_velocities, n_i32, temperature, &mut self.d_entropy),
+            )?;
         }
         self.device.synchronize()?;
 
@@ -238,14 +256,17 @@ impl GpuThermodynamicNetwork {
         };
 
         unsafe {
-            kernel.clone().launch(cfg, (
-                &self.d_phases,
-                &self.d_velocities,
-                &self.d_coupling_matrix,
-                n_i32,
-                coupling_strength,
-                &mut self.d_energy,
-            ))?;
+            kernel.clone().launch(
+                cfg,
+                (
+                    &self.d_phases,
+                    &self.d_velocities,
+                    &self.d_coupling_matrix,
+                    n_i32,
+                    coupling_strength,
+                    &mut self.d_energy,
+                ),
+            )?;
         }
         self.device.synchronize()?;
 
@@ -272,12 +293,15 @@ impl GpuThermodynamicNetwork {
         };
 
         unsafe {
-            kernel.clone().launch(cfg, (
-                &self.d_phases,
-                n_i32,
-                &mut self.d_coherence_real,
-                &mut self.d_coherence_imag,
-            ))?;
+            kernel.clone().launch(
+                cfg,
+                (
+                    &self.d_phases,
+                    n_i32,
+                    &mut self.d_coherence_real,
+                    &mut self.d_coherence_imag,
+                ),
+            )?;
         }
         self.device.synchronize()?;
 
@@ -303,9 +327,9 @@ impl GpuThermodynamicNetwork {
     /// Update coupling matrix on GPU
     pub fn update_coupling_matrix(&mut self, coupling_matrix: &[f64]) -> Result<()> {
         let new_coupling = self.device.htod_sync_copy(coupling_matrix)?;
-        self.device.dtod_copy(&new_coupling, &mut self.d_coupling_matrix)?;
+        self.device
+            .dtod_copy(&new_coupling, &mut self.d_coupling_matrix)?;
         self.device.synchronize()?;
         Ok(())
     }
 }
-

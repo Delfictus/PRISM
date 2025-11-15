@@ -5,8 +5,8 @@
 //! Run with: cargo run --features cuda --example gpu_graph_coloring
 
 use prct_core::{
-    ports::{NeuromorphicPort, NeuromorphicEncodingParams},
-    adapters::{NeuromorphicAdapter, QuantumAdapter, CouplingAdapter},
+    adapters::{CouplingAdapter, NeuromorphicAdapter, QuantumAdapter},
+    ports::{NeuromorphicEncodingParams, NeuromorphicPort},
 };
 use shared_types::*;
 
@@ -16,7 +16,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Create test graph (10-vertex wheel graph)
     println!("1. Creating test graph...");
     let graph = create_wheel_graph(10);
-    println!("   ✅ Graph: {} vertices, {} edges", graph.num_vertices, graph.num_edges);
+    println!(
+        "   ✅ Graph: {} vertices, {} edges",
+        graph.num_vertices, graph.num_edges
+    );
 
     // 2. Initialize adapters
     println!("\n2. Initializing PRCT adapters...");
@@ -62,21 +65,26 @@ fn run_drpp_pipeline(
     quantum: QuantumAdapter,
     coupling: CouplingAdapter,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    use prct_core::ports::{PhysicsCouplingPort, QuantumPort};
     use std::time::Instant;
-    use prct_core::ports::{QuantumPort, PhysicsCouplingPort};
 
     let start = Instant::now();
 
     // Encode graph as spike pattern (GPU)
     let params = NeuromorphicEncodingParams::default();
     let spike_pattern = neuro.encode_graph_as_spikes(&graph, &params)?;
-    println!("   ✅ Spike encoding: {} spikes in {:.2}ms",
-             spike_pattern.spikes.len(),
-             start.elapsed().as_micros() as f64 / 1000.0);
+    println!(
+        "   ✅ Spike encoding: {} spikes in {:.2}ms",
+        spike_pattern.spikes.len(),
+        start.elapsed().as_micros() as f64 / 1000.0
+    );
 
     // Process through neuromorphic adapter (GPU)
     let neuro_state = neuro.process_and_detect_patterns(&spike_pattern)?;
-    println!("   ✅ Neuromorphic processing: {} activations", neuro_state.neuron_states.len());
+    println!(
+        "   ✅ Neuromorphic processing: {} activations",
+        neuro_state.neuron_states.len()
+    );
 
     // Quantum evolution
     let evolution_params = EvolutionParams {
@@ -97,14 +105,23 @@ fn run_drpp_pipeline(
     };
 
     let quantum_state = quantum.evolve_state(&hamiltonian, &initial_state, 1.0)?;
-    println!("   ✅ Quantum evolution: {} amplitudes", quantum_state.amplitudes.len());
+    println!(
+        "   ✅ Quantum evolution: {} amplitudes",
+        quantum_state.amplitudes.len()
+    );
 
     // Coupling analysis
     let coupling_result = coupling.get_bidirectional_coupling(&neuro_state, &quantum_state)?;
-    println!("   ✅ Coupling: order parameter = {:.4}", coupling_result.kuramoto_state.order_parameter);
+    println!(
+        "   ✅ Coupling: order parameter = {:.4}",
+        coupling_result.kuramoto_state.order_parameter
+    );
 
     let total_time = start.elapsed();
-    println!("\n   ⏱️  Total pipeline time: {:.2}ms", total_time.as_micros() as f64 / 1000.0);
+    println!(
+        "\n   ⏱️  Total pipeline time: {:.2}ms",
+        total_time.as_micros() as f64 / 1000.0
+    );
 
     Ok(())
 }
@@ -112,14 +129,20 @@ fn run_drpp_pipeline(
 #[cfg(not(feature = "cuda"))]
 fn run_cpu_pipeline(graph: Graph) -> Result<(), Box<dyn std::error::Error>> {
     println!("   ⚠️  CPU-only mode not yet implemented");
-    println!("   Graph has {} vertices and {} edges", graph.num_vertices, graph.num_edges);
+    println!(
+        "   Graph has {} vertices and {} edges",
+        graph.num_vertices, graph.num_edges
+    );
     Ok(())
 }
 
 #[cfg(feature = "cuda")]
 fn run_cpu_pipeline(graph: Graph) -> Result<(), Box<dyn std::error::Error>> {
     println!("   ⚠️  CPU fallback not yet implemented");
-    println!("   Graph has {} vertices and {} edges", graph.num_vertices, graph.num_edges);
+    println!(
+        "   Graph has {} vertices and {} edges",
+        graph.num_vertices, graph.num_edges
+    );
     Ok(())
 }
 

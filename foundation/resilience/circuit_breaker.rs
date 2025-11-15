@@ -43,9 +43,9 @@
 //!
 //! Circuit opens when: λ(t) > threshold
 
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use serde::{Serialize, Deserialize};
 
 /// Circuit breaker state
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -233,8 +233,8 @@ impl CircuitBreaker {
         state.consecutive_failures += 1;
 
         // Update failure rate EMA
-        state.failure_rate = self.config.ema_alpha
-            + (1.0 - self.config.ema_alpha) * state.failure_rate;
+        state.failure_rate =
+            self.config.ema_alpha + (1.0 - self.config.ema_alpha) * state.failure_rate;
 
         // Check if circuit should open
         let total_calls = state.success_count + state.failure_count;

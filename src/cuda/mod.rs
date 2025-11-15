@@ -4,17 +4,19 @@ use anyhow::Result;
 
 pub mod dense_path_guard;
 pub mod device_guard;
-pub mod ensemble_generation;  // Fixed cudarc API compatibility
+pub mod ensemble_generation; // Fixed cudarc API compatibility
 pub mod gpu_coloring;
-pub mod prct_algorithm;
 pub mod prct_adapters;
+pub mod prct_algorithm;
 pub mod prct_gpu;
-pub mod prism_pipeline;  // Fixed cudarc API compatibility
+pub mod prism_pipeline; // Fixed cudarc API compatibility
 
-pub use prct_algorithm::{PRCTAlgorithm, PRCTConfig};
+pub use ensemble_generation::{Ensemble, GpuEnsembleGenerator};
 pub use gpu_coloring::{GpuColoringEngine, GpuColoringResult};
-pub use prism_pipeline::{PrismPipeline as FullGpuPipeline, PrismConfig as GpuPrismConfig, PrismCoherence};
-pub use ensemble_generation::{GpuEnsembleGenerator, Ensemble};
+pub use prct_algorithm::{PRCTAlgorithm, PRCTConfig};
+pub use prism_pipeline::{
+    PrismCoherence, PrismConfig as GpuPrismConfig, PrismPipeline as FullGpuPipeline,
+};
 
 use dense_path_guard::DensePathGuard;
 

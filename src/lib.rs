@@ -169,21 +169,22 @@ impl PrismAI {
         if let Some(ref engine) = self.gpu_coloring {
             // Use configured number of replicas without artificial limitation
             let num_attempts = self.config.num_replicas;
-            let result = engine.color_graph(
-                &adj_matrix,
-                num_attempts,
-                self.config.temperature,
-                n,
-            ).map_err(|e| PrismError::Other(e))?;
+            let result = engine
+                .color_graph(&adj_matrix, num_attempts, self.config.temperature, n)
+                .map_err(|e| PrismError::Other(e))?;
 
-            println!("[PRISM-AI] GPU Coloring: {} colors in {:.2}ms",
-                     result.chromatic_number, result.runtime_ms);
+            println!(
+                "[PRISM-AI] GPU Coloring: {} colors in {:.2}ms",
+                result.chromatic_number, result.runtime_ms
+            );
 
             return Ok(result.coloring);
         }
 
         // Fallback if GPU failed
-        Err(PrismError::CudaError("GPU coloring not available".to_string()))
+        Err(PrismError::CudaError(
+            "GPU coloring not available".to_string(),
+        ))
     }
 
     /// Color a graph and capture determinism proof data.

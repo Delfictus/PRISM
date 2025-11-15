@@ -17,61 +17,34 @@
 //! ρ = |⟨e^{iθ}⟩|  // Kuramoto order parameter (phase coherence)
 //! ```
 
+pub mod adapters;
 pub mod cross_domain_bridge;
 pub mod information_channel;
-pub mod synchronization;
-pub mod unified_platform;
+pub mod ports;
 #[cfg(feature = "quantum_mlir_support")]
 pub mod quantum_mlir_integration;
-pub mod ports;
-pub mod adapters;
+pub mod synchronization;
+pub mod unified_platform;
 
-pub use cross_domain_bridge::{
-    CrossDomainBridge,
-    DomainState,
-    CouplingStrength,
-    BridgeMetrics,
-};
+pub use cross_domain_bridge::{BridgeMetrics, CouplingStrength, CrossDomainBridge, DomainState};
 
-pub use information_channel::{
-    InformationChannel,
-    ChannelState,
-    TransferResult,
-};
+pub use information_channel::{ChannelState, InformationChannel, TransferResult};
 
-pub use synchronization::{
-    PhaseSynchronizer,
-    SynchronizationMetrics,
-    CoherenceLevel,
-};
+pub use synchronization::{CoherenceLevel, PhaseSynchronizer, SynchronizationMetrics};
 
 pub use unified_platform::{
-    UnifiedPlatform,
-    PlatformInput,
-    PlatformOutput,
-    PerformanceMetrics,
-    ProcessingPhase,
+    PerformanceMetrics, PlatformInput, PlatformOutput, ProcessingPhase, UnifiedPlatform,
 };
 
 #[cfg(feature = "quantum_mlir_support")]
-pub use quantum_mlir_integration::{
-    QuantumMlirIntegration,
-    QuantumGate,
-};
+pub use quantum_mlir_integration::{QuantumGate, QuantumMlirIntegration};
 
 pub use ports::{
-    NeuromorphicPort,
-    InformationFlowPort,
-    ThermodynamicPort,
-    QuantumPort,
-    ActiveInferencePort,
+    ActiveInferencePort, InformationFlowPort, NeuromorphicPort, QuantumPort, ThermodynamicPort,
 };
 
 pub use adapters::{
-    NeuromorphicAdapter,
-    InformationFlowAdapter,
+    ActiveInferenceAdapter, InformationFlowAdapter, NeuromorphicAdapter, QuantumAdapter,
     ThermodynamicAdapter,
-    QuantumAdapter,
-    ActiveInferenceAdapter,
 };
 pub mod multi_modal_reasoner;

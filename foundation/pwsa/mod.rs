@@ -9,35 +9,23 @@
 //! - Article IV: Active inference for threat classification
 //! - Article V: Shared GPU context for platform components
 
-pub mod satellite_adapters;
-pub mod vendor_sandbox;
-pub mod gpu_kernels;
-pub mod streaming;
 pub mod active_inference_classifier;
 pub mod gpu_classifier;
+pub mod gpu_kernels;
+pub mod satellite_adapters;
+pub mod streaming;
+pub mod vendor_sandbox;
 // pub mod gpu_classifier_v2;  // File doesn't exist yet
 
 // Re-export primary types for convenient access
 pub use satellite_adapters::{
-    TransportLayerAdapter,
-    TrackingLayerAdapter,
-    GroundLayerAdapter,
-    PwsaFusionPlatform,
-    OctTelemetry,
-    IrSensorFrame,
-    GroundStationData,
-    MissionAwareness,
-    ThreatDetection,
+    GroundLayerAdapter, GroundStationData, IrSensorFrame, MissionAwareness, OctTelemetry,
+    PwsaFusionPlatform, ThreatDetection, TrackingLayerAdapter, TransportLayerAdapter,
 };
 
 pub use vendor_sandbox::{
-    VendorSandbox,
-    VendorPlugin,
+    AuditLogger, DataClassification, ResourceQuota, SecureDataSlice, VendorPlugin, VendorSandbox,
     ZeroTrustPolicy,
-    ResourceQuota,
-    AuditLogger,
-    SecureDataSlice,
-    DataClassification,
 };
 
 /// PWSA Configuration for Tranche 1
@@ -57,11 +45,11 @@ pub struct PwsaConfig {
 impl Default for PwsaConfig {
     fn default() -> Self {
         Self {
-            transport_svs: 154,      // Tranche 1 Transport Layer
-            tracking_svs: 35,        // Tranche 1 Tracking Layer
-            ground_stations: 5,      // Typical ground station count
-            target_latency_ms: 5.0,  // <5ms requirement
-            gpu_device: 0,           // Default GPU
+            transport_svs: 154,     // Tranche 1 Transport Layer
+            tracking_svs: 35,       // Tranche 1 Tracking Layer
+            ground_stations: 5,     // Typical ground station count
+            target_latency_ms: 5.0, // <5ms requirement
+            gpu_device: 0,          // Default GPU
         }
     }
 }

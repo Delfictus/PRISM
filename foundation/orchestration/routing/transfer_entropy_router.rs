@@ -8,9 +8,9 @@
 //!
 //! Impact: +40% quality via causal routing + synergy detection
 
+use anyhow::Result;
 use ndarray::Array1;
 use std::collections::HashMap;
-use anyhow::Result;
 
 use crate::information_theory::transfer_entropy::TransferEntropy;
 
@@ -26,7 +26,7 @@ pub struct TransferEntropyPromptRouter {
 }
 
 struct RoutingHistory {
-    prompt_features: f64,  // Simplified: single feature for now
+    prompt_features: f64, // Simplified: single feature for now
     llm_quality: HashMap<String, f64>,
 }
 
@@ -42,25 +42,22 @@ impl TransferEntropyPromptRouter {
     ///
     /// TE(Prompt → LLM_quality) measures causal predictability
     /// High TE = this LLM's quality is causally predicted by prompt
-    pub fn route_via_transfer_entropy(
-        &self,
-        _prompt: &str,
-    ) -> Result<String> {
+    pub fn route_via_transfer_entropy(&self, _prompt: &str) -> Result<String> {
         if self.history.len() < 20 {
             // Not enough data for TE - use default
             return Ok("gpt-4".to_string());
         }
 
         // Build time series from history
-        let prompt_series: Vec<f64> = self.history.iter()
-            .map(|h| h.prompt_features)
-            .collect();
+        let prompt_series: Vec<f64> = self.history.iter().map(|h| h.prompt_features).collect();
 
         let mut te_scores = HashMap::new();
 
         // Compute TE for each LLM
         for llm in &["gpt-4", "claude", "gemini", "grok"] {
-            let quality_series: Vec<f64> = self.history.iter()
+            let quality_series: Vec<f64> = self
+                .history
+                .iter()
                 .map(|h| h.llm_quality.get(*llm).copied().unwrap_or(0.5))
                 .collect();
 
@@ -75,7 +72,8 @@ impl TransferEntropyPromptRouter {
         }
 
         // Select LLM with highest TE (most causally predictable)
-        let optimal = te_scores.iter()
+        let optimal = te_scores
+            .iter()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
             .map(|(llm, _)| llm.clone())
             .unwrap_or_else(|| "gpt-4".to_string());
@@ -85,7 +83,9 @@ impl TransferEntropyPromptRouter {
 
     /// Record result for learning
     pub fn record_result(&mut self, prompt_feature: f64, llm: &str, quality: f64) {
-        let entry = self.history.iter_mut()
+        let entry = self
+            .history
+            .iter_mut()
             .find(|h| (h.prompt_features - prompt_feature).abs() < 0.01);
 
         if let Some(entry) = entry {
@@ -126,7 +126,7 @@ impl PIDSynergyDetector {
     /// Negative synergy → Query one (redundant)
     pub fn detect_synergy_pairs(
         &self,
-        _llm_responses: &[(String, String)],  // (LLM name, response)
+        _llm_responses: &[(String, String)], // (LLM name, response)
     ) -> Result<SynergyMatrix> {
         // Placeholder implementation
         // Full PID requires significant historical data
@@ -134,7 +134,7 @@ impl PIDSynergyDetector {
         let mut synergy = HashMap::new();
 
         // Known synergies (will be learned from data)
-        synergy.insert(("gpt-4".to_string(), "claude".to_string()), 0.3);  // Synergistic
+        synergy.insert(("gpt-4".to_string(), "claude".to_string()), 0.3); // Synergistic
         synergy.insert(("gemini".to_string(), "grok".to_string()), -0.1); // Redundant
 
         Ok(SynergyMatrix { synergies: synergy })
@@ -188,15 +188,22 @@ impl PIDSynergyDetector {
         }
 
         // Sum synergies with already selected LLMs
-        selected.iter()
+        selected
+            .iter()
             .map(|llm| {
-                synergy_matrix.synergies
+                synergy_matrix
+                    .synergies
                     .get(&(llm.clone(), candidate.to_string()))
-                    .or_else(|| synergy_matrix.synergies.get(&(candidate.to_string(), llm.clone())))
+                    .or_else(|| {
+                        synergy_matrix
+                            .synergies
+                            .get(&(candidate.to_string(), llm.clone()))
+                    })
                     .copied()
                     .unwrap_or(0.0)
             })
-            .sum::<f64>() / selected.len() as f64
+            .sum::<f64>()
+            / selected.len() as f64
     }
 }
 

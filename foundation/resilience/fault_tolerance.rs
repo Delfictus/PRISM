@@ -39,9 +39,9 @@
 //! - A < 0.5 → Critical
 
 use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use serde::{Serialize, Deserialize};
 
 /// Component health status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -151,11 +151,7 @@ impl HealthMonitor {
     /// - `stale_timeout`: Duration before component considered stale (default 30s)
     /// - `degraded_threshold`: Availability threshold for degraded state (default 0.9)
     /// - `critical_threshold`: Availability threshold for critical state (default 0.5)
-    pub fn new(
-        stale_timeout: Duration,
-        degraded_threshold: f64,
-        critical_threshold: f64,
-    ) -> Self {
+    pub fn new(stale_timeout: Duration, degraded_threshold: f64, critical_threshold: f64) -> Self {
         Self {
             components: Arc::new(DashMap::new()),
             stale_timeout,
@@ -188,11 +184,7 @@ impl HealthMonitor {
     /// # Returns
     /// - `Ok(())` if component exists
     /// - `Err(String)` if component not registered
-    pub fn update_health(
-        &self,
-        name: &str,
-        status: HealthStatus,
-    ) -> Result<(), String> {
+    pub fn update_health(&self, name: &str, status: HealthStatus) -> Result<(), String> {
         self.components
             .get_mut(name)
             .map(|mut health| health.update_status(status))
@@ -275,8 +267,7 @@ impl HealthMonitor {
             .iter()
             .filter(|entry| {
                 let health = entry.value();
-                health.status == HealthStatus::Unhealthy
-                    || health.is_stale(self.stale_timeout)
+                health.status == HealthStatus::Unhealthy || health.is_stale(self.stale_timeout)
             })
             .map(|entry| entry.key().clone())
             .collect()

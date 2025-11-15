@@ -3,19 +3,19 @@
 //! Combines symbolic, neural, and quantum reasoning modes
 //! ALL on GPU with fused kernels for maximum performance
 
-use anyhow::Result;
-use std::sync::Arc;
-use cudarc::driver::{CudaDevice, CudaSlice};
 use crate::gpu::{GpuKernelExecutor, GpuTensorOpt};
+use anyhow::Result;
+use cudarc::driver::{CudaDevice, CudaSlice};
 use ndarray::{Array1, Array2};
+use std::sync::Arc;
 
 /// Reasoning mode
 #[derive(Debug, Clone, Copy)]
 pub enum ReasoningMode {
-    Symbolic,   // Classical constraint propagation
-    Neural,     // GNN pattern recognition
-    Quantum,    // Quantum annealing
-    Hybrid,     // Combination
+    Symbolic, // Classical constraint propagation
+    Neural,   // GNN pattern recognition
+    Quantum,  // Quantum annealing
+    Hybrid,   // Combination
 }
 
 /// Problem representation for multi-modal reasoning
@@ -152,11 +152,8 @@ impl MultiModalReasoner {
 
         // STEP 4: FUSED combination on GPU
         println!("   🔀 Fusing solutions on GPU...");
-        let combined = self.fuse_solutions_gpu(vec![
-            symbolic_solution,
-            neural_solution,
-            quantum_solution,
-        ])?;
+        let combined =
+            self.fuse_solutions_gpu(vec![symbolic_solution, neural_solution, quantum_solution])?;
 
         println!("   ✅ Combined confidence: {:.2}", combined.confidence);
 
@@ -168,7 +165,7 @@ impl MultiModalReasoner {
         // For graph coloring: propagate forbidden colors
 
         let n = problem.num_vertices;
-        let assignment = vec![0; n];  // Placeholder
+        let assignment = vec![0; n]; // Placeholder
 
         Ok(Solution {
             assignment,
@@ -183,7 +180,7 @@ impl MultiModalReasoner {
         // Uses our transformer/GNN kernels
 
         let n = problem.num_vertices;
-        let assignment = vec![0; n];  // Placeholder
+        let assignment = vec![0; n]; // Placeholder
 
         Ok(Solution {
             assignment,
@@ -198,7 +195,7 @@ impl MultiModalReasoner {
         // Uses Kuramoto kernels we have
 
         let n = problem.num_vertices;
-        let assignment = vec![0; n];  // Placeholder
+        let assignment = vec![0; n]; // Placeholder
 
         Ok(Solution {
             assignment,
@@ -219,7 +216,8 @@ impl MultiModalReasoner {
         let conf_gpu = self.context.htod_sync_copy(&confidences)?;
 
         // For now, simple weighted combination
-        let best_idx = solutions.iter()
+        let best_idx = solutions
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| {
                 let score_a = a.quality * a.confidence;
@@ -231,7 +229,8 @@ impl MultiModalReasoner {
 
         let mut best = solutions[best_idx].clone();
         best.reasoning_mode = ReasoningMode::Hybrid;
-        best.confidence = confidences.iter().map(|&c| c as f64).sum::<f64>() / confidences.len() as f64;
+        best.confidence =
+            confidences.iter().map(|&c| c as f64).sum::<f64>() / confidences.len() as f64;
 
         Ok(best)
     }

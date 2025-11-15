@@ -2,10 +2,10 @@
 //!
 //! NO CPU FALLBACK - GPU ONLY!
 
-use anyhow::{Result, Context as AnyhowContext};
-use std::sync::{Arc, Mutex, OnceLock};
+use super::kernel_executor::{get_global_executor, GpuKernelExecutor};
+use anyhow::{Context as AnyhowContext, Result};
 use cudarc::driver::CudaDevice;
-use super::kernel_executor::{GpuKernelExecutor, get_global_executor};
+use std::sync::{Arc, Mutex, OnceLock};
 
 /// Global GPU context and executor (shared across all tensors)
 static GPU_STATE: OnceLock<Arc<GpuState>> = OnceLock::new();
@@ -19,8 +19,8 @@ struct GpuState {
 impl GpuState {
     fn initialize() -> Result<Arc<Self>> {
         // Create CUDA device
-        let cuda_device = CudaDevice::new(0)
-            .context("Failed to create CUDA device - GPU REQUIRED!")?;
+        let cuda_device =
+            CudaDevice::new(0).context("Failed to create CUDA device - GPU REQUIRED!")?;
         let device_ordinal = cuda_device.ordinal();
 
         // Create kernel executor
@@ -83,7 +83,10 @@ impl GpuTensor {
     pub fn from_cpu(data: Vec<f32>, shape: Vec<usize>) -> Result<Self> {
         let gpu_state = GpuState::get()?;
 
-        println!("  📊 Tensor created (GPU KERNEL EXECUTION, size: {})", data.len());
+        println!(
+            "  📊 Tensor created (GPU KERNEL EXECUTION, size: {})",
+            data.len()
+        );
 
         Ok(Self {
             data,
@@ -118,7 +121,10 @@ impl GpuTensor {
             anyhow::bail!("Shape mismatch for matmul");
         }
 
-        println!("  🚀 Matrix multiply (GPU KERNEL EXECUTION, {}x{}x{})", m, k, n);
+        println!(
+            "  🚀 Matrix multiply (GPU KERNEL EXECUTION, {}x{}x{})",
+            m, k, n
+        );
 
         // ACTUAL GPU KERNEL EXECUTION - NO CPU COMPUTATION!
         let executor = self.gpu_state.kernel_executor.lock().unwrap();
@@ -284,7 +290,12 @@ impl GpuLinear {
         // GPU BROADCAST ADD KERNEL
         {
             let executor = output.gpu_state.kernel_executor.lock().unwrap();
-            executor.broadcast_add_inplace(&mut output.data, &self.bias.data, batch_size, features)?;
+            executor.broadcast_add_inplace(
+                &mut output.data,
+                &self.bias.data,
+                batch_size,
+                features,
+            )?;
         }
 
         Ok(output)
@@ -346,19 +357,13 @@ mod tests {
     #[test]
     fn test_gpu_activations() -> Result<()> {
         // Test ReLU
-        let mut tensor = GpuTensor::from_cpu(
-            vec![-1.0, 0.0, 1.0, -0.5, 2.0],
-            vec![5]
-        )?;
+        let mut tensor = GpuTensor::from_cpu(vec![-1.0, 0.0, 1.0, -0.5, 2.0], vec![5])?;
         tensor.relu()?;
         let result = tensor.to_cpu()?;
         assert_eq!(result, vec![0.0, 0.0, 1.0, 0.0, 2.0]);
 
         // Test Softmax
-        let mut tensor = GpuTensor::from_cpu(
-            vec![1.0, 2.0, 3.0, 4.0],
-            vec![2, 2]
-        )?;
+        let mut tensor = GpuTensor::from_cpu(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2])?;
         tensor.softmax(1)?;
         let result = tensor.to_cpu()?;
 

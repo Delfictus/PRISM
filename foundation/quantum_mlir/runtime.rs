@@ -3,13 +3,13 @@
 //! This is the runtime that executes quantum operations on GPU
 //! using our native complex number kernels
 
-use anyhow::{Result, Context};
-use std::sync::Arc;
+use anyhow::{Context, Result};
 use parking_lot::Mutex;
+use std::sync::Arc;
 
+use super::cuda_kernels::{CudaComplex, QuantumGpuKernels};
 use super::gpu_memory::GpuMemoryManager;
-use super::cuda_kernels::{QuantumGpuKernels, CudaComplex};
-use super::{Complex64, QuantumOp, Hamiltonian, QuantumState};
+use super::{Complex64, Hamiltonian, QuantumOp, QuantumState};
 #[cfg(feature = "cuda")]
 use cudarc::driver::CudaSlice;
 
@@ -28,7 +28,6 @@ pub struct QuantumGpuRuntime {
     num_qubits: usize,
 }
 
-
 #[cfg(feature = "cuda")]
 impl QuantumGpuRuntime {
     /// Create new quantum GPU runtime
@@ -46,7 +45,10 @@ impl QuantumGpuRuntime {
         let memory = Arc::new(GpuMemoryManager::new(context)?);
         let dimension = 1 << num_qubits;
 
-        println!("[Quantum GPU Runtime] Initializing with {} qubits", num_qubits);
+        println!(
+            "[Quantum GPU Runtime] Initializing with {} qubits",
+            num_qubits
+        );
         println!("[Quantum GPU Runtime] State dimension: {}", dimension);
         println!("[Quantum GPU Runtime] {}", memory.get_device_info());
 
@@ -65,7 +67,8 @@ impl QuantumGpuRuntime {
     /// Execute a quantum operation on GPU
     pub fn execute_op(&self, op: &QuantumOp) -> Result<()> {
         let mut state_guard = self.gpu_state.lock();
-        let state = state_guard.as_mut()
+        let state = state_guard
+            .as_mut()
             .ok_or_else(|| anyhow::anyhow!("GPU state not initialized"))?;
 
         match op {
@@ -74,8 +77,12 @@ impl QuantumGpuRuntime {
                 self.kernels.hadamard(state, *qubit, self.num_qubits)?;
             }
             QuantumOp::CNOT { control, target } => {
-                println!("[GPU PTX] Applying CNOT gate: control={}, target={}", control, target);
-                self.kernels.cnot(state, *control, *target, self.num_qubits)?;
+                println!(
+                    "[GPU PTX] Applying CNOT gate: control={}, target={}",
+                    control, target
+                );
+                self.kernels
+                    .cnot(state, *control, *target, self.num_qubits)?;
             }
             QuantumOp::Evolution { hamiltonian, time } => {
                 println!("[GPU PTX] Time evolution for t={}", time);
@@ -103,7 +110,10 @@ impl QuantumGpuRuntime {
 
     /// Upload Hamiltonian to GPU
     pub fn upload_hamiltonian(&self, hamiltonian: &Hamiltonian) -> Result<()> {
-        println!("[GPU] Uploading Hamiltonian ({}x{})", hamiltonian.dimension, hamiltonian.dimension);
+        println!(
+            "[GPU] Uploading Hamiltonian ({}x{})",
+            hamiltonian.dimension, hamiltonian.dimension
+        );
 
         let gpu_ham = self.memory.upload_hamiltonian(&hamiltonian.elements)?;
         *self.gpu_hamiltonian.lock() = Some(gpu_ham);
@@ -119,7 +129,10 @@ impl QuantumGpuRuntime {
             self.upload_hamiltonian(hamiltonian)?;
         }
 
-        println!("[GPU PTX] Hamiltonian evolution (simplified) for t={}", time);
+        println!(
+            "[GPU PTX] Hamiltonian evolution (simplified) for t={}",
+            time
+        );
         // Evolution kernel would be launched here
         Ok(())
     }
@@ -127,10 +140,14 @@ impl QuantumGpuRuntime {
     /// Apply Quantum Fourier Transform
     pub fn apply_qft(&self, inverse: bool) -> Result<()> {
         let mut state_guard = self.gpu_state.lock();
-        let state = state_guard.as_mut()
+        let state = state_guard
+            .as_mut()
             .ok_or_else(|| anyhow::anyhow!("GPU state not initialized"))?;
 
-        println!("[GPU PTX] Applying {} QFT", if inverse { "inverse" } else { "forward" });
+        println!(
+            "[GPU PTX] Applying {} QFT",
+            if inverse { "inverse" } else { "forward" }
+        );
         self.kernels.qft(state, self.num_qubits, inverse)?;
 
         Ok(())
@@ -139,15 +156,20 @@ impl QuantumGpuRuntime {
     /// Apply VQE ansatz with parameters
     pub fn apply_vqe_ansatz(&self, parameters: &[f64], num_layers: usize) -> Result<()> {
         let mut state_guard = self.gpu_state.lock();
-        let state = state_guard.as_mut()
+        let state = state_guard
+            .as_mut()
             .ok_or_else(|| anyhow::anyhow!("GPU state not initialized"))?;
 
         // Upload parameters to GPU
-        let gpu_params = self.memory.context.htod_sync_copy(parameters)
+        let gpu_params = self
+            .memory
+            .context
+            .htod_sync_copy(parameters)
             .map_err(|e| anyhow::anyhow!("Failed to upload VQE parameters: {}", e))?;
 
         println!("[GPU PTX] Applying VQE ansatz with {} layers", num_layers);
-        self.kernels.vqe_ansatz(state, &gpu_params, self.num_qubits, num_layers)?;
+        self.kernels
+            .vqe_ansatz(state, &gpu_params, self.num_qubits, num_layers)?;
 
         Ok(())
     }
@@ -155,7 +177,8 @@ impl QuantumGpuRuntime {
     /// Measure quantum state and get probabilities
     pub fn measure(&self) -> Result<Vec<f64>> {
         let state_guard = self.gpu_state.lock();
-        let state = state_guard.as_ref()
+        let state = state_guard
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("GPU state not initialized"))?;
 
         let dimension = 1 << self.num_qubits;
@@ -169,7 +192,8 @@ impl QuantumGpuRuntime {
     /// Get current quantum state from GPU
     pub fn get_state(&self) -> Result<QuantumState> {
         let state_guard = self.gpu_state.lock();
-        let gpu_state = state_guard.as_ref()
+        let gpu_state = state_guard
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("GPU state not initialized"))?;
 
         let amplitudes = self.memory.download_state(gpu_state)?;
@@ -198,4 +222,3 @@ impl QuantumGpuRuntime {
         ))
     }
 }
-

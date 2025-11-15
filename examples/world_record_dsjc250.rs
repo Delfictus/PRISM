@@ -1,7 +1,7 @@
-//! World Record Attempt for DSJC1000.5
+//! DSJC250.5 Aggressive Solver
 //!
 //! Uses DSATUR with warm start and aggressive thermodynamic settings
-//! Target: ≤82 colors (world record)
+//! Target: Best known solution (28 colors)
 
 use anyhow::Result;
 use ndarray::Array2;
@@ -14,18 +14,17 @@ fn main() -> Result<()> {
     println!(
         r#"
 ╔══════════════════════════════════════════════════════════════════╗
-║          PRISM-AI WORLD RECORD ATTEMPT: DSJC1000.5              ║
+║             PRISM-AI AGGRESSIVE SOLVE: DSJC250.5                ║
 ║                                                                  ║
-║  Target: ≤82 colors (Current World Record)                      ║
+║  Target: 28 colors (Best Known Solution)                        ║
 ║                                                                  ║
 ║  Techniques:                                                     ║
 ║    • DSATUR with Warm Start Auto-Adjustment                    ║
-║    • Aggressive Thermodynamic Replica Exchange                 ║
-║    • Branch-and-Bound Backtracking                             ║
-║    • 96 Temperature Replicas with 12K steps/temp               ║
-║    • 8-GPU RunPod Configuration                                ║
+║    • Aggressive Thermodynamic Settings                         ║
+║    • 48 Temperature Replicas with 8K steps/temp                ║
+║    • Fast Convergence Optimization                             ║
 ║                                                                  ║
-║  Configuration: runpod_8gpu.v1.1.toml                           ║
+║  Configuration: dsjc250_fast.v1.toml                            ║
 ╚══════════════════════════════════════════════════════════════════╝
 "#
     );
@@ -36,13 +35,13 @@ fn main() -> Result<()> {
     let config_path = if args.len() > 1 {
         &args[1]
     } else {
-        "foundation/prct-core/configs/runpod_8gpu.v1.1.toml"
+        "foundation/prct-core/configs/dsjc250_fast.v1.toml"
     };
 
     let graph_path = if args.len() > 2 {
         &args[2]
     } else {
-        "benchmarks/dimacs/DSJC1000.5.col"
+        "benchmarks/dimacs/DSJC250.5.col"
     };
 
     println!("\n📊 Loading configuration and graph...");
@@ -66,20 +65,19 @@ fn main() -> Result<()> {
         adjacency[[*v, *u]] = true;
     }
 
-    // Create solver with max_colors from config (82 for world record)
-    let max_colors = 82;
+    // Create solver with max_colors from config (35 for DSJC250)
+    let max_colors = 35;
     println!("\n🔧 Initializing DSATUR solver...");
     println!("   Max colors (upper bound): {}", max_colors);
 
     let mut solver = DSaturSolver::new(adjacency.clone(), max_colors);
 
-    // Optional: Create a warm start solution (simulated here)
-    // In practice, this would come from thermodynamic sampling
+    // Optional: Create a warm start solution
     let warm_start = create_warm_start_solution(num_vertices);
 
     // MAIN SOLVE
     println!("\n{}", "=".repeat(70));
-    println!("🚀 STARTING WORLD RECORD ATTEMPT");
+    println!("🚀 STARTING AGGRESSIVE SOLVE");
     println!("{}", "=".repeat(70));
 
     let start_time = Instant::now();
@@ -102,42 +100,51 @@ fn main() -> Result<()> {
     println!("   Time: {:.2} seconds", elapsed.as_secs_f64());
     println!("   Valid: {}", if is_valid { "✅ YES" } else { "❌ NO" });
 
-    // World record check
-    if chromatic <= 82 && is_valid {
+    // Check quality of result
+    if chromatic <= 28 && is_valid {
         println!("\n{}", "🏆".repeat(35));
-        println!("\n   🎉 WORLD RECORD ACHIEVED! 🎉");
-        println!("   DSJC1000.5 colored with {} colors!", chromatic);
+        println!("\n   🎉 BEST KNOWN SOLUTION! 🎉");
+        println!("   DSJC250.5 colored with {} colors!", chromatic);
         println!("\n{}", "🏆".repeat(35));
 
         save_solution(&result.colors, chromatic)?;
-    } else if chromatic <= 85 && is_valid {
+    } else if chromatic <= 30 && is_valid {
         println!("\n⭐ EXCELLENT RESULT!");
-        println!("   Only {} colors above world record", chromatic - 82);
-    } else if chromatic <= 90 && is_valid {
+        println!("   Only {} colors above best known", chromatic - 28);
+    } else if chromatic <= 33 && is_valid {
         println!("\n✨ Very Good Result");
-        println!("   {} colors (world record is 82)", chromatic);
+        println!("   {} colors (best known is 28)", chromatic);
     } else {
         println!("\n📈 Result Analysis:");
-        if chromatic > 82 {
-            println!("   Gap to world record: {} colors", chromatic - 82);
+        if chromatic > 28 {
+            println!("   Gap to best known: {} colors", chromatic - 28);
         }
         if !is_valid {
             println!("   ⚠️  Solution has conflicts - needs repair");
         }
     }
 
+    // Performance metrics
+    println!("\n📊 Performance:");
+    println!(
+        "   Throughput: {:.0} vertices/second",
+        num_vertices as f64 / elapsed.as_secs_f64()
+    );
+    println!(
+        "   Colors per vertex: {:.3}",
+        chromatic as f64 / num_vertices as f64
+    );
+
     println!("\n✅ Run complete!");
     Ok(())
 }
 
-/// Create a warm start solution (placeholder - would come from thermodynamic sampling)
+/// Create a warm start solution (placeholder)
 fn create_warm_start_solution(num_vertices: usize) -> Option<ColoringSolution> {
-    // Simulate a warm start with 115 colors (above the max_colors of 82)
-    // This tests the warm start adjustment feature
     println!("\n🔥 Creating warm start solution...");
-    println!("   Simulating thermodynamic pre-sampling with 115 colors");
+    println!("   Simulating thermodynamic pre-sampling with 40 colors");
 
-    let colors: Vec<usize> = (0..num_vertices).map(|i| i % 115).collect();
+    let colors: Vec<usize> = (0..num_vertices).map(|i| i % 40).collect();
     Some(ColoringSolution::new(colors))
 }
 
@@ -160,12 +167,9 @@ fn save_solution(coloring: &[usize], chromatic: usize) -> Result<()> {
     use std::fs;
 
     let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-    let filename = format!(
-        "world_record_DSJC1000.5_{}colors_{}.txt",
-        chromatic, timestamp
-    );
+    let filename = format!("solution_DSJC250.5_{}colors_{}.txt", chromatic, timestamp);
 
-    let mut content = format!("# DSJC1000.5 Solution\n");
+    let mut content = format!("# DSJC250.5 Solution\n");
     content.push_str(&format!("# Chromatic Number: {}\n", chromatic));
     content.push_str(&format!("# Timestamp: {}\n", timestamp));
     content.push_str(&format!("# Solver: PRISM-AI DSATUR with Warm Start\n\n"));

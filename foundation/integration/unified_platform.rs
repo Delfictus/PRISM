@@ -16,20 +16,22 @@
 //! Performance requirement: End-to-end latency < 10ms
 //! Physical constraints: Maintains thermodynamic consistency (dS/dt ≥ 0)
 
-use std::time::Instant;
-use std::sync::Arc;
-use ndarray::{Array1, Array2};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use cudarc::driver::CudaDevice;
-use shared_types::{PhaseField, KuramotoState};
+use ndarray::{Array1, Array2};
+use shared_types::{KuramotoState, PhaseField};
+use std::sync::Arc;
+use std::time::Instant;
 
-use crate::statistical_mechanics::ThermodynamicState;
-use super::cross_domain_bridge::{CrossDomainBridge, BridgeMetrics};
-use super::ports::{NeuromorphicPort, InformationFlowPort, ThermodynamicPort, QuantumPort, ActiveInferencePort};
 use super::adapters::{
-    NeuromorphicAdapter, InformationFlowAdapter, ThermodynamicAdapter,
-    QuantumAdapter, ActiveInferenceAdapter,
+    ActiveInferenceAdapter, InformationFlowAdapter, NeuromorphicAdapter, QuantumAdapter,
+    ThermodynamicAdapter,
 };
+use super::cross_domain_bridge::{BridgeMetrics, CrossDomainBridge};
+use super::ports::{
+    ActiveInferencePort, InformationFlowPort, NeuromorphicPort, QuantumPort, ThermodynamicPort,
+};
+use crate::statistical_mechanics::ThermodynamicState;
 
 /// Input data for the unified platform
 #[derive(Debug, Clone)]
@@ -45,7 +47,11 @@ pub struct PlatformInput {
 impl PlatformInput {
     /// Create new platform input
     pub fn new(sensory_data: Array1<f64>, targets: Array1<f64>, dt: f64) -> Self {
-        Self { sensory_data, targets, dt }
+        Self {
+            sensory_data,
+            targets,
+            dt,
+        }
     }
 }
 
@@ -94,8 +100,7 @@ impl PerformanceMetrics {
     /// 3. Total latency < 500ms (realistic for full pipeline)
     pub fn meets_requirements(&self) -> bool {
         // Constitutional requirements (MUST be met)
-        let constitutional = self.entropy_production >= 0.0
-            && self.free_energy.is_finite();
+        let constitutional = self.entropy_production >= 0.0 && self.free_energy.is_finite();
 
         // Performance targets (desirable but not required)
         let performance = self.total_latency_ms < 500.0;
@@ -108,8 +113,14 @@ impl PerformanceMetrics {
     /// Generate performance report
     pub fn report(&self) -> String {
         let phase_names = [
-            "Neuromorphic", "Info Flow", "Coupling", "Thermodynamic",
-            "Quantum", "Active Inference", "Control", "Synchronization"
+            "Neuromorphic",
+            "Info Flow",
+            "Coupling",
+            "Thermodynamic",
+            "Quantum",
+            "Active Inference",
+            "Control",
+            "Synchronization",
         ];
 
         let mut report = format!(
@@ -122,21 +133,37 @@ impl PerformanceMetrics {
              Phase Coherence: {:.3}\n\n\
              Phase Breakdown:\n",
             self.total_latency_ms,
-            if self.total_latency_ms < 500.0 { "✓" } else { "✗" },
+            if self.total_latency_ms < 500.0 {
+                "✓"
+            } else {
+                "✗"
+            },
             self.free_energy,
             self.entropy_production,
-            if self.entropy_production >= 0.0 { "✓" } else { "✗" },
+            if self.entropy_production >= 0.0 {
+                "✓"
+            } else {
+                "✗"
+            },
             self.mutual_information,
             self.phase_coherence,
         );
 
-        for (i, (name, latency)) in phase_names.iter().zip(self.phase_latencies.iter()).enumerate() {
-            report.push_str(&format!("  {}. {}: {:.3} ms\n", i+1, name, latency));
+        for (i, (name, latency)) in phase_names
+            .iter()
+            .zip(self.phase_latencies.iter())
+            .enumerate()
+        {
+            report.push_str(&format!("  {}. {}: {:.3} ms\n", i + 1, name, latency));
         }
 
         report.push_str(&format!(
             "\nOverall: {}",
-            if self.meets_requirements() { "✓ PASS" } else { "✗ FAIL" }
+            if self.meets_requirements() {
+                "✓ PASS"
+            } else {
+                "✗ FAIL"
+            }
         ));
 
         report
@@ -191,43 +218,57 @@ impl UnifiedPlatform {
     /// Use this for multi-GPU setups where you want to assign different
     /// platform instances to different GPUs
     pub fn new_with_device(n_dimensions: usize, device_id: usize) -> Result<Self> {
-        println!("[Platform] Initializing GPU-accelerated unified platform on device {}...", device_id);
+        println!(
+            "[Platform] Initializing GPU-accelerated unified platform on device {}...",
+            device_id
+        );
 
         // Step 1: Create shared CUDA context for specified device
-        let cuda_context = CudaDevice::new(device_id)
-            .map_err(|e| anyhow!("Failed to create CUDA context on device {}: {}", device_id, e))?;
+        let cuda_context = CudaDevice::new(device_id).map_err(|e| {
+            anyhow!(
+                "Failed to create CUDA context on device {}: {}",
+                device_id,
+                e
+            )
+        })?;
         println!("[Platform] ✓ CUDA context created (device {})", device_id);
 
         // Step 2: Initialize GPU-accelerated adapters with shared context
 
         // Neuromorphic: GPU reservoir for spike encoding
-        let neuromorphic = Box::new(
-            NeuromorphicAdapter::new_gpu(cuda_context.clone(), n_dimensions, 1000)?
-        ) as Box<dyn NeuromorphicPort>;
+        let neuromorphic = Box::new(NeuromorphicAdapter::new_gpu(
+            cuda_context.clone(),
+            n_dimensions,
+            1000,
+        )?) as Box<dyn NeuromorphicPort>;
         println!("[Platform] ✓ Neuromorphic adapter (GPU reservoir)");
 
         // Information Flow: GPU transfer entropy computation
-        let information_flow = Box::new(
-            InformationFlowAdapter::new_gpu(cuda_context.clone(), 10, 1, 1)?
-        ) as Box<dyn InformationFlowPort>;
+        let information_flow = Box::new(InformationFlowAdapter::new_gpu(
+            cuda_context.clone(),
+            10,
+            1,
+            1,
+        )?) as Box<dyn InformationFlowPort>;
         println!("[Platform] ✓ Information flow adapter (GPU transfer entropy)");
 
         // Thermodynamic: GPU-accelerated evolution
-        let thermodynamic = Box::new(
-            ThermodynamicAdapter::new_gpu(cuda_context.clone(), n_dimensions)?
-        ) as Box<dyn ThermodynamicPort>;
+        let thermodynamic = Box::new(ThermodynamicAdapter::new_gpu(
+            cuda_context.clone(),
+            n_dimensions,
+        )?) as Box<dyn ThermodynamicPort>;
         println!("[Platform] ✓ Thermodynamic adapter (GPU Langevin dynamics)");
 
         // Quantum: GPU MLIR kernels
-        let quantum = Box::new(
-            QuantumAdapter::new_gpu(cuda_context.clone(), 10)?
-        ) as Box<dyn QuantumPort>;
+        let quantum =
+            Box::new(QuantumAdapter::new_gpu(cuda_context.clone(), 10)?) as Box<dyn QuantumPort>;
         println!("[Platform] ✓ Quantum adapter (GPU MLIR)");
 
         // Active Inference: GPU-accelerated variational inference
-        let active_inference = Box::new(
-            ActiveInferenceAdapter::new_gpu(cuda_context.clone(), n_dimensions)?
-        ) as Box<dyn ActiveInferencePort>;
+        let active_inference = Box::new(ActiveInferenceAdapter::new_gpu(
+            cuda_context.clone(),
+            n_dimensions,
+        )?) as Box<dyn ActiveInferencePort>;
         println!("[Platform] ✓ Active inference adapter (GPU variational inference)");
 
         // Step 3: Initialize cross-domain bridge
@@ -278,7 +319,8 @@ impl UnifiedPlatform {
 
         // Delegate coupling matrix computation to adapter (GPU TE)
         let coupling = if spike_history.len() > 20 {
-            self.information_flow.compute_coupling_matrix(spike_history)?
+            self.information_flow
+                .compute_coupling_matrix(spike_history)?
         } else {
             Array2::eye(self.n_dimensions)
         };
@@ -290,7 +332,11 @@ impl UnifiedPlatform {
     /// Phase 3-4: Thermodynamic evolution under information flow coupling
     ///
     /// Constitutional: Delegates to ThermodynamicPort
-    fn thermodynamic_evolution(&mut self, coupling: &Array2<f64>, dt: f64) -> Result<(ThermodynamicState, f64)> {
+    fn thermodynamic_evolution(
+        &mut self,
+        coupling: &Array2<f64>,
+        dt: f64,
+    ) -> Result<(ThermodynamicState, f64)> {
         let start = Instant::now();
 
         // Delegate to adapter (CPU thermodynamics for now, GPU TODO)
@@ -299,8 +345,12 @@ impl UnifiedPlatform {
         // Verify 2nd law (constitutional requirement)
         // Allow small numerical errors (~0.1%) in entropy calculation
         let entropy_prod = self.thermodynamic.entropy_production();
-        if entropy_prod < -2.0 {  // Allow minor fluctuations, catch major violations
-            return Err(anyhow!("Entropy production violation: {} < 0", entropy_prod));
+        if entropy_prod < -2.0 {
+            // Allow minor fluctuations, catch major violations
+            return Err(anyhow!(
+                "Entropy production violation: {} < 0",
+                entropy_prod
+            ));
         }
 
         let latency = start.elapsed().as_secs_f64() * 1000.0;
@@ -310,7 +360,10 @@ impl UnifiedPlatform {
     /// Phase 5: Quantum processing (GPU MLIR kernels)
     ///
     /// Constitutional: Delegates to QuantumPort (GPU adapter)
-    fn quantum_processing(&mut self, thermo_state: &ThermodynamicState) -> Result<(Array1<f64>, f64)> {
+    fn quantum_processing(
+        &mut self,
+        thermo_state: &ThermodynamicState,
+    ) -> Result<(Array1<f64>, f64)> {
         let start = Instant::now();
 
         // Delegate to adapter (GPU quantum MLIR)
@@ -323,7 +376,12 @@ impl UnifiedPlatform {
     /// Phase 6: Active inference (variational free energy minimization)
     ///
     /// Constitutional: Delegates to ActiveInferencePort
-    fn active_inference(&mut self, observations: &Array1<f64>, quantum_obs: &Array1<f64>, targets: &Array1<f64>) -> Result<(Array1<f64>, f64, f64)> {
+    fn active_inference(
+        &mut self,
+        observations: &Array1<f64>,
+        quantum_obs: &Array1<f64>,
+        targets: &Array1<f64>,
+    ) -> Result<(Array1<f64>, f64, f64)> {
         let start = Instant::now();
         println!("[PIPELINE] Phase 6 active_inference() ENTRY");
 
@@ -331,7 +389,10 @@ impl UnifiedPlatform {
         let infer_start = Instant::now();
         let free_energy = self.active_inference.infer(observations, quantum_obs)?;
         let infer_elapsed = infer_start.elapsed();
-        println!("[PIPELINE] active_inference.infer() took {:?}", infer_elapsed);
+        println!(
+            "[PIPELINE] active_inference.infer() took {:?}",
+            infer_elapsed
+        );
 
         // CONSTITUTIONAL REQUIREMENT: Free energy must be finite
         if !free_energy.is_finite() {
@@ -358,7 +419,8 @@ impl UnifiedPlatform {
 
         // Map to bridge
         let n_dims = self.n_dimensions.min(quantum_obs.len());
-        self.bridge.quantum_state.phases = quantum_obs.iter()
+        self.bridge.quantum_state.phases = quantum_obs
+            .iter()
             .take(n_dims)
             .cloned()
             .collect::<Vec<_>>()
@@ -396,7 +458,8 @@ impl UnifiedPlatform {
         phase_latencies[4] = lat5;
 
         // Phase 6: Active inference (CPU for now)
-        let (control_signals, lat6, free_energy) = self.active_inference(&input.sensory_data, &quantum_obs, &input.targets)?;
+        let (control_signals, lat6, free_energy) =
+            self.active_inference(&input.sensory_data, &quantum_obs, &input.targets)?;
         phase_latencies[5] = lat6;
         phase_latencies[6] = 0.0; // Simplified control into phase 6
 
@@ -411,10 +474,16 @@ impl UnifiedPlatform {
         // CONSTITUTIONAL VERIFICATION
         // Allow small numerical fluctuations (~0.1%) in entropy calculation
         if entropy_production < -2.0 {
-            return Err(anyhow!("CONSTITUTION VIOLATION: 2nd Law violated! dS/dt = {}", entropy_production));
+            return Err(anyhow!(
+                "CONSTITUTION VIOLATION: 2nd Law violated! dS/dt = {}",
+                entropy_production
+            ));
         }
         if !free_energy.is_finite() {
-            return Err(anyhow!("CONSTITUTION VIOLATION: Free energy not finite: {}", free_energy));
+            return Err(anyhow!(
+                "CONSTITUTION VIOLATION: Free energy not finite: {}",
+                free_energy
+            ));
         }
 
         let metrics = PerformanceMetrics {
@@ -428,7 +497,10 @@ impl UnifiedPlatform {
 
         // Report requirements status
         if !metrics.meets_requirements() {
-            eprintln!("⚠ Performance requirements not fully met:\n{}", metrics.report());
+            eprintln!(
+                "⚠ Performance requirements not fully met:\n{}",
+                metrics.report()
+            );
         }
 
         // Generate predictions (placeholder - should come from active inference adapter)
@@ -491,8 +563,10 @@ mod tests {
     #[test]
     fn test_neuromorphic_encoding() {
         let mut platform = UnifiedPlatform::new(20).unwrap();
-        let input = Array1::from_vec(vec![0.3, 0.7, 0.4, 0.9, 0.2, 0.6, 0.8, 0.1, 0.5, 0.75,
-                                          0.3, 0.7, 0.4, 0.9, 0.2, 0.6, 0.8, 0.1, 0.5, 0.75]);
+        let input = Array1::from_vec(vec![
+            0.3, 0.7, 0.4, 0.9, 0.2, 0.6, 0.8, 0.1, 0.5, 0.75, 0.3, 0.7, 0.4, 0.9, 0.2, 0.6, 0.8,
+            0.1, 0.5, 0.75,
+        ]);
 
         let (spikes, latency) = platform.neuromorphic_encoding(&input).unwrap();
 
@@ -513,7 +587,7 @@ mod tests {
         let input = PlatformInput::new(
             Array1::from_vec((0..30).map(|i| (i as f64 * 0.1).sin() + 0.5).collect()),
             Array1::zeros(30),
-            0.01
+            0.01,
         );
 
         let result = platform.process(input);
@@ -564,11 +638,7 @@ mod tests {
         let mut platform = UnifiedPlatform::new(10).unwrap();
         platform.initialize();
 
-        let input = PlatformInput::new(
-            Array1::ones(10) * 0.6,
-            Array1::zeros(10),
-            0.01
-        );
+        let input = PlatformInput::new(Array1::ones(10) * 0.6, Array1::zeros(10), 0.01);
 
         if let Ok(output) = platform.process(input) {
             // Check all phases executed
@@ -580,8 +650,12 @@ mod tests {
             // Sum should approximately equal total
             let sum: f64 = output.metrics.phase_latencies.iter().sum();
             let diff = (output.metrics.total_latency_ms - sum).abs();
-            assert!(diff < 1.0, "Latency sum mismatch: total={}, sum={}",
-                output.metrics.total_latency_ms, sum);
+            assert!(
+                diff < 1.0,
+                "Latency sum mismatch: total={}, sum={}",
+                output.metrics.total_latency_ms,
+                sum
+            );
         }
     }
 
@@ -594,11 +668,7 @@ mod tests {
         let initial_mi = platform.bridge.channel.state.mutual_information;
 
         // Process with zero input
-        let input = PlatformInput::new(
-            Array1::zeros(15),
-            Array1::zeros(15),
-            0.01
-        );
+        let input = PlatformInput::new(Array1::zeros(15), Array1::zeros(15), 0.01);
 
         let _ = platform.process(input);
 

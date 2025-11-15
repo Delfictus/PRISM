@@ -9,8 +9,8 @@
 //!
 //! H(s) = Σᵢⱼ J_ij d(i,j) sᵢsⱼ + Σᵢⱼₖ K_ijk sᵢsⱼsₖ + Σᵢ hᵢsᵢ - T*S(s)
 
-use ndarray::{Array1, Array2, Array3};
 use anyhow::Result;
+use ndarray::{Array1, Array2, Array3};
 
 /// Enhanced Information Hamiltonian with Triplet Interactions
 pub struct InformationHamiltonian {
@@ -56,10 +56,8 @@ impl InformationHamiltonian {
         // PAIRWISE INTERACTIONS: Σᵢⱼ J_ij d(i,j) sᵢsⱼ
         for i in 0..n {
             for j in 0..n {
-                energy += self.coupling_matrix[[i, j]]
-                         * distances[[i, j]]
-                         * weights[i]
-                         * weights[j];
+                energy +=
+                    self.coupling_matrix[[i, j]] * distances[[i, j]] * weights[i] * weights[j];
             }
         }
 
@@ -69,13 +67,14 @@ impl InformationHamiltonian {
                 for k in 0..n {
                     if i != j && j != k && i != k {
                         // 3-body interaction energy
-                        let avg_distance = (distances[[i, j]] + distances[[j, k]] + distances[[i, k]]) / 3.0;
+                        let avg_distance =
+                            (distances[[i, j]] + distances[[j, k]] + distances[[i, k]]) / 3.0;
 
                         energy += self.triplet_couplings[[i, j, k]]
-                                 * avg_distance
-                                 * weights[i]
-                                 * weights[j]
-                                 * weights[k];
+                            * avg_distance
+                            * weights[i]
+                            * weights[j]
+                            * weights[k];
                     }
                 }
             }
@@ -114,21 +113,18 @@ impl InformationHamiltonian {
         for i in 0..n {
             // Pairwise term contribution
             for j in 0..n {
-                grad[i] += 2.0 * self.coupling_matrix[[i, j]]
-                          * distances[[i, j]]
-                          * weights[j];
+                grad[i] += 2.0 * self.coupling_matrix[[i, j]] * distances[[i, j]] * weights[j];
             }
 
             // Triplet term contribution (partial derivatives)
             for j in 0..n {
                 for k in 0..n {
                     if i != j && j != k && i != k {
-                        let avg_dist = (distances[[i, j]] + distances[[j, k]] + distances[[i, k]]) / 3.0;
+                        let avg_dist =
+                            (distances[[i, j]] + distances[[j, k]] + distances[[i, k]]) / 3.0;
 
-                        grad[i] += self.triplet_couplings[[i, j, k]]
-                                  * avg_dist
-                                  * weights[j]
-                                  * weights[k];
+                        grad[i] +=
+                            self.triplet_couplings[[i, j, k]] * avg_dist * weights[j] * weights[k];
                     }
                 }
             }
@@ -191,6 +187,10 @@ mod tests {
 
         let grad = h.gradient(&weights, &distances);
 
-        assert_eq!(grad.len(), 4, "Gradient should have same dimension as weights");
+        assert_eq!(
+            grad.len(),
+            4,
+            "Gradient should have same dimension as weights"
+        );
     }
 }

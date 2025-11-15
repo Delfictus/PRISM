@@ -9,11 +9,11 @@
 //! 4. Active Learning - queries only when needed
 //! 5. Phase 6 Hooks - seamless future integration
 
+use anyhow::{bail, Result};
 use ndarray::Array1;
-use std::sync::Arc;
 use parking_lot::Mutex;
-use anyhow::{Result, bail};
-use tokio::time::{Instant, Duration};
+use std::sync::Arc;
+use tokio::time::{Duration, Instant};
 
 use super::{LLMClient, LLMResponse};
 
@@ -67,16 +67,19 @@ impl BanditLLMEnsemble {
     pub fn new(llm_clients: Vec<Arc<dyn LLMClient>>) -> Self {
         let n = llm_clients.len();
 
-        let stats = llm_clients.iter().map(|client| {
-            LLMStatistics {
-                model_name: client.model_name().to_string(),
-                queries: 0,
-                total_quality: 0.0,
-                avg_quality: 0.5, // Optimistic initialization
-                avg_cost: 0.0,
-                avg_latency: 0.0,
-            }
-        }).collect();
+        let stats = llm_clients
+            .iter()
+            .map(|client| {
+                LLMStatistics {
+                    model_name: client.model_name().to_string(),
+                    queries: 0,
+                    total_quality: 0.0,
+                    avg_quality: 0.5, // Optimistic initialization
+                    avg_cost: 0.0,
+                    avg_latency: 0.0,
+                }
+            })
+            .collect();
 
         Self {
             llm_clients,
@@ -106,15 +109,16 @@ impl BanditLLMEnsemble {
                 f64::INFINITY // Force exploration of untried LLMs
             } else {
                 // UCB1 formula
-                stat.avg_quality + self.exploration_constant *
-                    ((total as f64).ln() / stat.queries as f64).sqrt()
+                stat.avg_quality
+                    + self.exploration_constant * ((total as f64).ln() / stat.queries as f64).sqrt()
             };
 
             ucb_scores.push((i, ucb));
         }
 
         // Select LLM with maximum UCB
-        ucb_scores.iter()
+        ucb_scores
+            .iter()
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
             .map(|(idx, _)| *idx)
             .unwrap_or(0)
@@ -137,7 +141,9 @@ impl BanditLLMEnsemble {
         };
 
         // Query selected LLM
-        let response = self.llm_clients[selected_idx].generate(prompt, temperature).await?;
+        let response = self.llm_clients[selected_idx]
+            .generate(prompt, temperature)
+            .await?;
 
         // Assess quality (simple for now, enhanced in Task 1.11)
         let quality = self.assess_quality(&response);
@@ -149,14 +155,18 @@ impl BanditLLMEnsemble {
 
             stats[selected_idx].queries += 1;
             stats[selected_idx].total_quality += quality;
-            stats[selected_idx].avg_quality = stats[selected_idx].total_quality / stats[selected_idx].queries as f64;
+            stats[selected_idx].avg_quality =
+                stats[selected_idx].total_quality / stats[selected_idx].queries as f64;
 
             // Update cost and latency
             let cost = self.estimate_cost(&response);
-            stats[selected_idx].avg_cost = (stats[selected_idx].avg_cost * (stats[selected_idx].queries - 1) as f64 + cost)
-                                          / stats[selected_idx].queries as f64;
-            stats[selected_idx].avg_latency = (stats[selected_idx].avg_latency * (stats[selected_idx].queries - 1) as f64 + response.latency.as_secs_f64())
-                                             / stats[selected_idx].queries as f64;
+            stats[selected_idx].avg_cost =
+                (stats[selected_idx].avg_cost * (stats[selected_idx].queries - 1) as f64 + cost)
+                    / stats[selected_idx].queries as f64;
+            stats[selected_idx].avg_latency = (stats[selected_idx].avg_latency
+                * (stats[selected_idx].queries - 1) as f64
+                + response.latency.as_secs_f64())
+                / stats[selected_idx].queries as f64;
 
             *total += 1;
         }
@@ -179,8 +189,12 @@ impl BanditLLMEnsemble {
     fn estimate_cost(&self, response: &LLMResponse) -> f64 {
         match response.model.as_str() {
             "gpt-4" => (response.usage.total_tokens as f64 / 1000.0) * 0.02,
-            model if model.contains("claude") => (response.usage.total_tokens as f64 / 1000.0) * 0.01,
-            model if model.contains("gemini") => (response.usage.total_tokens as f64 / 1000.0) * 0.0001,
+            model if model.contains("claude") => {
+                (response.usage.total_tokens as f64 / 1000.0) * 0.01
+            }
+            model if model.contains("gemini") => {
+                (response.usage.total_tokens as f64 / 1000.0) * 0.0001
+            }
             model if model.contains("grok") => (response.usage.total_tokens as f64 / 1000.0) * 0.01,
             _ => (response.usage.total_tokens as f64 / 1000.0) * 0.01,
         }
@@ -194,8 +208,9 @@ impl BanditLLMEnsemble {
             return f64::INFINITY;
         }
 
-        stats[llm_idx].avg_quality + self.exploration_constant *
-            ((total as f64).ln() / stats[llm_idx].queries as f64).sqrt()
+        stats[llm_idx].avg_quality
+            + self.exploration_constant
+                * ((total as f64).ln() / stats[llm_idx].queries as f64).sqrt()
     }
 
     /// Enable Phase 6 GNN enhancement (call later when Phase 6 implemented)
@@ -285,9 +300,7 @@ impl BayesianLLMEnsemble {
             let client = &self.llm_clients[idx];
             let prompt_clone = prompt.to_string();
 
-            let task = async move {
-                (idx, client.generate(&prompt_clone, temperature).await)
-            };
+            let task = async move { (idx, client.generate(&prompt_clone, temperature).await) };
 
             tasks.push(Box::pin(task));
         }
@@ -323,7 +336,8 @@ impl BayesianLLMEnsemble {
             individual_responses: responses,
             model_weights: weights,
             epistemic_uncertainty: uncertainty,
-            models_queried: success_indices.iter()
+            models_queried: success_indices
+                .iter()
                 .map(|&i| self.llm_clients[i].model_name().to_string())
                 .collect(),
         })
@@ -347,7 +361,11 @@ impl BayesianLLMEnsemble {
         Ok(weights)
     }
 
-    fn weighted_combination(&self, responses: &[LLMResponse], weights: &Array1<f64>) -> Result<String> {
+    fn weighted_combination(
+        &self,
+        responses: &[LLMResponse],
+        weights: &Array1<f64>,
+    ) -> Result<String> {
         // Simple weighted combination for now
         // Will be enhanced with Task 3 (consensus synthesis)
 
@@ -356,7 +374,8 @@ impl BayesianLLMEnsemble {
         }
 
         // For now: Select highest-weight response
-        let max_idx = weights.iter()
+        let max_idx = weights
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(i, _)| i)
@@ -444,7 +463,9 @@ impl LLMOrchestrator {
         prompt: &str,
         temperature: f32,
     ) -> Result<BanditResponse> {
-        self.bandit_ensemble.generate_optimal(prompt, temperature).await
+        self.bandit_ensemble
+            .generate_optimal(prompt, temperature)
+            .await
     }
 
     /// Query ensemble with uncertainty (Bayesian)
@@ -455,7 +476,9 @@ impl LLMOrchestrator {
         prompt: &str,
         temperature: f32,
     ) -> Result<BayesianConsensusResponse> {
-        self.bayesian_ensemble.generate_bayesian_consensus(prompt, temperature).await
+        self.bayesian_ensemble
+            .generate_bayesian_consensus(prompt, temperature)
+            .await
     }
 
     /// Enable Phase 6 enhancements

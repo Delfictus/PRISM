@@ -3,11 +3,11 @@
 //! Integrates GPU acceleration for PWSA threat classification
 //! Provides significant speedup for real-time satellite threat detection
 
+use anyhow::{Context, Result};
 use ndarray::{Array1, Array2};
-use anyhow::{Result, Context};
 use std::collections::VecDeque;
 
-use crate::gpu::gpu_enabled::{SimpleGpuContext, SimpleGpuTensor, SimpleGpuLinear};
+use crate::gpu::gpu_enabled::{SimpleGpuContext, SimpleGpuLinear, SimpleGpuTensor};
 
 /// Threat classification result
 #[derive(Debug, Clone)]
@@ -63,10 +63,10 @@ impl ThreatClass {
 
 /// GPU-Accelerated Recognition Network
 pub struct GpuRecognitionNetwork {
-    fc1: SimpleGpuLinear,  // 100 → 64
-    fc2: SimpleGpuLinear,  // 64 → 32
-    fc3: SimpleGpuLinear,  // 32 → 16
-    fc4: SimpleGpuLinear,  // 16 → 5 (5 threat classes)
+    fc1: SimpleGpuLinear, // 100 → 64
+    fc2: SimpleGpuLinear, // 64 → 32
+    fc3: SimpleGpuLinear, // 32 → 16
+    fc4: SimpleGpuLinear, // 16 → 5 (5 threat classes)
 }
 
 impl GpuRecognitionNetwork {
@@ -150,9 +150,7 @@ impl GpuActiveInferenceClassifier {
 
         // Convert back to CPU
         let posterior_vec = posterior_probs.to_cpu()?;
-        let posterior = Array1::from_vec(
-            posterior_vec.iter().map(|&x| x as f64).collect()
-        );
+        let posterior = Array1::from_vec(posterior_vec.iter().map(|&x| x as f64).collect());
 
         // Compute free energy
         let free_energy = self.compute_free_energy(&posterior, features)?;
@@ -172,7 +170,8 @@ impl GpuActiveInferenceClassifier {
         }
 
         // Determine expected class
-        let expected_idx = beliefs.iter()
+        let expected_idx = beliefs
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(i, _)| i)
@@ -234,11 +233,11 @@ impl GpuActiveInferenceClassifier {
 
     /// Update prior beliefs based on history
     pub fn update_prior(&mut self, historical_distribution: Array1<f64>) {
-        let alpha = 0.1;  // Learning rate
+        let alpha = 0.1; // Learning rate
 
         for i in 0..self.prior_beliefs.len() {
-            self.prior_beliefs[i] = (1.0 - alpha) * self.prior_beliefs[i]
-                                   + alpha * historical_distribution[i];
+            self.prior_beliefs[i] =
+                (1.0 - alpha) * self.prior_beliefs[i] + alpha * historical_distribution[i];
         }
 
         // Renormalize
@@ -249,7 +248,10 @@ impl GpuActiveInferenceClassifier {
     }
 
     /// Batch classify multiple threats (optimized for GPU)
-    pub fn classify_batch(&mut self, features_batch: &[Array1<f64>]) -> Result<Vec<GpuThreatClassification>> {
+    pub fn classify_batch(
+        &mut self,
+        features_batch: &[Array1<f64>],
+    ) -> Result<Vec<GpuThreatClassification>> {
         let start = std::time::Instant::now();
         let batch_size = features_batch.len();
 
@@ -279,15 +281,17 @@ impl GpuActiveInferenceClassifier {
             let end_idx = start_idx + 5;
 
             let posterior = Array1::from_vec(
-                posterior_data[start_idx..end_idx].iter()
+                posterior_data[start_idx..end_idx]
+                    .iter()
                     .map(|&x| x as f64)
-                    .collect()
+                    .collect(),
             );
 
             let free_energy = self.compute_free_energy(&posterior, &features_batch[i])?;
             let beliefs = self.update_beliefs(&posterior)?;
 
-            let expected_idx = beliefs.iter()
+            let expected_idx = beliefs
+                .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
                 .map(|(i, _)| i)
@@ -300,7 +304,7 @@ impl GpuActiveInferenceClassifier {
                 free_energy,
                 confidence,
                 expected_class: ThreatClass::from_index(expected_idx),
-                inference_time_us: 0,  // Will be set after
+                inference_time_us: 0, // Will be set after
             });
         }
 
@@ -347,7 +351,7 @@ impl ClassifierBenchmark {
         let gpu_batch_time_ms = gpu_batch_start.elapsed().as_millis() as f64;
 
         // Calculate speedups (compared to estimated CPU time)
-        let estimated_cpu_time_ms = num_samples as f64 * 2.0;  // ~2ms per sample on CPU
+        let estimated_cpu_time_ms = num_samples as f64 * 2.0; // ~2ms per sample on CPU
 
         Ok(BenchmarkResults {
             num_samples,

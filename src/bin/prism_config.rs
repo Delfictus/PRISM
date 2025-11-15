@@ -1,15 +1,15 @@
 // PRISM Configuration Management CLI
 // Complete control over all parameters with runtime verification
 
+use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::collections::{HashMap, BTreeMap};
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use std::collections::{BTreeMap, HashMap};
+use std::fs;
+use std::path::{Path, PathBuf};
 use toml::Value as TomlValue;
-use anyhow::{Result, Context, anyhow};
 
 #[derive(Parser)]
 #[clap(name = "prism-config")]
@@ -179,227 +179,312 @@ fn get_parameter_metadata() -> HashMap<String, ParameterMetadata> {
     let mut metadata = HashMap::new();
 
     // GPU parameters
-    metadata.insert("gpu.device_id".to_string(), ParameterMetadata {
-        path: "gpu.device_id".to_string(),
-        value_type: "usize".to_string(),
-        default: JsonValue::from(0),
-        min: Some(JsonValue::from(0)),
-        max: Some(JsonValue::from(8)),
-        description: "CUDA device ID".to_string(),
-        category: "gpu".to_string(),
-        affects_gpu: true,
-        requires_restart: true,
-    });
+    metadata.insert(
+        "gpu.device_id".to_string(),
+        ParameterMetadata {
+            path: "gpu.device_id".to_string(),
+            value_type: "usize".to_string(),
+            default: JsonValue::from(0),
+            min: Some(JsonValue::from(0)),
+            max: Some(JsonValue::from(8)),
+            description: "CUDA device ID".to_string(),
+            category: "gpu".to_string(),
+            affects_gpu: true,
+            requires_restart: true,
+        },
+    );
 
-    metadata.insert("gpu.batch_size".to_string(), ParameterMetadata {
-        path: "gpu.batch_size".to_string(),
-        value_type: "usize".to_string(),
-        default: JsonValue::from(1024),
-        min: Some(JsonValue::from(32)),
-        max: Some(JsonValue::from(8192)),
-        description: "GPU batch size for parallel operations".to_string(),
-        category: "gpu".to_string(),
-        affects_gpu: true,
-        requires_restart: false,
-    });
+    metadata.insert(
+        "gpu.batch_size".to_string(),
+        ParameterMetadata {
+            path: "gpu.batch_size".to_string(),
+            value_type: "usize".to_string(),
+            default: JsonValue::from(1024),
+            min: Some(JsonValue::from(32)),
+            max: Some(JsonValue::from(8192)),
+            description: "GPU batch size for parallel operations".to_string(),
+            category: "gpu".to_string(),
+            affects_gpu: true,
+            requires_restart: false,
+        },
+    );
 
-    metadata.insert("gpu.streams".to_string(), ParameterMetadata {
-        path: "gpu.streams".to_string(),
-        value_type: "usize".to_string(),
-        default: JsonValue::from(4),
-        min: Some(JsonValue::from(1)),
-        max: Some(JsonValue::from(32)),
-        description: "Number of CUDA streams".to_string(),
-        category: "gpu".to_string(),
-        affects_gpu: true,
-        requires_restart: true,
-    });
+    metadata.insert(
+        "gpu.streams".to_string(),
+        ParameterMetadata {
+            path: "gpu.streams".to_string(),
+            value_type: "usize".to_string(),
+            default: JsonValue::from(4),
+            min: Some(JsonValue::from(1)),
+            max: Some(JsonValue::from(32)),
+            description: "Number of CUDA streams".to_string(),
+            category: "gpu".to_string(),
+            affects_gpu: true,
+            requires_restart: true,
+        },
+    );
 
     // Thermodynamic parameters
-    metadata.insert("thermo.replicas".to_string(), ParameterMetadata {
-        path: "thermo.replicas".to_string(),
-        value_type: "usize".to_string(),
-        default: JsonValue::from(56),
-        min: Some(JsonValue::from(1)),
-        max: Some(JsonValue::from(56)), // VRAM limit
-        description: "Number of temperature replicas (VRAM limited to 56 for 8GB)".to_string(),
-        category: "thermo".to_string(),
-        affects_gpu: true,
-        requires_restart: false,
-    });
+    metadata.insert(
+        "thermo.replicas".to_string(),
+        ParameterMetadata {
+            path: "thermo.replicas".to_string(),
+            value_type: "usize".to_string(),
+            default: JsonValue::from(56),
+            min: Some(JsonValue::from(1)),
+            max: Some(JsonValue::from(56)), // VRAM limit
+            description: "Number of temperature replicas (VRAM limited to 56 for 8GB)".to_string(),
+            category: "thermo".to_string(),
+            affects_gpu: true,
+            requires_restart: false,
+        },
+    );
 
-    metadata.insert("thermo.num_temps".to_string(), ParameterMetadata {
-        path: "thermo.num_temps".to_string(),
-        value_type: "usize".to_string(),
-        default: JsonValue::from(16),
-        min: Some(JsonValue::from(2)),
-        max: Some(JsonValue::from(56)),
-        description: "Number of temperature levels".to_string(),
-        category: "thermo".to_string(),
-        affects_gpu: true,
-        requires_restart: false,
-    });
+    metadata.insert(
+        "thermo.num_temps".to_string(),
+        ParameterMetadata {
+            path: "thermo.num_temps".to_string(),
+            value_type: "usize".to_string(),
+            default: JsonValue::from(16),
+            min: Some(JsonValue::from(2)),
+            max: Some(JsonValue::from(56)),
+            description: "Number of temperature levels".to_string(),
+            category: "thermo".to_string(),
+            affects_gpu: true,
+            requires_restart: false,
+        },
+    );
 
-    metadata.insert("thermo.t_min".to_string(), ParameterMetadata {
-        path: "thermo.t_min".to_string(),
-        value_type: "f64".to_string(),
-        default: JsonValue::from(0.01),
-        min: Some(JsonValue::from(0.001)),
-        max: Some(JsonValue::from(1.0)),
-        description: "Minimum temperature".to_string(),
-        category: "thermo".to_string(),
-        affects_gpu: false,
-        requires_restart: false,
-    });
+    metadata.insert(
+        "thermo.t_min".to_string(),
+        ParameterMetadata {
+            path: "thermo.t_min".to_string(),
+            value_type: "f64".to_string(),
+            default: JsonValue::from(0.01),
+            min: Some(JsonValue::from(0.001)),
+            max: Some(JsonValue::from(1.0)),
+            description: "Minimum temperature".to_string(),
+            category: "thermo".to_string(),
+            affects_gpu: false,
+            requires_restart: false,
+        },
+    );
 
-    metadata.insert("thermo.t_max".to_string(), ParameterMetadata {
-        path: "thermo.t_max".to_string(),
-        value_type: "f64".to_string(),
-        default: JsonValue::from(10.0),
-        min: Some(JsonValue::from(1.0)),
-        max: Some(JsonValue::from(100.0)),
-        description: "Maximum temperature".to_string(),
-        category: "thermo".to_string(),
-        affects_gpu: false,
-        requires_restart: false,
-    });
+    metadata.insert(
+        "thermo.t_max".to_string(),
+        ParameterMetadata {
+            path: "thermo.t_max".to_string(),
+            value_type: "f64".to_string(),
+            default: JsonValue::from(10.0),
+            min: Some(JsonValue::from(1.0)),
+            max: Some(JsonValue::from(100.0)),
+            description: "Maximum temperature".to_string(),
+            category: "thermo".to_string(),
+            affects_gpu: false,
+            requires_restart: false,
+        },
+    );
 
     // Quantum parameters
-    metadata.insert("quantum.iterations".to_string(), ParameterMetadata {
-        path: "quantum.iterations".to_string(),
-        value_type: "usize".to_string(),
-        default: JsonValue::from(20),
-        min: Some(JsonValue::from(1)),
-        max: Some(JsonValue::from(1000)),
-        description: "Number of quantum solver iterations".to_string(),
-        category: "quantum".to_string(),
-        affects_gpu: true,
-        requires_restart: false,
-    });
+    metadata.insert(
+        "quantum.iterations".to_string(),
+        ParameterMetadata {
+            path: "quantum.iterations".to_string(),
+            value_type: "usize".to_string(),
+            default: JsonValue::from(20),
+            min: Some(JsonValue::from(1)),
+            max: Some(JsonValue::from(1000)),
+            description: "Number of quantum solver iterations".to_string(),
+            category: "quantum".to_string(),
+            affects_gpu: true,
+            requires_restart: false,
+        },
+    );
 
-    metadata.insert("quantum.target_chromatic".to_string(), ParameterMetadata {
-        path: "quantum.target_chromatic".to_string(),
-        value_type: "usize".to_string(),
-        default: JsonValue::from(83),
-        min: Some(JsonValue::from(1)),
-        max: Some(JsonValue::from(10000)),
-        description: "Target chromatic number".to_string(),
-        category: "quantum".to_string(),
-        affects_gpu: false,
-        requires_restart: false,
-    });
+    metadata.insert(
+        "quantum.target_chromatic".to_string(),
+        ParameterMetadata {
+            path: "quantum.target_chromatic".to_string(),
+            value_type: "usize".to_string(),
+            default: JsonValue::from(83),
+            min: Some(JsonValue::from(1)),
+            max: Some(JsonValue::from(10000)),
+            description: "Target chromatic number".to_string(),
+            category: "quantum".to_string(),
+            affects_gpu: false,
+            requires_restart: false,
+        },
+    );
 
     // Memetic parameters
-    metadata.insert("memetic.population_size".to_string(), ParameterMetadata {
-        path: "memetic.population_size".to_string(),
-        value_type: "usize".to_string(),
-        default: JsonValue::from(256),
-        min: Some(JsonValue::from(10)),
-        max: Some(JsonValue::from(10000)),
-        description: "Population size for memetic algorithm".to_string(),
-        category: "memetic".to_string(),
-        affects_gpu: false,
-        requires_restart: false,
-    });
+    metadata.insert(
+        "memetic.population_size".to_string(),
+        ParameterMetadata {
+            path: "memetic.population_size".to_string(),
+            value_type: "usize".to_string(),
+            default: JsonValue::from(256),
+            min: Some(JsonValue::from(10)),
+            max: Some(JsonValue::from(10000)),
+            description: "Population size for memetic algorithm".to_string(),
+            category: "memetic".to_string(),
+            affects_gpu: false,
+            requires_restart: false,
+        },
+    );
 
-    metadata.insert("memetic.generations".to_string(), ParameterMetadata {
-        path: "memetic.generations".to_string(),
-        value_type: "usize".to_string(),
-        default: JsonValue::from(500),
-        min: Some(JsonValue::from(1)),
-        max: Some(JsonValue::from(100000)),
-        description: "Number of generations".to_string(),
-        category: "memetic".to_string(),
-        affects_gpu: false,
-        requires_restart: false,
-    });
+    metadata.insert(
+        "memetic.generations".to_string(),
+        ParameterMetadata {
+            path: "memetic.generations".to_string(),
+            value_type: "usize".to_string(),
+            default: JsonValue::from(500),
+            min: Some(JsonValue::from(1)),
+            max: Some(JsonValue::from(100000)),
+            description: "Number of generations".to_string(),
+            category: "memetic".to_string(),
+            affects_gpu: false,
+            requires_restart: false,
+        },
+    );
 
-    metadata.insert("memetic.mutation_rate".to_string(), ParameterMetadata {
-        path: "memetic.mutation_rate".to_string(),
-        value_type: "f64".to_string(),
-        default: JsonValue::from(0.15),
-        min: Some(JsonValue::from(0.0)),
-        max: Some(JsonValue::from(1.0)),
-        description: "Mutation probability".to_string(),
-        category: "memetic".to_string(),
-        affects_gpu: false,
-        requires_restart: false,
-    });
+    metadata.insert(
+        "memetic.mutation_rate".to_string(),
+        ParameterMetadata {
+            path: "memetic.mutation_rate".to_string(),
+            value_type: "f64".to_string(),
+            default: JsonValue::from(0.15),
+            min: Some(JsonValue::from(0.0)),
+            max: Some(JsonValue::from(1.0)),
+            description: "Mutation probability".to_string(),
+            category: "memetic".to_string(),
+            affects_gpu: false,
+            requires_restart: false,
+        },
+    );
 
     // Phase toggles
     let phases = vec![
-        ("use_reservoir_prediction", true, "Enable neuromorphic reservoir computing"),
-        ("use_active_inference", true, "Enable active inference optimization"),
-        ("use_transfer_entropy", true, "Enable transfer entropy analysis"),
-        ("use_thermodynamic_equilibration", true, "Enable thermodynamic equilibration"),
-        ("use_quantum_classical_hybrid", true, "Enable quantum-classical hybrid solver"),
-        ("use_multiscale_analysis", false, "Enable multi-scale analysis"),
-        ("use_ensemble_consensus", false, "Enable ensemble consensus voting"),
-        ("use_geodesic_features", false, "Enable geodesic feature extraction"),
+        (
+            "use_reservoir_prediction",
+            true,
+            "Enable neuromorphic reservoir computing",
+        ),
+        (
+            "use_active_inference",
+            true,
+            "Enable active inference optimization",
+        ),
+        (
+            "use_transfer_entropy",
+            true,
+            "Enable transfer entropy analysis",
+        ),
+        (
+            "use_thermodynamic_equilibration",
+            true,
+            "Enable thermodynamic equilibration",
+        ),
+        (
+            "use_quantum_classical_hybrid",
+            true,
+            "Enable quantum-classical hybrid solver",
+        ),
+        (
+            "use_multiscale_analysis",
+            false,
+            "Enable multi-scale analysis",
+        ),
+        (
+            "use_ensemble_consensus",
+            false,
+            "Enable ensemble consensus voting",
+        ),
+        (
+            "use_geodesic_features",
+            false,
+            "Enable geodesic feature extraction",
+        ),
     ];
 
     for (name, default, desc) in phases {
-        metadata.insert(name.to_string(), ParameterMetadata {
-            path: name.to_string(),
-            value_type: "bool".to_string(),
-            default: JsonValue::from(default),
-            min: None,
-            max: None,
-            description: desc.to_string(),
-            category: "phases".to_string(),
-            affects_gpu: name.contains("reservoir") || name.contains("thermodynamic") || name.contains("quantum"),
-            requires_restart: false,
-        });
+        metadata.insert(
+            name.to_string(),
+            ParameterMetadata {
+                path: name.to_string(),
+                value_type: "bool".to_string(),
+                default: JsonValue::from(default),
+                min: None,
+                max: None,
+                description: desc.to_string(),
+                category: "phases".to_string(),
+                affects_gpu: name.contains("reservoir")
+                    || name.contains("thermodynamic")
+                    || name.contains("quantum"),
+                requires_restart: false,
+            },
+        );
     }
 
     // Global parameters
-    metadata.insert("target_chromatic".to_string(), ParameterMetadata {
-        path: "target_chromatic".to_string(),
-        value_type: "usize".to_string(),
-        default: JsonValue::from(83),
-        min: Some(JsonValue::from(1)),
-        max: Some(JsonValue::from(10000)),
-        description: "Global target chromatic number".to_string(),
-        category: "global".to_string(),
-        affects_gpu: false,
-        requires_restart: false,
-    });
+    metadata.insert(
+        "target_chromatic".to_string(),
+        ParameterMetadata {
+            path: "target_chromatic".to_string(),
+            value_type: "usize".to_string(),
+            default: JsonValue::from(83),
+            min: Some(JsonValue::from(1)),
+            max: Some(JsonValue::from(10000)),
+            description: "Global target chromatic number".to_string(),
+            category: "global".to_string(),
+            affects_gpu: false,
+            requires_restart: false,
+        },
+    );
 
-    metadata.insert("max_runtime_hours".to_string(), ParameterMetadata {
-        path: "max_runtime_hours".to_string(),
-        value_type: "f64".to_string(),
-        default: JsonValue::from(48.0),
-        min: Some(JsonValue::from(0.1)),
-        max: Some(JsonValue::from(168.0)),
-        description: "Maximum runtime in hours".to_string(),
-        category: "global".to_string(),
-        affects_gpu: false,
-        requires_restart: false,
-    });
+    metadata.insert(
+        "max_runtime_hours".to_string(),
+        ParameterMetadata {
+            path: "max_runtime_hours".to_string(),
+            value_type: "f64".to_string(),
+            default: JsonValue::from(48.0),
+            min: Some(JsonValue::from(0.1)),
+            max: Some(JsonValue::from(168.0)),
+            description: "Maximum runtime in hours".to_string(),
+            category: "global".to_string(),
+            affects_gpu: false,
+            requires_restart: false,
+        },
+    );
 
-    metadata.insert("deterministic".to_string(), ParameterMetadata {
-        path: "deterministic".to_string(),
-        value_type: "bool".to_string(),
-        default: JsonValue::from(false),
-        min: None,
-        max: None,
-        description: "Use deterministic random seed".to_string(),
-        category: "global".to_string(),
-        affects_gpu: false,
-        requires_restart: true,
-    });
+    metadata.insert(
+        "deterministic".to_string(),
+        ParameterMetadata {
+            path: "deterministic".to_string(),
+            value_type: "bool".to_string(),
+            default: JsonValue::from(false),
+            min: None,
+            max: None,
+            description: "Use deterministic random seed".to_string(),
+            category: "global".to_string(),
+            affects_gpu: false,
+            requires_restart: true,
+        },
+    );
 
-    metadata.insert("seed".to_string(), ParameterMetadata {
-        path: "seed".to_string(),
-        value_type: "u64".to_string(),
-        default: JsonValue::from(42),
-        min: Some(JsonValue::from(0)),
-        max: Some(JsonValue::from(u64::MAX)),
-        description: "Random seed for deterministic mode".to_string(),
-        category: "global".to_string(),
-        affects_gpu: false,
-        requires_restart: true,
-    });
+    metadata.insert(
+        "seed".to_string(),
+        ParameterMetadata {
+            path: "seed".to_string(),
+            value_type: "u64".to_string(),
+            default: JsonValue::from(42),
+            min: Some(JsonValue::from(0)),
+            max: Some(JsonValue::from(u64::MAX)),
+            description: "Random seed for deterministic mode".to_string(),
+            category: "global".to_string(),
+            affects_gpu: false,
+            requires_restart: true,
+        },
+    );
 
     metadata
 }
@@ -408,34 +493,67 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::List { category, modified, types } => {
+        Commands::List {
+            category,
+            modified,
+            types,
+        } => {
             list_parameters(category, modified, types)?;
         }
-        Commands::Get { path, config, verbose } => {
+        Commands::Get {
+            path,
+            config,
+            verbose,
+        } => {
             get_parameter(&path, config, verbose)?;
         }
-        Commands::Set { path, value, config, dry_run } => {
+        Commands::Set {
+            path,
+            value,
+            config,
+            dry_run,
+        } => {
             set_parameter(&path, &value, &config, dry_run)?;
         }
-        Commands::Apply { file, target, preview } => {
+        Commands::Apply {
+            file,
+            target,
+            preview,
+        } => {
             apply_config(&file, target, preview)?;
         }
-        Commands::Generate { output, base, template } => {
+        Commands::Generate {
+            output,
+            base,
+            template,
+        } => {
             generate_config(&output, base, &template)?;
         }
         Commands::Validate { config, gpu, deep } => {
             validate_config(&config, gpu, deep)?;
         }
-        Commands::Diff { file1, file2, changes_only } => {
+        Commands::Diff {
+            file1,
+            file2,
+            changes_only,
+        } => {
             diff_configs(&file1, &file2, changes_only)?;
         }
-        Commands::Merge { output, base, layers } => {
+        Commands::Merge {
+            output,
+            base,
+            layers,
+        } => {
             merge_configs(&output, &base, &layers)?;
         }
         Commands::Tune { config, category } => {
             tune_interactive(&config, category)?;
         }
-        Commands::Reset { config, category, output } => {
+        Commands::Reset {
+            config,
+            category,
+            output,
+        } => {
             reset_parameters(&config, category, output)?;
         }
     }
@@ -446,9 +564,20 @@ fn main() -> Result<()> {
 fn list_parameters(category: Option<String>, _modified: bool, types: bool) -> Result<()> {
     let metadata = get_parameter_metadata();
 
-    println!("{}", "═══════════════════════════════════════════════════════════".blue());
-    println!("{}", "                 PRISM CONFIGURATION PARAMETERS            ".blue().bold());
-    println!("{}", "═══════════════════════════════════════════════════════════".blue());
+    println!(
+        "{}",
+        "═══════════════════════════════════════════════════════════".blue()
+    );
+    println!(
+        "{}",
+        "                 PRISM CONFIGURATION PARAMETERS            "
+            .blue()
+            .bold()
+    );
+    println!(
+        "{}",
+        "═══════════════════════════════════════════════════════════".blue()
+    );
 
     // Group by category
     let mut categories: HashMap<String, Vec<&ParameterMetadata>> = HashMap::new();
@@ -458,7 +587,8 @@ fn list_parameters(category: Option<String>, _modified: bool, types: bool) -> Re
                 continue;
             }
         }
-        categories.entry(param.category.clone())
+        categories
+            .entry(param.category.clone())
             .or_insert_with(Vec::new)
             .push(param);
     }
@@ -509,8 +639,16 @@ fn list_parameters(category: Option<String>, _modified: bool, types: bool) -> Re
             if param.min.is_some() || param.max.is_some() {
                 let bounds = format!(
                     "      Range: [{} .. {}]",
-                    param.min.as_ref().map(format_json_value).unwrap_or("∞".to_string()),
-                    param.max.as_ref().map(format_json_value).unwrap_or("∞".to_string())
+                    param
+                        .min
+                        .as_ref()
+                        .map(format_json_value)
+                        .unwrap_or("∞".to_string()),
+                    param
+                        .max
+                        .as_ref()
+                        .map(format_json_value)
+                        .unwrap_or("∞".to_string())
                 );
                 println!("{}", bounds.dimmed());
             }
@@ -519,15 +657,34 @@ fn list_parameters(category: Option<String>, _modified: bool, types: bool) -> Re
         }
     }
 
-    println!("\n{}", "═══════════════════════════════════════════════════════════".blue());
+    println!(
+        "\n{}",
+        "═══════════════════════════════════════════════════════════".blue()
+    );
     println!(
         "Total Parameters: {} | GPU-Affecting: {} | Restart-Required: {}",
         metadata.len().to_string().white().bold(),
-        metadata.values().filter(|p| p.affects_gpu).count().to_string().yellow().bold(),
-        metadata.values().filter(|p| p.requires_restart).count().to_string().red().bold()
+        metadata
+            .values()
+            .filter(|p| p.affects_gpu)
+            .count()
+            .to_string()
+            .yellow()
+            .bold(),
+        metadata
+            .values()
+            .filter(|p| p.requires_restart)
+            .count()
+            .to_string()
+            .red()
+            .bold()
     );
 
-    println!("\nLegend: {} = Affects GPU | {} = Requires Restart", "GPU".yellow(), "®".red());
+    println!(
+        "\nLegend: {} = Affects GPU | {} = Requires Restart",
+        "GPU".yellow(),
+        "®".red()
+    );
 
     Ok(())
 }
@@ -549,12 +706,25 @@ fn get_parameter(path: &str, config: Option<PathBuf>, verbose: bool) -> Result<(
         if verbose {
             if let Some(meta) = metadata.get(path) {
                 println!("{}", "╔════════════════════════════════════════╗".blue());
-                println!("{} {} {}", "║".blue(), format!("Parameter: {}", path).white().bold(), "║".blue());
+                println!(
+                    "{} {} {}",
+                    "║".blue(),
+                    format!("Parameter: {}", path).white().bold(),
+                    "║".blue()
+                );
                 println!("{}", "╚════════════════════════════════════════╝".blue());
 
                 println!("  {} {}", "Type:".dimmed(), meta.value_type.yellow());
-                println!("  {} {}", "Current:".dimmed(), format_toml_value(&val).green().bold());
-                println!("  {} {}", "Default:".dimmed(), format_json_value(&meta.default).white());
+                println!(
+                    "  {} {}",
+                    "Current:".dimmed(),
+                    format_toml_value(&val).green().bold()
+                );
+                println!(
+                    "  {} {}",
+                    "Default:".dimmed(),
+                    format_json_value(&meta.default).white()
+                );
                 println!("  {} {}", "Category:".dimmed(), meta.category.cyan());
                 println!("  {} {}", "Description:".dimmed(), meta.description);
 
@@ -562,15 +732,37 @@ fn get_parameter(path: &str, config: Option<PathBuf>, verbose: bool) -> Result<(
                     println!(
                         "  {} [{} .. {}]",
                         "Range:".dimmed(),
-                        meta.min.as_ref().map(format_json_value).unwrap_or("∞".to_string()).yellow(),
-                        meta.max.as_ref().map(format_json_value).unwrap_or("∞".to_string()).yellow()
+                        meta.min
+                            .as_ref()
+                            .map(format_json_value)
+                            .unwrap_or("∞".to_string())
+                            .yellow(),
+                        meta.max
+                            .as_ref()
+                            .map(format_json_value)
+                            .unwrap_or("∞".to_string())
+                            .yellow()
                     );
                 }
 
-                println!("  {} {}", "Affects GPU:".dimmed(),
-                    if meta.affects_gpu { "Yes".yellow() } else { "No".dimmed() });
-                println!("  {} {}", "Requires Restart:".dimmed(),
-                    if meta.requires_restart { "Yes".red() } else { "No".green() });
+                println!(
+                    "  {} {}",
+                    "Affects GPU:".dimmed(),
+                    if meta.affects_gpu {
+                        "Yes".yellow()
+                    } else {
+                        "No".dimmed()
+                    }
+                );
+                println!(
+                    "  {} {}",
+                    "Requires Restart:".dimmed(),
+                    if meta.requires_restart {
+                        "Yes".red()
+                    } else {
+                        "No".green()
+                    }
+                );
             }
         } else {
             println!("{}", format_toml_value(&val));
@@ -588,7 +780,8 @@ fn set_parameter(path: &str, value: &str, config_path: &Path, dry_run: bool) -> 
     let metadata = get_parameter_metadata();
 
     // Validate parameter exists
-    let meta = metadata.get(path)
+    let meta = metadata
+        .get(path)
         .ok_or_else(|| anyhow!("Unknown parameter: {}", path))?;
 
     // Parse value
@@ -597,22 +790,34 @@ fn set_parameter(path: &str, value: &str, config_path: &Path, dry_run: bool) -> 
     // Validate bounds
     if let Some(min) = &meta.min {
         if !validate_bound(&parsed_value, min, true)? {
-            return Err(anyhow!("{} below minimum: {} < {}", path,
-                format_toml_value(&parsed_value), format_json_value(min)));
+            return Err(anyhow!(
+                "{} below minimum: {} < {}",
+                path,
+                format_toml_value(&parsed_value),
+                format_json_value(min)
+            ));
         }
     }
 
     if let Some(max) = &meta.max {
         if !validate_bound(&parsed_value, max, false)? {
-            return Err(anyhow!("{} above maximum: {} > {}", path,
-                format_toml_value(&parsed_value), format_json_value(max)));
+            return Err(anyhow!(
+                "{} above maximum: {} > {}",
+                path,
+                format_toml_value(&parsed_value),
+                format_json_value(max)
+            ));
         }
     }
 
     if dry_run {
         println!("{} Dry run - validation passed", "►".cyan());
-        println!("{} Would set {} = {}",
-            "✓".green(), path, format_toml_value(&parsed_value).yellow());
+        println!(
+            "{} Would set {} = {}",
+            "✓".green(),
+            path,
+            format_toml_value(&parsed_value).yellow()
+        );
         return Ok(());
     }
 
@@ -630,14 +835,19 @@ fn set_parameter(path: &str, value: &str, config_path: &Path, dry_run: bool) -> 
     // Write back
     fs::write(config_path, toml_doc.to_string())?;
 
-    println!("{} Set {} = {} in {}",
+    println!(
+        "{} Set {} = {} in {}",
         "✓".green().bold(),
         path.white().bold(),
         value.yellow().bold(),
-        config_path.display());
+        config_path.display()
+    );
 
     if meta.requires_restart {
-        println!("{} This parameter requires restarting the pipeline", "⚠".yellow());
+        println!(
+            "{} This parameter requires restarting the pipeline",
+            "⚠".yellow()
+        );
     }
     if meta.affects_gpu {
         println!("{} This parameter affects GPU operations", "⚡".yellow());
@@ -662,7 +872,10 @@ fn apply_config(file: &Path, target: Option<PathBuf>, preview: bool) -> Result<(
             let target_toml: TomlValue = toml::from_str(&target_content)?;
             show_diff(&target_toml, &source)?;
         } else {
-            println!("  Would create new config with all values from {}", file.display());
+            println!(
+                "  Would create new config with all values from {}",
+                file.display()
+            );
         }
 
         println!("  (No changes applied - remove --preview to apply)");
@@ -697,7 +910,11 @@ fn generate_config(output: &Path, base: Option<PathBuf>, template: &str) -> Resu
     let toml_str = toml::to_string_pretty(&final_config)?;
     fs::write(output, toml_str)?;
 
-    println!("{} Generated config file: {}", "✓".green().bold(), output.display());
+    println!(
+        "{} Generated config file: {}",
+        "✓".green().bold(),
+        output.display()
+    );
 
     Ok(())
 }
@@ -802,9 +1019,12 @@ fn diff_configs(file1: &Path, file2: &Path, changes_only: bool) -> Result<()> {
     let toml1: TomlValue = toml::from_str(&content1)?;
     let toml2: TomlValue = toml::from_str(&content2)?;
 
-    println!("\n{} {} → {}", "Diff:".cyan().bold(),
+    println!(
+        "\n{} {} → {}",
+        "Diff:".cyan().bold(),
         file1.display().to_string().white(),
-        file2.display().to_string().white());
+        file2.display().to_string().white()
+    );
     println!("{}", "─".repeat(60).dimmed());
 
     show_diff_recursive(&toml1, &toml2, "", changes_only)?;
@@ -830,20 +1050,30 @@ fn merge_configs(output: &Path, base: &Path, layers: &[PathBuf]) -> Result<()> {
     let toml_str = toml::to_string_pretty(&result)?;
     fs::write(output, toml_str)?;
 
-    println!("{} Merged config written to: {}", "✓".green().bold(), output.display());
+    println!(
+        "{} Merged config written to: {}",
+        "✓".green().bold(),
+        output.display()
+    );
 
     Ok(())
 }
 
 fn tune_interactive(config_path: &Path, category: Option<String>) -> Result<()> {
     println!("{}", "╔════════════════════════════════════════╗".blue());
-    println!("{} {} {}", "║".blue(), "INTERACTIVE CONFIGURATION TUNING".white().bold(), "║".blue());
+    println!(
+        "{} {} {}",
+        "║".blue(),
+        "INTERACTIVE CONFIGURATION TUNING".white().bold(),
+        "║".blue()
+    );
     println!("{}", "╚════════════════════════════════════════╝".blue());
 
     let metadata = get_parameter_metadata();
 
     // Filter by category if specified
-    let params_to_tune: Vec<_> = metadata.values()
+    let params_to_tune: Vec<_> = metadata
+        .values()
         .filter(|p| category.as_ref().map_or(true, |c| &p.category == c))
         .collect();
 
@@ -865,13 +1095,26 @@ fn tune_interactive(config_path: &Path, category: Option<String>) -> Result<()> 
 
         println!("\n{} {}", "►".cyan(), param.path.white().bold());
         println!("  {}", param.description.dimmed());
-        println!("  Type: {} | Category: {}",
-            param.value_type.yellow(), param.category.cyan());
+        println!(
+            "  Type: {} | Category: {}",
+            param.value_type.yellow(),
+            param.category.cyan()
+        );
 
         if param.min.is_some() || param.max.is_some() {
-            println!("  Range: [{} .. {}]",
-                param.min.as_ref().map(format_json_value).unwrap_or("∞".to_string()),
-                param.max.as_ref().map(format_json_value).unwrap_or("∞".to_string()));
+            println!(
+                "  Range: [{} .. {}]",
+                param
+                    .min
+                    .as_ref()
+                    .map(format_json_value)
+                    .unwrap_or("∞".to_string()),
+                param
+                    .max
+                    .as_ref()
+                    .map(format_json_value)
+                    .unwrap_or("∞".to_string())
+            );
         }
 
         println!("  Current: {}", format_toml_value(&current).green());
@@ -916,12 +1159,20 @@ fn tune_interactive(config_path: &Path, category: Option<String>) -> Result<()> 
 
     // Save
     fs::write(config_path, doc.to_string())?;
-    println!("\n{} Configuration saved to {}", "✓".green().bold(), config_path.display());
+    println!(
+        "\n{} Configuration saved to {}",
+        "✓".green().bold(),
+        config_path.display()
+    );
 
     Ok(())
 }
 
-fn reset_parameters(config_path: &Path, category: Option<String>, output: Option<PathBuf>) -> Result<()> {
+fn reset_parameters(
+    config_path: &Path,
+    category: Option<String>,
+    output: Option<PathBuf>,
+) -> Result<()> {
     let metadata = get_parameter_metadata();
     let output_path = output.unwrap_or_else(|| config_path.to_path_buf());
 
@@ -946,10 +1197,12 @@ fn reset_parameters(config_path: &Path, category: Option<String>, output: Option
 
     fs::write(&output_path, doc.to_string())?;
 
-    println!("{} Reset {} parameters to defaults in {}",
+    println!(
+        "{} Reset {} parameters to defaults in {}",
         "✓".green().bold(),
         reset_count,
-        output_path.display());
+        output_path.display()
+    );
 
     Ok(())
 }
@@ -989,7 +1242,7 @@ fn parse_toml_value(s: &str, expected_type: &str) -> Result<TomlValue> {
             let f = s.parse::<f64>().context("Expected float")?;
             Ok(TomlValue::Float(f))
         }
-        _ => Ok(TomlValue::String(s.to_string()))
+        _ => Ok(TomlValue::String(s.to_string())),
     }
 }
 
@@ -1039,7 +1292,8 @@ fn set_toml_value(doc: &mut toml_edit::Document, path: &str, value: TomlValue) -
             if !current.contains_key(part) || !current[part].is_table() {
                 current[part] = toml_edit::table();
             }
-            current = current[part].as_table_mut()
+            current = current[part]
+                .as_table_mut()
                 .ok_or_else(|| anyhow!("Failed to create nested table"))?;
         }
     }
@@ -1064,7 +1318,8 @@ fn validate_bound(value: &TomlValue, bound: &JsonValue, is_min: bool) -> Result<
         _ => return Ok(true),
     };
 
-    let bound_num = bound.as_f64()
+    let bound_num = bound
+        .as_f64()
         .or_else(|| bound.as_i64().map(|i| i as f64))
         .or_else(|| bound.as_u64().map(|u| u as f64))
         .ok_or_else(|| anyhow!("Invalid bound type"))?;
@@ -1122,7 +1377,12 @@ fn show_diff(old: &TomlValue, new: &TomlValue) -> Result<()> {
     show_diff_recursive(old, new, "", false)
 }
 
-fn show_diff_recursive(old: &TomlValue, new: &TomlValue, prefix: &str, changes_only: bool) -> Result<()> {
+fn show_diff_recursive(
+    old: &TomlValue,
+    new: &TomlValue,
+    prefix: &str,
+    changes_only: bool,
+) -> Result<()> {
     match (old, new) {
         (TomlValue::Table(old_table), TomlValue::Table(new_table)) => {
             let mut all_keys = BTreeMap::new();
@@ -1144,22 +1404,36 @@ fn show_diff_recursive(old: &TomlValue, new: &TomlValue, prefix: &str, changes_o
                     (Some(old_val), Some(new_val)) => {
                         if old_val != new_val {
                             if !old_val.is_table() && !new_val.is_table() {
-                                println!("  {} {} → {}",
+                                println!(
+                                    "  {} {} → {}",
                                     path.yellow(),
                                     format_toml_value(old_val).red(),
-                                    format_toml_value(new_val).green());
+                                    format_toml_value(new_val).green()
+                                );
                             } else {
                                 show_diff_recursive(old_val, new_val, &path, changes_only)?;
                             }
                         } else if !changes_only && !old_val.is_table() {
-                            println!("  {} {}", path.dimmed(), format_toml_value(old_val).dimmed());
+                            println!(
+                                "  {} {}",
+                                path.dimmed(),
+                                format_toml_value(old_val).dimmed()
+                            );
                         }
                     }
                     (Some(old_val), None) => {
-                        println!("  {} {} (removed)", path.red(), format_toml_value(old_val).red());
+                        println!(
+                            "  {} {} (removed)",
+                            path.red(),
+                            format_toml_value(old_val).red()
+                        );
                     }
                     (None, Some(new_val)) => {
-                        println!("  {} {} (added)", path.green(), format_toml_value(new_val).green());
+                        println!(
+                            "  {} {} (added)",
+                            path.green(),
+                            format_toml_value(new_val).green()
+                        );
                     }
                     _ => {}
                 }
@@ -1167,10 +1441,12 @@ fn show_diff_recursive(old: &TomlValue, new: &TomlValue, prefix: &str, changes_o
         }
         _ => {
             if old != new {
-                println!("  {} {} → {}",
+                println!(
+                    "  {} {} → {}",
                     prefix.yellow(),
                     format_toml_value(old).red(),
-                    format_toml_value(new).green());
+                    format_toml_value(new).green()
+                );
             }
         }
     }
@@ -1278,7 +1554,8 @@ fn generate_full_config() -> TomlValue {
             if i == parts.len() - 1 {
                 current.insert(part.to_string(), toml_value_from_json(&meta.default));
             } else {
-                current = current.entry(part.to_string())
+                current = current
+                    .entry(part.to_string())
                     .or_insert_with(|| TomlValue::Table(toml::map::Map::new()))
                     .as_table_mut()
                     .unwrap();

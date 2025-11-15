@@ -36,17 +36,14 @@ impl E3EquivariantGNN {
     }
 
     /// Forward pass: ensemble -> causal manifold (stub)
-    pub fn forward(
-        &self,
-        ensemble: &crate::cma::Ensemble,
-    ) -> Result<crate::cma::CausalManifold> {
+    pub fn forward(&self, ensemble: &crate::cma::Ensemble) -> Result<crate::cma::CausalManifold> {
         // Stub implementation - returns simple manifold
         let n = ensemble.solutions.len();
 
         // Create some dummy causal edges
         let mut edges = Vec::new();
         for i in 0..n.min(3) {
-            for j in (i+1)..n.min(4) {
+            for j in (i + 1)..n.min(4) {
                 edges.push(crate::cma::CausalEdge {
                     source: i,
                     target: j,

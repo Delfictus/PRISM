@@ -10,14 +10,14 @@
 //! - Comprehensive error handling
 //! - Async/await (non-blocking)
 
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use tokio::time::{sleep, timeout, Duration, Instant};
+use anyhow::{bail, Context, Result};
 use dashmap::DashMap;
 use parking_lot::Mutex;
-use anyhow::{Result, Context, bail};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::SystemTime;
+use tokio::time::{sleep, timeout, Duration, Instant};
 
 /// OpenAI GPT-4 client (production-grade)
 pub struct OpenAIClient {
@@ -109,7 +109,7 @@ pub struct LLMResponse {
 
 /// Rate limiter (token bucket algorithm)
 pub struct RateLimiter {
-    max_rate: f64,  // requests per second
+    max_rate: f64, // requests per second
     last_request: Mutex<Instant>,
 }
 
@@ -192,11 +192,7 @@ impl OpenAIClient {
     /// - Retry logic (3 attempts, exponential backoff)
     /// - Cost tracking
     /// - Comprehensive error handling
-    pub async fn generate(
-        &self,
-        prompt: &str,
-        temperature: f32,
-    ) -> Result<LLMResponse> {
+    pub async fn generate(&self, prompt: &str, temperature: f32) -> Result<LLMResponse> {
         let start = Instant::now();
 
         // 1. Check cache first
@@ -229,18 +225,21 @@ impl OpenAIClient {
                     response.latency = start.elapsed();
                     response.cached = false;
 
-                    self.cache.insert(cache_key, CachedResponse {
-                        response: response.clone(),
-                        timestamp: SystemTime::now(),
-                        ttl: Duration::from_secs(3600), // 1 hour
-                    });
+                    self.cache.insert(
+                        cache_key,
+                        CachedResponse {
+                            response: response.clone(),
+                            timestamp: SystemTime::now(),
+                            ttl: Duration::from_secs(3600), // 1 hour
+                        },
+                    );
 
                     // Track cost
                     let cost = self.calculate_cost(&response.usage);
                     self.token_counter.lock().add_usage(&response.usage, cost);
 
                     return Ok(response);
-                },
+                }
                 Err(e) => {
                     last_error = Some(e);
 
@@ -253,7 +252,11 @@ impl OpenAIClient {
             }
         }
 
-        Err(anyhow::anyhow!("All {} retries failed: {:?}", self.max_retries, last_error))
+        Err(anyhow::anyhow!(
+            "All {} retries failed: {:?}",
+            self.max_retries,
+            last_error
+        ))
     }
 
     async fn make_api_request(&self, prompt: &str, temperature: f32) -> Result<LLMResponse> {
@@ -283,9 +286,10 @@ impl OpenAIClient {
                 .header("Authorization", format!("Bearer {}", self.api_key))
                 .header("Content-Type", "application/json")
                 .json(&request)
-                .send()
-        ).await
-            .context("Request timeout")??;
+                .send(),
+        )
+        .await
+        .context("Request timeout")??;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -293,7 +297,9 @@ impl OpenAIClient {
             bail!("OpenAI API error {}: {}", status, error_body);
         }
 
-        let api_response: OpenAIResponse = response.json().await
+        let api_response: OpenAIResponse = response
+            .json()
+            .await
             .context("Failed to parse OpenAI response")?;
 
         if api_response.choices.is_empty() {
@@ -384,7 +390,11 @@ mod tests {
         let cost = client.calculate_cost(&usage);
 
         // Expected: (500/1000)*0.01 + (200/1000)*0.03 = 0.005 + 0.006 = 0.011
-        assert!((cost - 0.011).abs() < 0.001, "Cost calculation incorrect: {}", cost);
+        assert!(
+            (cost - 0.011).abs() < 0.001,
+            "Cost calculation incorrect: {}",
+            cost
+        );
     }
 
     #[test]
@@ -392,7 +402,11 @@ mod tests {
         let response = LLMResponse {
             model: "gpt-4".to_string(),
             text: "Test response".to_string(),
-            usage: Usage { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 },
+            usage: Usage {
+                prompt_tokens: 10,
+                completion_tokens: 10,
+                total_tokens: 20,
+            },
             latency: Duration::from_secs(1),
             cached: false,
         };
@@ -409,7 +423,7 @@ mod tests {
         let expired = CachedResponse {
             response: cached.response.clone(),
             timestamp: SystemTime::now() - Duration::from_secs(7200), // 2 hours ago
-            ttl: Duration::from_secs(3600), // 1 hour TTL
+            ttl: Duration::from_secs(3600),                           // 1 hour TTL
         };
 
         assert!(!expired.is_fresh());
@@ -429,6 +443,9 @@ mod tests {
         let elapsed = start.elapsed();
 
         // Should take at least 1 second (2 requests/second)
-        assert!(elapsed >= Duration::from_millis(800), "Rate limiting not working");
+        assert!(
+            elapsed >= Duration::from_millis(800),
+            "Rate limiting not working"
+        );
     }
 }

@@ -9,11 +9,11 @@
 //!
 //! Impact: 3.5x cache efficiency (70% hit rate vs 30% exact match)
 
-use ndarray::Array1;
-use std::sync::Arc;
-use parking_lot::RwLock;
-use std::time::SystemTime;
 use anyhow::Result;
+use ndarray::Array1;
+use parking_lot::RwLock;
+use std::sync::Arc;
+use std::time::SystemTime;
 
 use crate::orchestration::llm_clients::LLMResponse;
 
@@ -93,10 +93,7 @@ impl QuantumSemanticCache {
     ///
     /// Uses Grover-inspired amplitude amplification
     /// O(√N) search vs O(N) classical
-    pub fn quantum_approximate_nn(
-        &self,
-        query_embedding: &Array1<f64>,
-    ) -> Option<LLMResponse> {
+    pub fn quantum_approximate_nn(&self, query_embedding: &Array1<f64>) -> Option<LLMResponse> {
         // 1. Get candidate buckets via quantum hash
         let bucket_indices = self.quantum_hash(query_embedding);
 
@@ -142,7 +139,8 @@ impl QuantumSemanticCache {
         // 4. Measure: Select entry with highest amplitude² (probability)
         let probabilities: Vec<f64> = amplitudes.iter().map(|a| a * a).collect();
 
-        let best_idx = probabilities.iter()
+        let best_idx = probabilities
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(i, _)| i)?;
@@ -156,7 +154,10 @@ impl QuantumSemanticCache {
             // Update access count
             for &bucket_idx in &bucket_indices {
                 let mut bucket = self.buckets[bucket_idx].write();
-                if let Some(entry) = bucket.iter_mut().find(|e| e.prompt == candidates[best_idx].prompt) {
+                if let Some(entry) = bucket
+                    .iter_mut()
+                    .find(|e| e.prompt == candidates[best_idx].prompt)
+                {
                     entry.access_count += 1;
                 }
             }
@@ -218,7 +219,11 @@ impl QuantumSemanticCache {
         CacheStats {
             hits,
             misses,
-            hit_rate: if total > 0 { hits as f64 / total as f64 } else { 0.0 },
+            hit_rate: if total > 0 {
+                hits as f64 / total as f64
+            } else {
+                0.0
+            },
         }
     }
 }
@@ -282,6 +287,9 @@ mod tests {
         let prob_42 = amplitudes[42] * amplitudes[42];
         let prob_others = amplitudes[0] * amplitudes[0];
 
-        assert!(prob_42 > prob_others, "Marked amplitude should be amplified");
+        assert!(
+            prob_42 > prob_others,
+            "Marked amplitude should be amplified"
+        );
     }
 }

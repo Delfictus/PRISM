@@ -3,11 +3,11 @@
 //! Advanced performance optimization utilities for RTX 5070 CUDA acceleration
 //! Provides detailed performance hotspot analysis and optimization recommendations
 
-use cudarc::driver::*;
 use anyhow::Result;
+use cudarc::driver::*;
+use dashmap::DashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use dashmap::DashMap;
 
 /// Performance analysis metrics for CUDA operations
 #[derive(Debug, Clone)]
@@ -41,19 +41,19 @@ pub struct PerformanceHotspot {
 
 #[derive(Debug, Clone)]
 pub enum BottleneckType {
-    ComputeBound,        // Limited by GPU compute
-    MemoryBound,         // Limited by memory bandwidth
-    LaunchOverhead,      // CUDA kernel launch overhead
-    CpuGpuTransfer,      // Host-device transfer bottleneck
-    Synchronization,     // Device synchronization overhead
+    ComputeBound,    // Limited by GPU compute
+    MemoryBound,     // Limited by memory bandwidth
+    LaunchOverhead,  // CUDA kernel launch overhead
+    CpuGpuTransfer,  // Host-device transfer bottleneck
+    Synchronization, // Device synchronization overhead
 }
 
 #[derive(Debug, Clone)]
 pub enum Priority {
-    Critical,   // >10% of total time
-    High,       // 5-10% of total time
-    Medium,     // 1-5% of total time
-    Low,        // <1% of total time
+    Critical, // >10% of total time
+    High,     // 5-10% of total time
+    Medium,   // 1-5% of total time
+    Low,      // <1% of total time
 }
 
 #[derive(Debug, Clone)]
@@ -66,9 +66,9 @@ pub struct OptimizationRecommendation {
 
 #[derive(Debug, Clone)]
 pub enum Difficulty {
-    Easy,       // Simple configuration change
-    Medium,     // Code refactoring required
-    Hard,       // Major architectural changes
+    Easy,   // Simple configuration change
+    Medium, // Code refactoring required
+    Hard,   // Major architectural changes
 }
 
 /// GPU performance profiler optimized for RTX 5070
@@ -121,7 +121,9 @@ impl GpuProfiler {
         let memory_transfer_time: f64 = 0.0; // Cannot separate without events
 
         // Update metrics
-        let mut metric = self.metrics.entry(operation_name.to_string())
+        let mut metric = self
+            .metrics
+            .entry(operation_name.to_string())
             .or_insert_with(|| PerformanceMetrics {
                 operation_name: operation_name.to_string(),
                 total_time_us: 0.0,
@@ -146,7 +148,9 @@ impl GpuProfiler {
         let analysis_start = Instant::now();
 
         // Calculate total time across all operations
-        let total_time: f64 = self.metrics.iter()
+        let total_time: f64 = self
+            .metrics
+            .iter()
             .map(|entry| entry.value().total_time_us)
             .sum();
 
@@ -159,18 +163,21 @@ impl GpuProfiler {
         }
 
         // Identify hotspots
-        let mut hotspots: Vec<PerformanceHotspot> = self.metrics.iter()
+        let mut hotspots: Vec<PerformanceHotspot> = self
+            .metrics
+            .iter()
             .map(|entry| {
                 let metric = entry.value();
                 let time_percentage = (metric.total_time_us / total_time) * 100.0;
 
-                let bottleneck_type = if metric.memory_transfer_time_us > metric.gpu_compute_time_us * 2.0 {
-                    BottleneckType::CpuGpuTransfer
-                } else if metric.memory_transfer_time_us > metric.gpu_compute_time_us {
-                    BottleneckType::MemoryBound
-                } else {
-                    BottleneckType::ComputeBound
-                };
+                let bottleneck_type =
+                    if metric.memory_transfer_time_us > metric.gpu_compute_time_us * 2.0 {
+                        BottleneckType::CpuGpuTransfer
+                    } else if metric.memory_transfer_time_us > metric.gpu_compute_time_us {
+                        BottleneckType::MemoryBound
+                    } else {
+                        BottleneckType::ComputeBound
+                    };
 
                 let priority = if time_percentage > 10.0 {
                     Priority::Critical
@@ -193,7 +200,11 @@ impl GpuProfiler {
             .collect();
 
         // Sort by time percentage (highest first)
-        hotspots.sort_by(|a, b| b.time_percentage.partial_cmp(&a.time_percentage).unwrap_or(std::cmp::Ordering::Equal));
+        hotspots.sort_by(|a, b| {
+            b.time_percentage
+                .partial_cmp(&a.time_percentage)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Generate optimization recommendations
         let recommendations = self.generate_optimization_recommendations(&hotspots);
@@ -206,7 +217,10 @@ impl GpuProfiler {
     }
 
     /// Generate RTX 5070-specific optimization recommendations
-    fn generate_optimization_recommendations(&self, hotspots: &[PerformanceHotspot]) -> Vec<OptimizationRecommendation> {
+    fn generate_optimization_recommendations(
+        &self,
+        hotspots: &[PerformanceHotspot],
+    ) -> Vec<OptimizationRecommendation> {
         let mut recommendations = Vec::new();
 
         for hotspot in hotspots {
@@ -315,15 +329,26 @@ impl GpuProfiler {
                 hotspot.time_percentage,
                 hotspot.absolute_time_us / 1000.0
             ));
-            report.push_str(&format!("   Type: {:?}, Priority: {:?}\n", hotspot.bottleneck_type, hotspot.optimization_priority));
+            report.push_str(&format!(
+                "   Type: {:?}, Priority: {:?}\n",
+                hotspot.bottleneck_type, hotspot.optimization_priority
+            ));
         }
 
         report.push_str("\n⚡ OPTIMIZATION RECOMMENDATIONS:\n");
         for (i, rec) in analysis.optimization_recommendations.iter().enumerate() {
-            let rtx_icon = if rec.rtx_5070_specific { "🎯" } else { "💡" };
+            let rtx_icon = if rec.rtx_5070_specific {
+                "🎯"
+            } else {
+                "💡"
+            };
             report.push_str(&format!(
                 "{}. {} {} (Expected improvement: {:.1}%, Difficulty: {:?})\n",
-                i + 1, rtx_icon, rec.description, rec.expected_improvement, rec.implementation_difficulty
+                i + 1,
+                rtx_icon,
+                rec.description,
+                rec.expected_improvement,
+                rec.implementation_difficulty
             ));
         }
 
@@ -337,7 +362,8 @@ impl GpuProfiler {
 
     /// Get current metrics
     pub fn get_metrics(&self) -> Vec<PerformanceMetrics> {
-        self.metrics.iter()
+        self.metrics
+            .iter()
             .map(|entry| entry.value().clone())
             .collect()
     }
@@ -351,9 +377,9 @@ impl Rtx5070Optimizer {
     pub fn get_optimal_kernel_config(problem_size: usize) -> (u32, u32) {
         // RTX 5070 has 24 SMs, 6144 CUDA cores
         let block_size = if problem_size < 1000 {
-            256  // Smaller problems benefit from smaller blocks
+            256 // Smaller problems benefit from smaller blocks
         } else {
-            512  // Large problems can utilize full blocks
+            512 // Large problems can utilize full blocks
         };
 
         let grid_size = ((problem_size as u32 + block_size - 1) / block_size).min(4096);
@@ -362,11 +388,9 @@ impl Rtx5070Optimizer {
     }
 
     /// Calculate memory bandwidth utilization
-    pub fn calculate_memory_bandwidth_utilization(
-        bytes_transferred: usize,
-        time_us: f64,
-    ) -> f64 {
-        let bandwidth_gb_s = (bytes_transferred as f64) / (time_us * 1e-6) / (1024.0 * 1024.0 * 1024.0);
+    pub fn calculate_memory_bandwidth_utilization(bytes_transferred: usize, time_us: f64) -> f64 {
+        let bandwidth_gb_s =
+            (bytes_transferred as f64) / (time_us * 1e-6) / (1024.0 * 1024.0 * 1024.0);
         let rtx_5070_peak_bandwidth = 504.0; // GB/s (theoretical peak)
 
         (bandwidth_gb_s / rtx_5070_peak_bandwidth) * 100.0
@@ -381,7 +405,9 @@ impl Rtx5070Optimizer {
         let total_threads = threads_per_block * blocks_per_grid;
         let rtx_5070_max_threads = 6144; // CUDA cores
 
-        let utilization = (total_threads.min(rtx_5070_max_threads) as f64 / rtx_5070_max_threads as f64) * occupancy;
+        let utilization = (total_threads.min(rtx_5070_max_threads) as f64
+            / rtx_5070_max_threads as f64)
+            * occupancy;
         utilization * 100.0
     }
 }
@@ -401,7 +427,7 @@ mod tests {
     fn test_bandwidth_calculation() {
         let utilization = Rtx5070Optimizer::calculate_memory_bandwidth_utilization(
             1024 * 1024 * 1024, // 1GB
-            1000.0, // 1ms
+            1000.0,             // 1ms
         );
         assert!(utilization > 0.0 && utilization <= 100.0);
     }

@@ -10,9 +10,9 @@
 // 3. Efficient exploration-exploitation ✅
 // 4. Performance: <2ms per action selection - BENCHMARKS
 
-use ndarray::Array1;
 use super::hierarchical_model::HierarchicalModel;
 use super::policy_selection::ActiveInferenceController;
+use ndarray::Array1;
 
 /// Controller validator for Task 2.3
 pub struct ControllerValidator {
@@ -28,11 +28,7 @@ impl ControllerValidator {
     /// Test if actions reduce uncertainty
     ///
     /// Constitution Task 2.3: Actions reduce uncertainty
-    pub fn actions_reduce_uncertainty(
-        &self,
-        model: &HierarchicalModel,
-        num_steps: usize,
-    ) -> bool {
+    pub fn actions_reduce_uncertainty(&self, model: &HierarchicalModel, num_steps: usize) -> bool {
         let initial_uncertainty: f64 = model.level1.belief.variance.sum();
 
         let test_model = model.clone();
@@ -43,7 +39,7 @@ impl ControllerValidator {
             let action = self.controller.control(&test_model);
 
             // Simulate observation
-            let obs = Array1::<f64>::ones(100);  // Simplified
+            let obs = Array1::<f64>::ones(100); // Simplified
 
             // Update would reduce uncertainty (in real system)
             // For this test: check that high-uncertainty windows are selected
@@ -78,12 +74,12 @@ impl ControllerValidator {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::hierarchical_model::constants;
     use super::super::observation_model::ObservationModel;
+    use super::super::policy_selection::{PolicySelector, SensingStrategy};
     use super::super::transition_model::TransitionModel;
     use super::super::variational_inference::VariationalInference;
-    use super::super::policy_selection::{PolicySelector, SensingStrategy};
+    use super::*;
 
     fn create_test_controller() -> (ActiveInferenceController, HierarchicalModel) {
         let model = HierarchicalModel::new();
@@ -105,7 +101,10 @@ mod tests {
         let validator = ControllerValidator::new(controller);
         let reduces_uncertainty = validator.actions_reduce_uncertainty(&model, 5);
 
-        assert!(reduces_uncertainty, "Actions should not dramatically increase uncertainty");
+        assert!(
+            reduces_uncertainty,
+            "Actions should not dramatically increase uncertainty"
+        );
     }
 
     #[test]
@@ -123,7 +122,7 @@ mod tests {
 
         // Error should be computable
         assert!(error.is_finite());
-        assert!(error > 0.0);  // There is error to correct
+        assert!(error > 0.0); // There is error to correct
     }
 
     #[test]
@@ -148,7 +147,10 @@ mod tests {
 
         let difference = (first_correction - last_correction).mapv(|x| x.abs()).sum();
 
-        assert!(difference > 1e-6, "Actions should adapt over time (exploration)");
+        assert!(
+            difference > 1e-6,
+            "Actions should adapt over time (exploration)"
+        );
     }
 
     #[test]
@@ -195,6 +197,10 @@ mod tests {
         // Correction should be significant
         let correction_magnitude = action.phase_correction.mapv(|x| x.abs()).sum();
 
-        assert!(correction_magnitude > 0.1, "Correction should be non-trivial: {}", correction_magnitude);
+        assert!(
+            correction_magnitude > 0.1,
+            "Correction should be non-trivial: {}",
+            correction_magnitude
+        );
     }
 }

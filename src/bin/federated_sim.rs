@@ -211,9 +211,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn load_interface(
-    scenario_path: Option<&Path>,
-) -> Result<(FederatedInterface, Option<String>)> {
+fn load_interface(scenario_path: Option<&Path>) -> Result<(FederatedInterface, Option<String>)> {
     if let Some(path) = scenario_path {
         let bytes = fs::read(path)
             .with_context(|| format!("Failed to read scenario: {}", path.display()))?;
@@ -260,7 +258,8 @@ fn verify_mode(summary_path: &Path, ledger_dir: &Path, expected_label: Option<&s
         if label != expected {
             return Err(anyhow!(
                 "Summary label mismatch: expected '{}', found '{}'",
-                expected, label
+                expected,
+                label
             ));
         }
     }
@@ -288,7 +287,9 @@ fn verify_mode(summary_path: &Path, ledger_dir: &Path, expected_label: Option<&s
         let ledger_path = if label == "default" {
             ledger_dir.join(format!("epoch_{:03}.json", epoch))
         } else {
-            ledger_dir.join(label).join(format!("epoch_{:03}.json", epoch))
+            ledger_dir
+                .join(label)
+                .join(format!("epoch_{:03}.json", epoch))
         };
 
         let ledger_text = fs::read_to_string(&ledger_path)
@@ -321,15 +322,14 @@ fn verify_mode(summary_path: &Path, ledger_dir: &Path, expected_label: Option<&s
         if recomputed != merkle {
             return Err(anyhow!(
                 "Ledger merkle mismatch for epoch {}: summary {}, computed {}",
-                epoch, merkle, recomputed
+                epoch,
+                merkle,
+                recomputed
             ));
         }
 
         if !verify_signature(&merkle, signature) {
-            return Err(anyhow!(
-                "Signature verification failed for epoch {}",
-                epoch
-            ));
+            return Err(anyhow!("Signature verification failed for epoch {}", epoch));
         }
 
         roots.push(merkle.to_string());

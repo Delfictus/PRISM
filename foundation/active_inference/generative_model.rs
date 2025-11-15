@@ -18,9 +18,9 @@ use std::collections::VecDeque;
 
 use super::hierarchical_model::HierarchicalModel;
 use super::observation_model::ObservationModel;
-use super::transition_model::{TransitionModel, ControlAction};
-use super::variational_inference::{VariationalInference, FreeEnergyComponents};
-use super::policy_selection::{PolicySelector, ActiveInferenceController, SensingStrategy};
+use super::policy_selection::{ActiveInferenceController, PolicySelector, SensingStrategy};
+use super::transition_model::{ControlAction, TransitionModel};
+use super::variational_inference::{FreeEnergyComponents, VariationalInference};
 
 /// Complete generative model for active inference
 #[derive(Debug, Clone)]
@@ -53,26 +53,19 @@ impl GenerativeModel {
         let transition = TransitionModel::default_timescales();
 
         // Variational inference
-        let inference = VariationalInference::new(
-            observation.clone(),
-            transition.clone(),
-            &model,
-        );
+        let inference = VariationalInference::new(observation.clone(), transition.clone(), &model);
 
         // Policy selector with 3-step horizon
         let preferred_obs = Array1::ones(100); // Flat wavefront
         let selector = PolicySelector::new(
-            3,           // horizon
-            10,          // n_policies
+            3,  // horizon
+            10, // n_policies
             preferred_obs,
             inference.clone(),
             transition.clone(),
         );
 
-        let controller = ActiveInferenceController::new(
-            selector,
-            SensingStrategy::Adaptive,
-        );
+        let controller = ActiveInferenceController::new(selector, SensingStrategy::Adaptive);
 
         Self {
             model,
@@ -129,27 +122,21 @@ impl GenerativeModel {
         }
 
         // Compare recent average to older average
-        let recent: f64 = self.free_energy_history
-            .iter()
-            .rev()
-            .take(5)
-            .sum::<f64>() / 5.0;
+        let recent: f64 = self.free_energy_history.iter().rev().take(5).sum::<f64>() / 5.0;
 
-        let older: f64 = self.free_energy_history
+        let older: f64 = self
+            .free_energy_history
             .iter()
             .skip(self.free_energy_history.len() - 10)
             .take(5)
-            .sum::<f64>() / 5.0;
+            .sum::<f64>()
+            / 5.0;
 
         recent < older // Free energy should decrease
     }
 
     /// Update model parameters from data (online learning)
-    pub fn learn_parameters(
-        &mut self,
-        observations: &[Array1<f64>],
-        states: &[Array1<f64>],
-    ) {
+    pub fn learn_parameters(&mut self, observations: &[Array1<f64>], states: &[Array1<f64>]) {
         self.inference.learn_parameters(observations, states);
     }
 
@@ -208,7 +195,8 @@ impl GenerativeModel {
 
         // Free energy
         let current_fe = if !observations.is_empty() {
-            self.free_energy(&observations[observations.len() - 1]).total
+            self.free_energy(&observations[observations.len() - 1])
+                .total
         } else {
             f64::NAN
         };
@@ -263,7 +251,7 @@ impl PerformanceMetrics {
     pub fn satisfies_constitution(&self) -> bool {
         self.rmse < 0.05           // RMSE < 5%
             && self.uncertainty.is_finite()  // Uncertainty quantified
-            && self.learning           // Learning (FE decreasing)
+            && self.learning // Learning (FE decreasing)
     }
 }
 
@@ -339,11 +327,7 @@ mod tests {
     fn test_multi_step_run() {
         let mut model = GenerativeModel::new();
 
-        let observations = vec![
-            Array1::ones(100),
-            Array1::ones(100),
-            Array1::ones(100),
-        ];
+        let observations = vec![Array1::ones(100), Array1::ones(100), Array1::ones(100)];
 
         let actions = model.run(&observations);
 
@@ -371,10 +355,7 @@ mod tests {
     fn test_performance_metrics() {
         let model = GenerativeModel::new();
 
-        let observations = vec![
-            Array1::ones(100),
-            Array1::ones(100),
-        ];
+        let observations = vec![Array1::ones(100), Array1::ones(100)];
 
         let metrics = model.metrics(&observations);
 

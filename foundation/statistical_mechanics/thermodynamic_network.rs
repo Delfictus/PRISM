@@ -10,8 +10,8 @@
 //!
 //! Performance Contract: <1ms per step for 1024 oscillators
 
-use std::f64::consts::PI;
 use crate::information_theory::TransferEntropy;
+use std::f64::consts::PI;
 
 /// Boltzmann constant (J/K)
 pub const KB: f64 = 1.380649e-23;
@@ -190,12 +190,8 @@ impl ThermodynamicNetwork {
 
         // Calculate initial entropy and energy
         let entropy = Self::calculate_entropy(&phases, &velocities, config.temperature);
-        let energy = Self::calculate_energy(
-            &phases,
-            &velocities,
-            &natural_frequencies,
-            &coupling_matrix,
-        );
+        let energy =
+            Self::calculate_energy(&phases, &velocities, &natural_frequencies, &coupling_matrix);
 
         let state = ThermodynamicState {
             phases,
@@ -451,8 +447,8 @@ impl ThermodynamicNetwork {
             sum_real += phase.cos();
             sum_imag += phase.sin();
         }
-        let phase_coherence = ((sum_real * sum_real + sum_imag * sum_imag).sqrt())
-            / (self.state.phases.len() as f64);
+        let phase_coherence =
+            ((sum_real * sum_real + sum_imag * sum_imag).sqrt()) / (self.state.phases.len() as f64);
 
         // Energy histogram for Boltzmann validation
         let energy_histogram = self.build_energy_histogram();
@@ -507,7 +503,8 @@ impl ThermodynamicNetwork {
 
         // Convert to probabilities
         let total = energies.len() as f64;
-        histogram.iter()
+        histogram
+            .iter()
             .enumerate()
             .map(|(i, &count)| {
                 let energy = (i as f64 + 0.5) * bin_width;
@@ -565,8 +562,8 @@ impl ThermodynamicNetwork {
         force_variance /= (n_history * n_osc) as f64;
 
         // Expected from fluctuation-dissipation theorem
-        let expected_variance = 2.0 * self.config.damping * KB * self.config.temperature
-            / self.config.dt;
+        let expected_variance =
+            2.0 * self.config.damping * KB * self.config.temperature / self.config.dt;
 
         // Return ratio (should be ≈ 1.0)
         if expected_variance > 0.0 {
@@ -686,9 +683,9 @@ impl ThermodynamicNetwork {
 
         // Heuristic: TE is high when phases are synchronized and velocities correlated
         let phase_coherence = (PI - phase_diff.min(2.0 * PI - phase_diff)) / PI;
-        let velocity_coherence = velocity_corr.abs() /
-            (self.state.velocities[i].abs().max(1e-10) *
-             self.state.velocities[j].abs().max(1e-10));
+        let velocity_coherence = velocity_corr.abs()
+            / (self.state.velocities[i].abs().max(1e-10)
+                * self.state.velocities[j].abs().max(1e-10));
 
         // Approximate TE in bits (0-1 range)
         (phase_coherence * 0.5 + velocity_coherence.min(1.0) * 0.5).min(1.0)
@@ -778,8 +775,10 @@ mod tests {
         let result = network.evolve(100);
 
         // Entropy should never decrease
-        assert!(result.entropy_never_decreased,
-            "Entropy decreased during evolution - violates second law!");
+        assert!(
+            result.entropy_never_decreased,
+            "Entropy decreased during evolution - violates second law!"
+        );
     }
 
     #[test]
@@ -799,8 +798,11 @@ mod tests {
         // Energy should be approximately conserved (within numerical tolerance)
         // Euler method has O(dt) error, so allow 0.5% relative error
         let energy_change = (final_energy - initial_energy).abs() / initial_energy.abs();
-        assert!(energy_change < 0.005,
-            "Energy not conserved: relative change = {}", energy_change);
+        assert!(
+            energy_change < 0.005,
+            "Energy not conserved: relative change = {}",
+            energy_change
+        );
     }
 
     #[test]
@@ -828,12 +830,17 @@ mod tests {
         let final_avg_coupling = network.average_coupling();
 
         // Should have modified some connections
-        assert!(modifications > 0,
-            "Information gating did not modify any connections");
+        assert!(
+            modifications > 0,
+            "Information gating did not modify any connections"
+        );
 
         // Coupling should be within valid range [0, 1]
-        assert!(final_avg_coupling >= 0.0 && final_avg_coupling <= 1.0,
-            "Average coupling out of valid range: {}", final_avg_coupling);
+        assert!(
+            final_avg_coupling >= 0.0 && final_avg_coupling <= 1.0,
+            "Average coupling out of valid range: {}",
+            final_avg_coupling
+        );
 
         println!("Initial avg coupling: {:.4}", initial_avg_coupling);
         println!("Final avg coupling: {:.4}", final_avg_coupling);
@@ -867,15 +874,23 @@ mod tests {
         // Verify TE values are in valid range [0, 1]
         for i in 0..16 {
             for j in 0..16 {
-                assert!(te_matrix[i][j] >= 0.0 && te_matrix[i][j] <= 1.0,
-                    "TE[{},{}] = {} out of range", i, j, te_matrix[i][j]);
+                assert!(
+                    te_matrix[i][j] >= 0.0 && te_matrix[i][j] <= 1.0,
+                    "TE[{},{}] = {} out of range",
+                    i,
+                    j,
+                    te_matrix[i][j]
+                );
             }
         }
 
         // Diagonal should be zero (no self-information transfer in this model)
         for i in 0..16 {
-            assert_eq!(te_matrix[i][i], 0.0,
-                "Self TE should be zero: TE[{},{}] = {}", i, i, te_matrix[i][i]);
+            assert_eq!(
+                te_matrix[i][i], 0.0,
+                "Self TE should be zero: TE[{},{}] = {}",
+                i, i, te_matrix[i][i]
+            );
         }
 
         println!("Causal structure analysis completed successfully");

@@ -3,10 +3,10 @@
 //! Implements highly optimized CUDA kernels for RTX 5070 that provide
 //! the core 89% performance improvement in neuromorphic processing
 
-use cudarc::driver::*;
 use anyhow::Result;
-use std::sync::Arc;
+use cudarc::driver::*;
 use std::fmt;
+use std::sync::Arc;
 
 /// CUDA kernel definitions for neuromorphic operations
 pub struct NeuromorphicKernels {
@@ -30,8 +30,8 @@ pub struct KernelConfig {
 impl Default for KernelConfig {
     fn default() -> Self {
         Self {
-            block_size: 512,     // Optimized for RTX 5070's Ada Lovelace architecture
-            max_blocks: 4096,    // Maximize utilization of 6,144 CUDA cores and 24 SMs
+            block_size: 512,                // Optimized for RTX 5070's Ada Lovelace architecture
+            max_blocks: 4096,               // Maximize utilization of 6,144 CUDA cores and 24 SMs
             shared_memory_bytes: 64 * 1024, // 64KB shared memory per block (RTX 5070 allows up to 100KB)
         }
     }
@@ -108,14 +108,13 @@ extern "C" __global__ void leaky_integration_kernel(
             .map_err(|e| anyhow::anyhow!("Failed to compile leaky integration kernel: {}", e))?;
 
         // Load PTX module and get function (cudarc 0.9 API)
-        device.load_ptx(
-            ptx,
-            "leaky_integration",
-            &["leaky_integration_kernel"]
-        ).map_err(|e| anyhow::anyhow!("Failed to load PTX module: {}", e))?;
+        device
+            .load_ptx(ptx, "leaky_integration", &["leaky_integration_kernel"])
+            .map_err(|e| anyhow::anyhow!("Failed to load PTX module: {}", e))?;
 
         // Get the function from the device
-        let function = device.get_func("leaky_integration", "leaky_integration_kernel")
+        let function = device
+            .get_func("leaky_integration", "leaky_integration_kernel")
             .ok_or_else(|| anyhow::anyhow!("Failed to load kernel function"))?;
 
         Ok(Arc::new(function))
@@ -161,13 +160,12 @@ extern "C" __global__ void spike_encoding_kernel(
             .map_err(|e| anyhow::anyhow!("Failed to compile spike encoding kernel: {}", e))?;
 
         // Load PTX module and get function (cudarc 0.9 API)
-        device.load_ptx(
-            ptx,
-            "spike_encoding",
-            &["spike_encoding_kernel"]
-        ).map_err(|e| anyhow::anyhow!("Failed to load PTX module: {}", e))?;
+        device
+            .load_ptx(ptx, "spike_encoding", &["spike_encoding_kernel"])
+            .map_err(|e| anyhow::anyhow!("Failed to load PTX module: {}", e))?;
 
-        let function = device.get_func("spike_encoding", "spike_encoding_kernel")
+        let function = device
+            .get_func("spike_encoding", "spike_encoding_kernel")
             .ok_or_else(|| anyhow::anyhow!("Failed to load kernel function"))?;
 
         Ok(Arc::new(function))
@@ -224,13 +222,12 @@ extern "C" __global__ void pattern_detection_kernel(
             .map_err(|e| anyhow::anyhow!("Failed to compile pattern detection kernel: {}", e))?;
 
         // Load PTX module and get function (cudarc 0.9 API)
-        device.load_ptx(
-            ptx,
-            "pattern_detection",
-            &["pattern_detection_kernel"]
-        ).map_err(|e| anyhow::anyhow!("Failed to load PTX module: {}", e))?;
+        device
+            .load_ptx(ptx, "pattern_detection", &["pattern_detection_kernel"])
+            .map_err(|e| anyhow::anyhow!("Failed to load PTX module: {}", e))?;
 
-        let function = device.get_func("pattern_detection", "pattern_detection_kernel")
+        let function = device
+            .get_func("pattern_detection", "pattern_detection_kernel")
             .ok_or_else(|| anyhow::anyhow!("Failed to load kernel function"))?;
 
         Ok(Arc::new(function))
@@ -286,13 +283,16 @@ extern "C" __global__ void spectral_radius_iteration_kernel(
             .map_err(|e| anyhow::anyhow!("Failed to compile spectral radius kernel: {}", e))?;
 
         // Load PTX module and get function (cudarc 0.9 API)
-        device.load_ptx(
-            ptx,
-            "spectral_radius",
-            &["spectral_radius_iteration_kernel"]
-        ).map_err(|e| anyhow::anyhow!("Failed to load PTX module: {}", e))?;
+        device
+            .load_ptx(
+                ptx,
+                "spectral_radius",
+                &["spectral_radius_iteration_kernel"],
+            )
+            .map_err(|e| anyhow::anyhow!("Failed to load PTX module: {}", e))?;
 
-        let function = device.get_func("spectral_radius", "spectral_radius_iteration_kernel")
+        let function = device
+            .get_func("spectral_radius", "spectral_radius_iteration_kernel")
             .ok_or_else(|| anyhow::anyhow!("Failed to load kernel function"))?;
 
         Ok(Arc::new(function))
@@ -336,20 +336,22 @@ extern "C" __global__ void spectral_radius_iteration_kernel(
             (*self.leaky_integration_kernel).clone().launch(
                 cfg,
                 (
-                    current_state,         // float* current_state
-                    previous_state,        // const float* previous_state
-                    input_contrib,         // const float* input_contrib
-                    recurrent_contrib,     // const float* recurrent_contrib
-                    leak_rate,             // const float leak_rate (by value)
-                    noise_level,           // const float noise_level (by value)
-                    n_neurons_u32,         // const unsigned int n_neurons (by value)
-                    seed,                  // const unsigned long long seed (by value)
-                )
+                    current_state,     // float* current_state
+                    previous_state,    // const float* previous_state
+                    input_contrib,     // const float* input_contrib
+                    recurrent_contrib, // const float* recurrent_contrib
+                    leak_rate,         // const float leak_rate (by value)
+                    noise_level,       // const float noise_level (by value)
+                    n_neurons_u32,     // const unsigned int n_neurons (by value)
+                    seed,              // const unsigned long long seed (by value)
+                ),
             )
-        }.map_err(|e| anyhow::anyhow!("Failed to launch leaky integration kernel: {}", e))?;
+        }
+        .map_err(|e| anyhow::anyhow!("Failed to launch leaky integration kernel: {}", e))?;
 
         // Synchronize to ensure completion
-        self.device.synchronize()
+        self.device
+            .synchronize()
             .map_err(|e| anyhow::anyhow!("Failed to synchronize device: {}", e))?;
 
         Ok(())
@@ -377,7 +379,11 @@ extern "C" __global__ void spectral_radius_iteration_kernel(
         };
 
         // Calculate normalization factor
-        let normalization_factor = if n_spikes > 0 { 1.0f32 / n_spikes as f32 } else { 1.0f32 };
+        let normalization_factor = if n_spikes > 0 {
+            1.0f32 / n_spikes as f32
+        } else {
+            1.0f32
+        };
 
         // Launch kernel with cudarc 0.9 API
         let n_spikes_u32 = n_spikes as u32;
@@ -389,7 +395,9 @@ extern "C" __global__ void spectral_radius_iteration_kernel(
             amplitudes
         } else {
             // Create a small dummy buffer for null pointer case
-            dummy_buffer = self.device.alloc_zeros::<f32>(1)
+            dummy_buffer = self
+                .device
+                .alloc_zeros::<f32>(1)
                 .map_err(|e| anyhow::anyhow!("Failed to allocate dummy buffer: {}", e))?;
             &dummy_buffer
         };
@@ -398,19 +406,21 @@ extern "C" __global__ void spectral_radius_iteration_kernel(
             (*self.spike_encoding_kernel).clone().launch(
                 cfg,
                 (
-                    output_vector,            // float* output_vector
-                    spike_times,              // const float* spike_times
-                    amplitudes_ptr,           // const float* spike_amplitudes
-                    spike_neuron_ids,         // const unsigned int* spike_neuron_ids
-                    n_spikes_u32,             // const unsigned int n_spikes (by value)
-                    n_bins_u32,               // const unsigned int n_bins (by value)
-                    duration_ms,              // const float duration_ms (by value)
-                    normalization_factor,     // const float normalization_factor (by value)
-                )
+                    output_vector,        // float* output_vector
+                    spike_times,          // const float* spike_times
+                    amplitudes_ptr,       // const float* spike_amplitudes
+                    spike_neuron_ids,     // const unsigned int* spike_neuron_ids
+                    n_spikes_u32,         // const unsigned int n_spikes (by value)
+                    n_bins_u32,           // const unsigned int n_bins (by value)
+                    duration_ms,          // const float duration_ms (by value)
+                    normalization_factor, // const float normalization_factor (by value)
+                ),
             )
-        }.map_err(|e| anyhow::anyhow!("Failed to launch spike encoding kernel: {}", e))?;
+        }
+        .map_err(|e| anyhow::anyhow!("Failed to launch spike encoding kernel: {}", e))?;
 
-        self.device.synchronize()
+        self.device
+            .synchronize()
             .map_err(|e| anyhow::anyhow!("Failed to synchronize device: {}", e))?;
         Ok(())
     }
@@ -427,7 +437,7 @@ extern "C" __global__ void spectral_radius_iteration_kernel(
         config: &KernelConfig,
     ) -> Result<()> {
         let cfg = LaunchConfig {
-            grid_dim: (n_patterns as u32, 1, 1),  // One block per pattern
+            grid_dim: (n_patterns as u32, 1, 1), // One block per pattern
             block_dim: (config.block_size, 1, 1),
             shared_mem_bytes: config.block_size * 4, // Shared memory for reduction
         };
@@ -439,17 +449,19 @@ extern "C" __global__ void spectral_radius_iteration_kernel(
             (*self.pattern_detection_kernel).clone().launch(
                 cfg,
                 (
-                    pattern_scores,        // float* pattern_scores
-                    neuron_states,         // const float* neuron_states
-                    pattern_templates,     // const float* pattern_templates
-                    n_neurons_u32,         // const unsigned int n_neurons (by value)
-                    n_patterns_u32,        // const unsigned int n_patterns (by value)
-                    threshold,             // const float threshold (by value)
-                )
+                    pattern_scores,    // float* pattern_scores
+                    neuron_states,     // const float* neuron_states
+                    pattern_templates, // const float* pattern_templates
+                    n_neurons_u32,     // const unsigned int n_neurons (by value)
+                    n_patterns_u32,    // const unsigned int n_patterns (by value)
+                    threshold,         // const float threshold (by value)
+                ),
             )
-        }.map_err(|e| anyhow::anyhow!("Failed to launch pattern detection kernel: {}", e))?;
+        }
+        .map_err(|e| anyhow::anyhow!("Failed to launch pattern detection kernel: {}", e))?;
 
-        self.device.synchronize()
+        self.device
+            .synchronize()
             .map_err(|e| anyhow::anyhow!("Failed to synchronize device: {}", e))?;
         Ok(())
     }
@@ -474,7 +486,8 @@ extern "C" __global__ void spectral_radius_iteration_kernel(
         };
 
         // Clear norm result - cudarc 0.9 API
-        self.device.memset_zeros(norm_result)
+        self.device
+            .memset_zeros(norm_result)
             .map_err(|e| anyhow::anyhow!("Failed to clear norm result: {}", e))?;
 
         let n_dim_u32 = n_dim as u32;
@@ -483,16 +496,18 @@ extern "C" __global__ void spectral_radius_iteration_kernel(
             (*self.spectral_radius_kernel).clone().launch(
                 cfg,
                 (
-                    output_vector,         // float* output_vector
-                    input_vector,          // const float* input_vector
-                    matrix,                // const float* matrix
-                    n_dim_u32,             // const unsigned int n_dim (by value)
-                    norm_result,           // float* norm_result
-                )
+                    output_vector, // float* output_vector
+                    input_vector,  // const float* input_vector
+                    matrix,        // const float* matrix
+                    n_dim_u32,     // const unsigned int n_dim (by value)
+                    norm_result,   // float* norm_result
+                ),
             )
-        }.map_err(|e| anyhow::anyhow!("Failed to launch spectral radius kernel: {}", e))?;
+        }
+        .map_err(|e| anyhow::anyhow!("Failed to launch spectral radius kernel: {}", e))?;
 
-        self.device.synchronize()
+        self.device
+            .synchronize()
             .map_err(|e| anyhow::anyhow!("Failed to synchronize device: {}", e))?;
         Ok(())
     }
@@ -574,9 +589,9 @@ impl NeuromorphicKernelManager {
 
     /// Get average kernel execution time
     pub fn get_average_kernel_time_us(&self) -> f64 {
-        let total_calls = self.performance_stats.leaky_integration_calls +
-                         self.performance_stats.spike_encoding_calls +
-                         self.performance_stats.pattern_detection_calls;
+        let total_calls = self.performance_stats.leaky_integration_calls
+            + self.performance_stats.spike_encoding_calls
+            + self.performance_stats.pattern_detection_calls;
 
         if total_calls > 0 {
             self.performance_stats.total_kernel_time_us as f64 / total_calls as f64
@@ -643,20 +658,25 @@ mod tests {
                 // Benchmark kernel execution
                 let start = std::time::Instant::now();
                 for _ in 0..100 {
-                    manager.leaky_integration(
-                        &mut current_state,
-                        &previous_state,
-                        &input_contrib,
-                        &recurrent_contrib,
-                        0.3,
-                        0.01,
-                        n_neurons,
-                    ).unwrap();
+                    manager
+                        .leaky_integration(
+                            &mut current_state,
+                            &previous_state,
+                            &input_contrib,
+                            &recurrent_contrib,
+                            0.3,
+                            0.01,
+                            n_neurons,
+                        )
+                        .unwrap();
                 }
                 let total_time = start.elapsed();
 
                 println!("100 kernel executions took {:?}", total_time);
-                println!("Average kernel time: {:.2}μs", manager.get_average_kernel_time_us());
+                println!(
+                    "Average kernel time: {:.2}μs",
+                    manager.get_average_kernel_time_us()
+                );
 
                 // Should be very fast on GPU
                 assert!(total_time.as_millis() < 100); // Less than 100ms for 100 iterations

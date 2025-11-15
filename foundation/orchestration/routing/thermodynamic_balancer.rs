@@ -8,10 +8,10 @@
 //!
 //! Impact: 40% cost savings, 20% quality improvement
 
+use anyhow::Result;
 use ndarray::Array1;
 use std::collections::HashMap;
 use tokio::time::Duration;
-use anyhow::Result;
 
 use crate::orchestration::optimization::mdl_prompt_optimizer::QueryType;
 
@@ -31,7 +31,7 @@ struct LLMPerformanceProfile {
     avg_cost: f64,
     avg_latency: Duration,
     quality_by_type: HashMap<QueryType, f64>,
-    response_entropy: f64,  // Diversity
+    response_entropy: f64, // Diversity
     current_load: usize,
 }
 
@@ -40,43 +40,57 @@ impl ThermodynamicLoadBalancer {
         let mut profiles = HashMap::new();
 
         // Initialize profiles (will be updated with real data)
-        profiles.insert("gpt-4".to_string(), LLMPerformanceProfile {
-            model_name: "gpt-4".to_string(),
-            avg_cost: 0.02,
-            avg_latency: Duration::from_secs(2),
-            quality_by_type: HashMap::new(),
-            response_entropy: 0.8,
-            current_load: 0,
-        });
+        profiles.insert(
+            "gpt-4".to_string(),
+            LLMPerformanceProfile {
+                model_name: "gpt-4".to_string(),
+                avg_cost: 0.02,
+                avg_latency: Duration::from_secs(2),
+                quality_by_type: HashMap::new(),
+                response_entropy: 0.8,
+                current_load: 0,
+            },
+        );
 
-        profiles.insert("claude".to_string(), LLMPerformanceProfile {
-            model_name: "claude".to_string(),
-            avg_cost: 0.01,
-            avg_latency: Duration::from_secs(3),
-            quality_by_type: HashMap::new(),
-            response_entropy: 0.7,
-            current_load: 0,
-        });
+        profiles.insert(
+            "claude".to_string(),
+            LLMPerformanceProfile {
+                model_name: "claude".to_string(),
+                avg_cost: 0.01,
+                avg_latency: Duration::from_secs(3),
+                quality_by_type: HashMap::new(),
+                response_entropy: 0.7,
+                current_load: 0,
+            },
+        );
 
-        profiles.insert("gemini".to_string(), LLMPerformanceProfile {
-            model_name: "gemini".to_string(),
-            avg_cost: 0.0001,
-            avg_latency: Duration::from_millis(1500),
-            quality_by_type: HashMap::new(),
-            response_entropy: 0.6,
-            current_load: 0,
-        });
+        profiles.insert(
+            "gemini".to_string(),
+            LLMPerformanceProfile {
+                model_name: "gemini".to_string(),
+                avg_cost: 0.0001,
+                avg_latency: Duration::from_millis(1500),
+                quality_by_type: HashMap::new(),
+                response_entropy: 0.6,
+                current_load: 0,
+            },
+        );
 
-        profiles.insert("grok".to_string(), LLMPerformanceProfile {
-            model_name: "grok".to_string(),
-            avg_cost: 0.01,
-            avg_latency: Duration::from_secs(2),
-            quality_by_type: HashMap::new(),
-            response_entropy: 0.75,
-            current_load: 0,
-        });
+        profiles.insert(
+            "grok".to_string(),
+            LLMPerformanceProfile {
+                model_name: "grok".to_string(),
+                avg_cost: 0.01,
+                avg_latency: Duration::from_secs(2),
+                quality_by_type: HashMap::new(),
+                response_entropy: 0.75,
+                current_load: 0,
+            },
+        );
 
-        Self { llm_profiles: profiles }
+        Self {
+            llm_profiles: profiles,
+        }
     }
 
     /// Select LLM via free energy minimization
@@ -89,7 +103,7 @@ impl ThermodynamicLoadBalancer {
     pub fn select_optimal_llm(
         &self,
         query_type: QueryType,
-        urgency: f64,  // 0-1, higher = more urgent
+        urgency: f64, // 0-1, higher = more urgent
     ) -> LLMSelection {
         let mut candidates = Vec::new();
 
@@ -118,7 +132,8 @@ impl ThermodynamicLoadBalancer {
         }
 
         // Select minimum free energy (thermodynamic equilibrium)
-        let optimal = candidates.iter()
+        let optimal = candidates
+            .iter()
             .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
             .unwrap();
 
@@ -134,11 +149,15 @@ impl ThermodynamicLoadBalancer {
     fn compute_temperature(&self, urgency: f64) -> f64 {
         // High urgency → low temperature → exploit (use best)
         // Low urgency → high temperature → explore (try different)
-        1.0 - 0.8 * urgency  // Range: [0.2, 1.0]
+        1.0 - 0.8 * urgency // Range: [0.2, 1.0]
     }
 
     fn get_quality(&self, profile: &LLMPerformanceProfile, query_type: QueryType) -> f64 {
-        profile.quality_by_type.get(&query_type).copied().unwrap_or(0.7)
+        profile
+            .quality_by_type
+            .get(&query_type)
+            .copied()
+            .unwrap_or(0.7)
     }
 }
 
@@ -194,9 +213,7 @@ impl QuantumVotingConsensus {
         }
 
         // Measure: Probability = |amplitude|²
-        let probabilities: Vec<f64> = amplitudes.iter()
-            .map(|a| a.norm_sqr())
-            .collect();
+        let probabilities: Vec<f64> = amplitudes.iter().map(|a| a.norm_sqr()).collect();
 
         // Normalize
         let sum: f64 = probabilities.iter().sum();
@@ -207,7 +224,8 @@ impl QuantumVotingConsensus {
         };
 
         // Select consensus
-        let consensus_idx = normalized.iter()
+        let consensus_idx = normalized
+            .iter()
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
             .map(|(i, _)| i)
@@ -250,7 +268,7 @@ impl QuantumVotingConsensus {
         let mut coherence = 0.0;
 
         for i in 0..amplitudes.len() {
-            for j in (i+1)..amplitudes.len() {
+            for j in (i + 1)..amplitudes.len() {
                 coherence += (amplitudes[i] * amplitudes[j].conj()).norm();
             }
         }
@@ -301,14 +319,20 @@ impl Complex {
     }
 
     fn conj(&self) -> Self {
-        Self { re: self.re, im: -self.im }
+        Self {
+            re: self.re,
+            im: -self.im,
+        }
     }
 }
 
 impl std::ops::Add for Complex {
     type Output = Self;
     fn add(self, other: Self) -> Self {
-        Self { re: self.re + other.re, im: self.im + other.im }
+        Self {
+            re: self.re + other.re,
+            im: self.im + other.im,
+        }
     }
 }
 
@@ -322,14 +346,20 @@ impl std::ops::AddAssign for Complex {
 impl std::ops::Mul<f64> for Complex {
     type Output = Self;
     fn mul(self, scalar: f64) -> Self {
-        Self { re: self.re * scalar, im: self.im * scalar }
+        Self {
+            re: self.re * scalar,
+            im: self.im * scalar,
+        }
     }
 }
 
 impl std::ops::Mul<Complex> for f64 {
     type Output = Complex;
     fn mul(self, c: Complex) -> Complex {
-        Complex { re: self * c.re, im: self * c.im }
+        Complex {
+            re: self * c.re,
+            im: self * c.im,
+        }
     }
 }
 
@@ -354,7 +384,10 @@ mod tests {
         // High urgency should select fastest/best (low temperature)
         let selection = balancer.select_optimal_llm(QueryType::Geopolitical, 0.9);
 
-        assert!(selection.temperature < 0.3, "High urgency = low temperature");
+        assert!(
+            selection.temperature < 0.3,
+            "High urgency = low temperature"
+        );
     }
 
     #[test]
@@ -373,7 +406,10 @@ mod tests {
 
         // Should select Option A (quantum interference reinforces)
         assert!(result.consensus_option.contains("Option A"));
-        assert!(result.quantum_coherence > 0.0, "Should have quantum coherence");
+        assert!(
+            result.quantum_coherence > 0.0,
+            "Should have quantum coherence"
+        );
     }
 
     #[test]

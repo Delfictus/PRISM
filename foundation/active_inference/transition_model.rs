@@ -14,8 +14,7 @@ use ndarray::Array1;
 use std::f64::consts::PI;
 
 use super::hierarchical_model::{
-    HierarchicalModel, WindowPhaseLevel, AtmosphericLevel, SatelliteLevel,
-    GaussianBelief,
+    AtmosphericLevel, GaussianBelief, HierarchicalModel, SatelliteLevel, WindowPhaseLevel,
 };
 
 /// Control action (for active inference)
@@ -75,11 +74,7 @@ impl TransitionModel {
     /// 1. Evolve Level 3 (satellite) - slowest
     /// 2. Evolve Level 2 (atmosphere) with satellite context
     /// 3. Evolve Level 1 (windows) with atmospheric driving
-    pub fn predict(
-        &self,
-        model: &mut HierarchicalModel,
-        action: &ControlAction,
-    ) {
+    pub fn predict(&self, model: &mut HierarchicalModel, action: &ControlAction) {
         // Level 3: Satellite orbital dynamics (slowest)
         self.evolve_satellite(&mut model.level3, self.dt_slow);
 
@@ -88,12 +83,7 @@ impl TransitionModel {
 
         // Level 1: Window phases (fastest, multiple substeps)
         for _ in 0..self.substeps {
-            self.evolve_windows(
-                &mut model.level1,
-                &model.level2,
-                action,
-                self.dt_fast,
-            );
+            self.evolve_windows(&mut model.level1, &model.level2, action, self.dt_fast);
         }
     }
 
@@ -346,8 +336,8 @@ impl PredictionError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::hierarchical_model::constants;
+    use super::*;
 
     #[test]
     fn test_transition_model_creation() {
@@ -446,8 +436,13 @@ mod tests {
         transition.evolve_windows(&mut level, &atmosphere, &action, transition.dt_fast);
 
         // Phase should be reduced (on average, accounting for drift + diffusion + numerical noise)
-        let mean_abs_phase = level.belief.mean.iter().map(|p| p.abs()).sum::<f64>() / level.n_windows as f64;
-        assert!(mean_abs_phase <= 0.50001, "Mean |phase| = {} should be ≤ 0.5 (with tolerance)", mean_abs_phase);
+        let mean_abs_phase =
+            level.belief.mean.iter().map(|p| p.abs()).sum::<f64>() / level.n_windows as f64;
+        assert!(
+            mean_abs_phase <= 0.50001,
+            "Mean |phase| = {} should be ≤ 0.5 (with tolerance)",
+            mean_abs_phase
+        );
     }
 
     #[test]

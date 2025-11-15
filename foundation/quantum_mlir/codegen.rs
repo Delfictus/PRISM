@@ -2,8 +2,8 @@
 //!
 //! Generates PTX code for GPU execution
 
-use anyhow::Result;
 use super::GpuArchitecture;
+use anyhow::Result;
 
 /// PTX code generator for quantum operations
 pub struct PtxCodeGenerator {
@@ -32,8 +32,7 @@ impl PtxCodeGenerator {
             "// PTX generated for {}\n\
              // Actual PTX is compiled from quantum_mlir.cu\n\
              // Target: {}",
-            compute_capability,
-            compute_capability
+            compute_capability, compute_capability
         ))
     }
 }

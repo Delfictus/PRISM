@@ -144,9 +144,15 @@ fn compile_cu_file(nvcc: &str, ptx_dir: &PathBuf, src_path: &str, output_name: &
             // Copy to target/ptx for runtime loading
             let target_ptx = PathBuf::from("target/ptx").join(output_name);
             if let Err(e) = std::fs::copy(&ptx_output, &target_ptx) {
-                println!("cargo:warning=[BUILD] ⚠️  Failed to copy {} to target/ptx: {}", output_name, e);
+                println!(
+                    "cargo:warning=[BUILD] ⚠️  Failed to copy {} to target/ptx: {}",
+                    output_name, e
+                );
             } else {
-                println!("cargo:warning=[BUILD] ✅ Copied to: {}", target_ptx.display());
+                println!(
+                    "cargo:warning=[BUILD] ✅ Copied to: {}",
+                    target_ptx.display()
+                );
             }
         }
         Ok(status) => {
@@ -157,7 +163,10 @@ fn compile_cu_file(nvcc: &str, ptx_dir: &PathBuf, src_path: &str, output_name: &
             panic!("CUDA compilation failed");
         }
         Err(e) => {
-            println!("cargo:warning=[BUILD] ❌ Failed to run nvcc for {}: {}", src_path, e);
+            println!(
+                "cargo:warning=[BUILD] ❌ Failed to run nvcc for {}: {}",
+                src_path, e
+            );
             panic!("Failed to run nvcc");
         }
     }

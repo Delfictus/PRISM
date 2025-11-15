@@ -10,19 +10,19 @@
 //! - Optimal memory layout for GPU execution
 //! - Real working implementation with actual GPU code
 
+pub mod codegen;
+pub mod cuda_kernels;
 pub mod dialect;
-pub mod types;
+pub mod gpu_memory;
 pub mod ops;
 pub mod passes;
-pub mod codegen;
 pub mod runtime;
-pub mod cuda_kernels;
-pub mod gpu_memory;
+pub mod types;
 
-use anyhow::{Result, Context};
-use std::sync::Arc;
-use self::runtime::QuantumGpuRuntime;
 use self::gpu_memory::GpuMemoryManager;
+use self::runtime::QuantumGpuRuntime;
+use anyhow::{Context, Result};
+use std::sync::Arc;
 
 /// The Quantum MLIR compiler pipeline - NOW WITH REAL GPU EXECUTION!
 pub struct QuantumCompiler {
@@ -102,7 +102,10 @@ impl QuantumCompiler {
 
     /// Compile and execute quantum operations on GPU
     pub fn compile(&self, operations: &[QuantumOp]) -> Result<CompiledQuantumKernel> {
-        println!("[Quantum MLIR] Compiling {} operations for GPU execution", operations.len());
+        println!(
+            "[Quantum MLIR] Compiling {} operations for GPU execution",
+            operations.len()
+        );
 
         // For now, we execute operations directly on GPU
         // In a full implementation, we would generate MLIR IR first
@@ -264,11 +267,17 @@ pub struct Complex64 {
 
 impl Complex64 {
     pub fn zero() -> Self {
-        Self { real: 0.0, imag: 0.0 }
+        Self {
+            real: 0.0,
+            imag: 0.0,
+        }
     }
 
     pub fn one() -> Self {
-        Self { real: 1.0, imag: 0.0 }
+        Self {
+            real: 1.0,
+            imag: 0.0,
+        }
     }
 
     pub fn new(real: f64, imag: f64) -> Self {
@@ -369,17 +378,25 @@ pub mod mlir {
     pub struct PassManager;
 
     impl PassManager {
-        pub fn new() -> Self { PassManager }
+        pub fn new() -> Self {
+            PassManager
+        }
         pub fn add_pass<T>(&self, _pass: T) {}
-        pub fn run(&self, _module: &Module) -> anyhow::Result<()> { Ok(()) }
+        pub fn run(&self, _module: &Module) -> anyhow::Result<()> {
+            Ok(())
+        }
     }
 
     impl Builder {
-        pub fn create_module(&self, _name: &str) -> Module { Module }
+        pub fn create_module(&self, _name: &str) -> Module {
+            Module
+        }
     }
 
     impl Module {
-        pub fn create_function(&self, _name: &str) -> Function { Function }
+        pub fn create_function(&self, _name: &str) -> Function {
+            Function
+        }
     }
 
     pub struct Function;

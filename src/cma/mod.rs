@@ -31,7 +31,7 @@ pub struct CausalManifold {
 pub struct Solution {
     pub coloring: Vec<usize>,
     pub cost: f64,
-    pub data: Vec<f64>,  // Raw solution data for neural optimization
+    pub data: Vec<f64>, // Raw solution data for neural optimization
     pub metadata: std::collections::HashMap<String, f64>,
 }
 

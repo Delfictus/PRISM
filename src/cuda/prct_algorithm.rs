@@ -8,7 +8,7 @@ use prct_core::ports::NeuromorphicEncodingParams;
 use shared_types::*;
 use std::sync::Arc;
 
-use super::prct_adapters::{NeuromorphicAdapter, QuantumAdapter, PhysicsCouplingAdapter};
+use super::prct_adapters::{NeuromorphicAdapter, PhysicsCouplingAdapter, QuantumAdapter};
 
 /// PRCT Algorithm Configuration
 #[derive(Clone, Debug)]
@@ -107,9 +107,13 @@ impl PRCTAlgorithm {
         };
 
         use prct_core::ports::NeuromorphicPort;
-        let spike_pattern = self.neuro_adapter.encode_graph_as_spikes(&graph, &neuro_params)
+        let spike_pattern = self
+            .neuro_adapter
+            .encode_graph_as_spikes(&graph, &neuro_params)
             .map_err(|e| anyhow::anyhow!("Neuromorphic encoding failed: {:?}", e))?;
-        let neuro_state = self.neuro_adapter.process_and_detect_patterns(&spike_pattern)
+        let neuro_state = self
+            .neuro_adapter
+            .process_and_detect_patterns(&spike_pattern)
             .map_err(|e| anyhow::anyhow!("Neuromorphic processing failed: {:?}", e))?;
         log::info!("Neuromorphic coherence: {:.4}", neuro_state.coherence);
 
@@ -125,20 +129,32 @@ impl PRCTAlgorithm {
         };
 
         use prct_core::ports::QuantumPort;
-        let hamiltonian = self.quantum_adapter.build_hamiltonian(&graph, &evolution_params)
+        let hamiltonian = self
+            .quantum_adapter
+            .build_hamiltonian(&graph, &evolution_params)
             .map_err(|e| anyhow::anyhow!("Hamiltonian construction failed: {:?}", e))?;
-        log::info!("Hamiltonian ground energy: {:.4}", hamiltonian.ground_state_energy);
+        log::info!(
+            "Hamiltonian ground energy: {:.4}",
+            hamiltonian.ground_state_energy
+        );
 
-        let initial_state = self.quantum_adapter.compute_ground_state(&hamiltonian)
+        let initial_state = self
+            .quantum_adapter
+            .compute_ground_state(&hamiltonian)
             .map_err(|e| anyhow::anyhow!("Ground state computation failed: {:?}", e))?;
-        let quantum_state = self.quantum_adapter.evolve_state(
-            &hamiltonian,
-            &initial_state,
-            self.config.quantum_evolution_time,
-        ).map_err(|e| anyhow::anyhow!("Quantum evolution failed: {:?}", e))?;
+        let quantum_state = self
+            .quantum_adapter
+            .evolve_state(
+                &hamiltonian,
+                &initial_state,
+                self.config.quantum_evolution_time,
+            )
+            .map_err(|e| anyhow::anyhow!("Quantum evolution failed: {:?}", e))?;
         log::info!("Quantum entanglement: {:.4}", quantum_state.entanglement);
 
-        let phase_field = self.quantum_adapter.get_phase_field(&quantum_state)
+        let phase_field = self
+            .quantum_adapter
+            .get_phase_field(&quantum_state)
             .map_err(|e| anyhow::anyhow!("Phase field extraction failed: {:?}", e))?;
 
         // ========================================
@@ -146,9 +162,14 @@ impl PRCTAlgorithm {
         // ========================================
         log::info!("Layer 2.5: Kuramoto phase synchronization");
         use prct_core::ports::PhysicsCouplingPort;
-        let coupling = self.coupling_adapter.get_bidirectional_coupling(&neuro_state, &quantum_state)
+        let coupling = self
+            .coupling_adapter
+            .get_bidirectional_coupling(&neuro_state, &quantum_state)
             .map_err(|e| anyhow::anyhow!("Coupling computation failed: {:?}", e))?;
-        log::info!("Kuramoto order parameter: {:.4}", coupling.kuramoto_state.order_parameter);
+        log::info!(
+            "Kuramoto order parameter: {:.4}",
+            coupling.kuramoto_state.order_parameter
+        );
 
         // ========================================
         // LAYER 3: PHASE-GUIDED COLORING
@@ -165,9 +186,13 @@ impl PRCTAlgorithm {
             &phase_field,
             &coupling.kuramoto_state,
             target_colors,
-        ).map_err(|e| anyhow::anyhow!("Phase-guided coloring failed: {:?}", e))?;
+        )
+        .map_err(|e| anyhow::anyhow!("Phase-guided coloring failed: {:?}", e))?;
 
-        log::info!("PRCT coloring complete: {} colors", solution.chromatic_number);
+        log::info!(
+            "PRCT coloring complete: {} colors",
+            solution.chromatic_number
+        );
         log::info!("Solution quality score: {:.4}", solution.quality_score);
 
         Ok(solution.colors)
@@ -215,7 +240,11 @@ impl PRCTAlgorithm {
 
         if improved_colors < current_colors {
             *coloring = improved;
-            log::info!("PRCT refinement improved: {} -> {} colors", current_colors, improved_colors);
+            log::info!(
+                "PRCT refinement improved: {} -> {} colors",
+                current_colors,
+                improved_colors
+            );
         }
 
         Ok(improved_colors)
@@ -255,11 +284,7 @@ mod tests {
         let prct = PRCTAlgorithm::new().unwrap();
 
         // Simple triangle graph
-        let adjacency = vec![
-            vec![1, 2],
-            vec![0, 2],
-            vec![0, 1],
-        ];
+        let adjacency = vec![vec![1, 2], vec![0, 2], vec![0, 1]];
 
         let ordering = vec![0, 1, 2];
         let coloring = prct.color(&adjacency, &ordering).unwrap();

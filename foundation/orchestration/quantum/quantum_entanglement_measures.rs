@@ -5,10 +5,10 @@
 //! and quantum discord for analyzing correlations between LLM responses.
 
 use crate::orchestration::OrchestrationError;
-use nalgebra::{DMatrix, DVector, Complex, SymmetricEigen};
+use nalgebra::{Complex, DMatrix, DVector, SymmetricEigen};
 use num_complex::Complex64;
-use std::collections::{HashMap, VecDeque};
 use ordered_float::OrderedFloat;
+use std::collections::{HashMap, VecDeque};
 
 /// Quantum entanglement analyzer for LLM response correlations
 pub struct QuantumEntanglementAnalyzer {
@@ -250,7 +250,7 @@ struct OptimalWitness {
 
 #[derive(Clone, Debug)]
 enum OptimizationMethod {
-    SDP,  // Semidefinite programming
+    SDP, // Semidefinite programming
     GradientDescent,
     GeneticAlgorithm,
     ConvexOptimization,
@@ -476,7 +476,11 @@ impl QuantumEntanglementAnalyzer {
         }
 
         // Initialize with maximally mixed state
-        let rho = DMatrix::from_element(dimension, dimension, Complex64::new(1.0 / dimension as f64, 0.0));
+        let rho = DMatrix::from_element(
+            dimension,
+            dimension,
+            Complex64::new(1.0 / dimension as f64, 0.0),
+        );
 
         Ok(Self {
             density_matrix: DensityMatrixHandler {
@@ -512,11 +516,14 @@ impl QuantumEntanglementAnalyzer {
     }
 
     /// Set density matrix directly
-    pub fn set_density_matrix(&mut self, rho: DMatrix<Complex64>) -> Result<(), OrchestrationError> {
+    pub fn set_density_matrix(
+        &mut self,
+        rho: DMatrix<Complex64>,
+    ) -> Result<(), OrchestrationError> {
         // Verify Hermiticity
         if !self.is_hermitian(&rho) {
             return Err(OrchestrationError::InvalidMatrix(
-                "Density matrix must be Hermitian".to_string()
+                "Density matrix must be Hermitian".to_string(),
             ));
         }
 
@@ -524,7 +531,7 @@ impl QuantumEntanglementAnalyzer {
         let trace = rho.trace();
         if (trace.re - 1.0).abs() > 1e-10 || trace.im.abs() > 1e-10 {
             return Err(OrchestrationError::InvalidMatrix(
-                "Density matrix trace must be 1".to_string()
+                "Density matrix trace must be 1".to_string(),
             ));
         }
 
@@ -533,7 +540,7 @@ impl QuantumEntanglementAnalyzer {
         for &lambda in &eigenvalues {
             if lambda < -1e-10 {
                 return Err(OrchestrationError::InvalidMatrix(
-                    "Density matrix must be positive semidefinite".to_string()
+                    "Density matrix must be positive semidefinite".to_string(),
                 ));
             }
         }
@@ -562,7 +569,10 @@ impl QuantumEntanglementAnalyzer {
     }
 
     /// Compute eigenvalues of Hermitian matrix
-    fn compute_eigenvalues(&self, matrix: &DMatrix<Complex64>) -> Result<Vec<f64>, OrchestrationError> {
+    fn compute_eigenvalues(
+        &self,
+        matrix: &DMatrix<Complex64>,
+    ) -> Result<Vec<f64>, OrchestrationError> {
         // Convert to real symmetric matrix for Hermitian case
         let n = matrix.nrows();
         let mut real_matrix = DMatrix::zeros(n, n);
@@ -621,7 +631,12 @@ impl QuantumEntanglementAnalyzer {
     }
 
     /// Compute partial trace
-    fn partial_trace(&self, rho: &DMatrix<Complex64>, dim_a: usize, trace_system: usize) -> Result<DMatrix<Complex64>, OrchestrationError> {
+    fn partial_trace(
+        &self,
+        rho: &DMatrix<Complex64>,
+        dim_a: usize,
+        trace_system: usize,
+    ) -> Result<DMatrix<Complex64>, OrchestrationError> {
         let dim_b = rho.nrows() / dim_a;
 
         if dim_a * dim_b != rho.nrows() {
@@ -697,14 +712,20 @@ impl QuantumEntanglementAnalyzer {
     fn compute_concurrence(&mut self) -> Result<f64, OrchestrationError> {
         // Check if system is 2-qubit (4x4 density matrix)
         if self.density_matrix.rho.nrows() != 4 {
-            return Ok(0.0);  // Concurrence only defined for 2-qubit systems
+            return Ok(0.0); // Concurrence only defined for 2-qubit systems
         }
 
         // Pauli-Y matrix
-        let sigma_y = DMatrix::from_row_slice(2, 2, &[
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, -1.0),
-            Complex64::new(0.0, 1.0), Complex64::new(0.0, 0.0)
-        ]);
+        let sigma_y = DMatrix::from_row_slice(
+            2,
+            2,
+            &[
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, -1.0),
+                Complex64::new(0.0, 1.0),
+                Complex64::new(0.0, 0.0),
+            ],
+        );
 
         // Spin-flip operation: (σ_y ⊗ σ_y) ρ* (σ_y ⊗ σ_y)
         let spin_flip = self.kron(&sigma_y, &sigma_y);
@@ -755,7 +776,10 @@ impl QuantumEntanglementAnalyzer {
     }
 
     /// Matrix square root for positive semidefinite matrices
-    fn matrix_sqrt(&self, matrix: &DMatrix<Complex64>) -> Result<DMatrix<Complex64>, OrchestrationError> {
+    fn matrix_sqrt(
+        &self,
+        matrix: &DMatrix<Complex64>,
+    ) -> Result<DMatrix<Complex64>, OrchestrationError> {
         // Eigendecomposition
         let eigenvalues = self.compute_eigenvalues(matrix)?;
 
@@ -767,10 +791,11 @@ impl QuantumEntanglementAnalyzer {
         // Approximate using power iteration
         sqrt_matrix = matrix.clone();
         for _ in 0..10 {
-            let inverse = sqrt_matrix.clone().try_inverse()
-                .ok_or_else(|| OrchestrationError::SingularMatrix {
-                    matrix_name: "sqrt iteration".to_string()
-                })?;
+            let inverse = sqrt_matrix.clone().try_inverse().ok_or_else(|| {
+                OrchestrationError::SingularMatrix {
+                    matrix_name: "sqrt iteration".to_string(),
+                }
+            })?;
             sqrt_matrix = (&sqrt_matrix + &inverse * matrix) / Complex::new(2.0, 0.0);
         }
 
@@ -794,10 +819,8 @@ impl QuantumEntanglementAnalyzer {
 
         self.measures.negativity.value = negativity;
         self.measures.negativity.partial_transpose = rho_pt;
-        self.measures.negativity.negative_eigenvalues = eigenvalues.iter()
-            .filter(|&&x| x < 0.0)
-            .copied()
-            .collect();
+        self.measures.negativity.negative_eigenvalues =
+            eigenvalues.iter().filter(|&&x| x < 0.0).copied().collect();
         self.measures.negativity.ppt = !has_negative;
 
         // Logarithmic negativity
@@ -807,12 +830,15 @@ impl QuantumEntanglementAnalyzer {
     }
 
     /// Partial transpose operation
-    fn partial_transpose(&self, rho: &DMatrix<Complex64>) -> Result<DMatrix<Complex64>, OrchestrationError> {
+    fn partial_transpose(
+        &self,
+        rho: &DMatrix<Complex64>,
+    ) -> Result<DMatrix<Complex64>, OrchestrationError> {
         let total_dim = rho.nrows();
         let subsystem_dim = (total_dim as f64).sqrt() as usize;
 
         if subsystem_dim * subsystem_dim != total_dim {
-            return Ok(rho.clone());  // Not a square bipartite system
+            return Ok(rho.clone()); // Not a square bipartite system
         }
 
         let mut rho_pt = DMatrix::zeros(total_dim, total_dim);
@@ -823,7 +849,7 @@ impl QuantumEntanglementAnalyzer {
                     for l in 0..subsystem_dim {
                         let row = i * subsystem_dim + j;
                         let col = k * subsystem_dim + l;
-                        let row_pt = k * subsystem_dim + j;  // Transpose first subsystem
+                        let row_pt = k * subsystem_dim + j; // Transpose first subsystem
                         let col_pt = i * subsystem_dim + l;
 
                         rho_pt[(row_pt, col_pt)] = rho[(row, col)];
@@ -841,7 +867,8 @@ impl QuantumEntanglementAnalyzer {
         let separable = self.find_closest_separable(&self.density_matrix.rho)?;
 
         // Compute relative entropy S(ρ||σ) = Tr(ρ log ρ) - Tr(ρ log σ)
-        let relative_entropy = self.relative_entropy_between(&self.density_matrix.rho, &separable)?;
+        let relative_entropy =
+            self.relative_entropy_between(&self.density_matrix.rho, &separable)?;
 
         self.measures.relative_entropy.value = relative_entropy;
         self.measures.relative_entropy.closest_separable = separable;
@@ -850,15 +877,26 @@ impl QuantumEntanglementAnalyzer {
     }
 
     /// Find closest separable state
-    fn find_closest_separable(&self, rho: &DMatrix<Complex64>) -> Result<DMatrix<Complex64>, OrchestrationError> {
+    fn find_closest_separable(
+        &self,
+        rho: &DMatrix<Complex64>,
+    ) -> Result<DMatrix<Complex64>, OrchestrationError> {
         // Simplified: use maximally mixed state as approximation
         // In production, would use SDP optimization
         let dim = rho.nrows();
-        Ok(DMatrix::from_element(dim, dim, Complex64::new(1.0 / dim as f64, 0.0)))
+        Ok(DMatrix::from_element(
+            dim,
+            dim,
+            Complex64::new(1.0 / dim as f64, 0.0),
+        ))
     }
 
     /// Compute relative entropy between two density matrices
-    fn relative_entropy_between(&self, rho: &DMatrix<Complex64>, sigma: &DMatrix<Complex64>) -> Result<f64, OrchestrationError> {
+    fn relative_entropy_between(
+        &self,
+        rho: &DMatrix<Complex64>,
+        sigma: &DMatrix<Complex64>,
+    ) -> Result<f64, OrchestrationError> {
         // S(ρ||σ) = Tr(ρ log ρ) - Tr(ρ log σ)
         let eigenvalues_rho = self.compute_eigenvalues(rho)?;
         let eigenvalues_sigma = self.compute_eigenvalues(sigma)?;
@@ -948,10 +986,13 @@ impl QuantumEntanglementAnalyzer {
     }
 
     /// Compute classical correlations
-    fn compute_classical_correlations(&self, basis: &DMatrix<Complex64>) -> Result<f64, OrchestrationError> {
+    fn compute_classical_correlations(
+        &self,
+        basis: &DMatrix<Complex64>,
+    ) -> Result<f64, OrchestrationError> {
         // Simplified calculation
         // Would properly compute post-measurement mutual information
-        Ok(self.density_matrix.entropy * 0.5)  // Placeholder
+        Ok(self.density_matrix.entropy * 0.5) // Placeholder
     }
 
     /// Compute optimal entanglement witness
@@ -967,7 +1008,7 @@ impl QuantumEntanglementAnalyzer {
         let expectation = (&witness * &self.density_matrix.rho).trace().re;
 
         // Check if entanglement detected
-        let threshold = 0.5;  // Simplified threshold
+        let threshold = 0.5; // Simplified threshold
         let detected = expectation < threshold;
 
         self.witnesses.linear.push(LinearWitness {
@@ -986,14 +1027,17 @@ impl QuantumEntanglementAnalyzer {
         // Check if state is not biseparable
 
         // For small systems, check if entanglement measures are significant
-        let is_gme = self.measures.concurrence.value > 0.5 ||
-                    self.measures.negativity.value > 0.5;
+        let is_gme = self.measures.concurrence.value > 0.5 || self.measures.negativity.value > 0.5;
 
         Ok(is_gme)
     }
 
     /// Evolve system under Hamiltonian
-    pub fn evolve(&mut self, hamiltonian: &DMatrix<Complex64>, time: f64) -> Result<(), OrchestrationError> {
+    pub fn evolve(
+        &mut self,
+        hamiltonian: &DMatrix<Complex64>,
+        time: f64,
+    ) -> Result<(), OrchestrationError> {
         // U = exp(-iHt)
         let unitary = self.compute_unitary_evolution(hamiltonian, time)?;
 
@@ -1004,14 +1048,21 @@ impl QuantumEntanglementAnalyzer {
 
         // Track evolution
         self.dynamics.evolution.time_points.push(time);
-        self.dynamics.evolution.entanglement_history.push(self.measures.concurrence.value);
+        self.dynamics
+            .evolution
+            .entanglement_history
+            .push(self.measures.concurrence.value);
         self.dynamics.evolution.U.push(unitary);
 
         Ok(())
     }
 
     /// Compute unitary evolution operator
-    fn compute_unitary_evolution(&self, hamiltonian: &DMatrix<Complex64>, time: f64) -> Result<DMatrix<Complex64>, OrchestrationError> {
+    fn compute_unitary_evolution(
+        &self,
+        hamiltonian: &DMatrix<Complex64>,
+        time: f64,
+    ) -> Result<DMatrix<Complex64>, OrchestrationError> {
         // Simplified: use first-order approximation
         // In production, would use matrix exponential
 
@@ -1031,7 +1082,11 @@ impl QuantumEntanglementAnalyzer {
     }
 
     /// Apply quantum channel
-    pub fn apply_channel(&mut self, channel_type: ChannelType, parameter: f64) -> Result<(), OrchestrationError> {
+    pub fn apply_channel(
+        &mut self,
+        channel_type: ChannelType,
+        parameter: f64,
+    ) -> Result<(), OrchestrationError> {
         match channel_type {
             ChannelType::Depolarizing => self.apply_depolarizing_channel(parameter),
             ChannelType::AmplitudeDamping => self.apply_amplitude_damping(parameter),
@@ -1054,19 +1109,31 @@ impl QuantumEntanglementAnalyzer {
     /// Apply amplitude damping channel
     fn apply_amplitude_damping(&mut self, gamma: f64) -> Result<(), OrchestrationError> {
         // Kraus operators for amplitude damping
-        let k0 = DMatrix::from_row_slice(2, 2, &[
-            Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new((1.0 - gamma).sqrt(), 0.0)
-        ]);
+        let k0 = DMatrix::from_row_slice(
+            2,
+            2,
+            &[
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new((1.0 - gamma).sqrt(), 0.0),
+            ],
+        );
 
-        let k1 = DMatrix::from_row_slice(2, 2, &[
-            Complex64::new(0.0, 0.0), Complex64::new(gamma.sqrt(), 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0)
-        ]);
+        let k1 = DMatrix::from_row_slice(
+            2,
+            2,
+            &[
+                Complex64::new(0.0, 0.0),
+                Complex64::new(gamma.sqrt(), 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+        );
 
         // Apply channel: ρ' = Σ_i K_i ρ K_i†
-        let new_rho = &k0 * &self.density_matrix.rho * k0.conjugate().transpose() +
-                     &k1 * &self.density_matrix.rho * k1.conjugate().transpose();
+        let new_rho = &k0 * &self.density_matrix.rho * k0.conjugate().transpose()
+            + &k1 * &self.density_matrix.rho * k1.conjugate().transpose();
 
         self.set_density_matrix(new_rho)
     }
@@ -1090,7 +1157,10 @@ impl QuantumEntanglementAnalyzer {
     }
 
     /// Analyze entanglement in LLM responses
-    pub fn analyze_llm_entanglement(&mut self, responses: &[String]) -> Result<LLMEntanglementAnalysis, OrchestrationError> {
+    pub fn analyze_llm_entanglement(
+        &mut self,
+        responses: &[String],
+    ) -> Result<LLMEntanglementAnalysis, OrchestrationError> {
         // Encode responses as quantum states
         let states = self.encode_responses_as_states(responses)?;
 
@@ -1117,20 +1187,25 @@ impl QuantumEntanglementAnalyzer {
     }
 
     /// Encode responses as quantum states
-    fn encode_responses_as_states(&self, responses: &[String]) -> Result<Vec<DVector<Complex64>>, OrchestrationError> {
+    fn encode_responses_as_states(
+        &self,
+        responses: &[String],
+    ) -> Result<Vec<DVector<Complex64>>, OrchestrationError> {
         let mut states = Vec::new();
 
         for response in responses {
             // Map response to quantum state (simplified encoding)
-            let mut state = DVector::zeros(2);  // Qubit encoding
+            let mut state = DVector::zeros(2); // Qubit encoding
 
             // Use response length and content for encoding
             let phase = response.len() as f64 * 0.1;
             let amplitude = (1.0 / (1.0 + response.len() as f64)).sqrt();
 
             state[0] = Complex64::new(amplitude, 0.0);
-            state[1] = Complex64::new((1.0 - amplitude * amplitude).sqrt() * phase.cos(),
-                                     (1.0 - amplitude * amplitude).sqrt() * phase.sin());
+            state[1] = Complex64::new(
+                (1.0 - amplitude * amplitude).sqrt() * phase.cos(),
+                (1.0 - amplitude * amplitude).sqrt() * phase.sin(),
+            );
 
             states.push(state);
         }
@@ -1139,7 +1214,10 @@ impl QuantumEntanglementAnalyzer {
     }
 
     /// Build joint density matrix from states
-    fn build_joint_density_matrix(&self, states: &[DVector<Complex64>]) -> Result<DMatrix<Complex64>, OrchestrationError> {
+    fn build_joint_density_matrix(
+        &self,
+        states: &[DVector<Complex64>],
+    ) -> Result<DMatrix<Complex64>, OrchestrationError> {
         if states.len() < 2 {
             return Err(OrchestrationError::InsufficientData {
                 required: 2,
@@ -1164,7 +1242,11 @@ impl QuantumEntanglementAnalyzer {
     }
 
     /// Tensor product of states
-    fn tensor_product(&self, state1: &DVector<Complex64>, state2: &DVector<Complex64>) -> DVector<Complex64> {
+    fn tensor_product(
+        &self,
+        state1: &DVector<Complex64>,
+        state2: &DVector<Complex64>,
+    ) -> DVector<Complex64> {
         let mut result = DVector::zeros(state1.len() * state2.len());
 
         for i in 0..state1.len() {
@@ -1190,13 +1272,13 @@ impl QuantumEntanglementAnalyzer {
     fn compute_entanglement_depth(&self) -> usize {
         // Simplified: based on concurrence
         if self.measures.concurrence.value > 0.9 {
-            3  // Highly entangled
+            3 // Highly entangled
         } else if self.measures.concurrence.value > 0.5 {
-            2  // Moderately entangled
+            2 // Moderately entangled
         } else if self.measures.concurrence.value > 0.0 {
-            1  // Weakly entangled
+            1 // Weakly entangled
         } else {
-            0  // Separable
+            0 // Separable
         }
     }
 
@@ -1214,13 +1296,17 @@ impl QuantumEntanglementAnalyzer {
     }
 
     /// Find maximally entangled pairs
-    fn find_maximally_entangled_pairs(&mut self, responses: &[String]) -> Result<Vec<(usize, usize, f64)>, OrchestrationError> {
+    fn find_maximally_entangled_pairs(
+        &mut self,
+        responses: &[String],
+    ) -> Result<Vec<(usize, usize, f64)>, OrchestrationError> {
         let mut pairs = Vec::new();
 
         for i in 0..responses.len() {
-            for j in i+1..responses.len() {
+            for j in i + 1..responses.len() {
                 // Compute pairwise entanglement
-                let states = self.encode_responses_as_states(&[responses[i].clone(), responses[j].clone()])?;
+                let states =
+                    self.encode_responses_as_states(&[responses[i].clone(), responses[j].clone()])?;
                 let joint_rho = self.build_joint_density_matrix(&states)?;
                 self.set_density_matrix(joint_rho)?;
 
@@ -1484,14 +1570,14 @@ mod tests {
 
         // Create Bell state |Φ+⟩ = (|00⟩ + |11⟩)/√2
         let mut psi = DVector::zeros(4);
-        psi[0] = Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0);  // |00⟩
-        psi[3] = Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0);  // |11⟩
+        psi[0] = Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0); // |00⟩
+        psi[3] = Complex64::new(1.0 / 2.0_f64.sqrt(), 0.0); // |11⟩
 
         analyzer.set_pure_state(&psi).unwrap();
 
         let report = analyzer.compute_all_measures().unwrap();
 
         assert!(report.is_entangled);
-        assert!(report.concurrence > 0.99);  // Maximally entangled
+        assert!(report.concurrence > 0.99); // Maximally entangled
     }
 }

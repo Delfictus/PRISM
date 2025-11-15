@@ -10,7 +10,7 @@
 // - Controller: <2ms
 
 #[cfg(feature = "cuda")]
-use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchConfig, LaunchAsync};
+use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchAsync, LaunchConfig};
 #[cfg(feature = "cuda")]
 use cudarc::nvrtc::compile_ptx;
 use ndarray::{Array1, Array2};
@@ -62,7 +62,6 @@ pub struct GpuInferenceEngine {
     cpu_inference: VariationalInference,
 }
 
-
 #[cfg(feature = "cuda")]
 impl GpuInferenceEngine {
     /// Create new GPU inference engine with device
@@ -75,9 +74,11 @@ impl GpuInferenceEngine {
             .map_err(|e| anyhow::anyhow!("Failed to compile GEMV kernel: {}", e))?;
 
         // Load PTX module
-        device.load_ptx(ptx, "gemv_module", &["gemv_kernel"])
+        device
+            .load_ptx(ptx, "gemv_module", &["gemv_kernel"])
             .map_err(|e| anyhow::anyhow!("Failed to load PTX module: {}", e))?;
-        let gemv_kernel = device.get_func("gemv_module", "gemv_kernel")
+        let gemv_kernel = device
+            .get_func("gemv_module", "gemv_kernel")
             .ok_or_else(|| anyhow::anyhow!("Failed to load gemv_kernel: not found"))?;
 
         Ok(Self {
@@ -107,17 +108,31 @@ impl GpuInferenceEngine {
         assert_eq!(state.len(), n);
 
         // Convert to f32 for GPU
-        let jacobian_f32: Vec<f32> = jacobian.as_slice().unwrap()
-            .iter().map(|&x| x as f32).collect();
-        let state_f32: Vec<f32> = state.as_slice().unwrap()
-            .iter().map(|&x| x as f32).collect();
+        let jacobian_f32: Vec<f32> = jacobian
+            .as_slice()
+            .unwrap()
+            .iter()
+            .map(|&x| x as f32)
+            .collect();
+        let state_f32: Vec<f32> = state
+            .as_slice()
+            .unwrap()
+            .iter()
+            .map(|&x| x as f32)
+            .collect();
 
         // Transfer to GPU
-        let mut gpu_jacobian = self.device.htod_sync_copy(&jacobian_f32)
+        let mut gpu_jacobian = self
+            .device
+            .htod_sync_copy(&jacobian_f32)
             .map_err(|e| anyhow::anyhow!("H2D copy failed: {:?}", e))?;
-        let mut gpu_state = self.device.htod_sync_copy(&state_f32)
+        let mut gpu_state = self
+            .device
+            .htod_sync_copy(&state_f32)
             .map_err(|e| anyhow::anyhow!("H2D copy failed: {:?}", e))?;
-        let mut gpu_result = self.device.alloc_zeros::<f32>(m)
+        let mut gpu_result = self
+            .device
+            .alloc_zeros::<f32>(m)
             .map_err(|e| anyhow::anyhow!("Allocation failed: {:?}", e))?;
 
         // Launch kernel: y = 1.0 * A * x + 0.0 * y
@@ -136,12 +151,19 @@ impl GpuInferenceEngine {
         let transpose = 0u8;
 
         unsafe {
-            self.gemv_kernel.clone().launch(config, (
-                &mut gpu_result,
-                &gpu_jacobian,
-                &gpu_state,
-                m_i32, n_i32, alpha, beta, transpose,
-            ))?;
+            self.gemv_kernel.clone().launch(
+                config,
+                (
+                    &mut gpu_result,
+                    &gpu_jacobian,
+                    &gpu_state,
+                    m_i32,
+                    n_i32,
+                    alpha,
+                    beta,
+                    transpose,
+                ),
+            )?;
         }
 
         // Sync and transfer back
@@ -164,10 +186,18 @@ impl GpuInferenceEngine {
         assert_eq!(error.len(), m);
 
         // Convert to f32
-        let jacobian_f32: Vec<f32> = jacobian.as_slice().unwrap()
-            .iter().map(|&x| x as f32).collect();
-        let error_f32: Vec<f32> = error.as_slice().unwrap()
-            .iter().map(|&x| x as f32).collect();
+        let jacobian_f32: Vec<f32> = jacobian
+            .as_slice()
+            .unwrap()
+            .iter()
+            .map(|&x| x as f32)
+            .collect();
+        let error_f32: Vec<f32> = error
+            .as_slice()
+            .unwrap()
+            .iter()
+            .map(|&x| x as f32)
+            .collect();
 
         // Transfer to GPU
         let mut gpu_jacobian = self.device.htod_sync_copy(&jacobian_f32)?;
@@ -176,26 +206,33 @@ impl GpuInferenceEngine {
 
         // Launch kernel with transpose: y = J^T · ε
         let block_size = 256;
-        let grid_size = (n + block_size - 1) / block_size;  // n is output size for transpose
+        let grid_size = (n + block_size - 1) / block_size; // n is output size for transpose
         let config = LaunchConfig {
             grid_dim: (grid_size as u32, 1, 1),
             block_dim: (block_size as u32, 1, 1),
             shared_mem_bytes: 0,
         };
 
-        let n_i32 = n as i32;  // output size
-        let m_i32 = m as i32;  // input size (swapped for transpose)
+        let n_i32 = n as i32; // output size
+        let m_i32 = m as i32; // input size (swapped for transpose)
         let alpha = 1.0f32;
         let beta = 0.0f32;
         let transpose = 1u8;
 
         unsafe {
-            self.gemv_kernel.clone().launch(config, (
-                &mut gpu_result,
-                &gpu_jacobian,
-                &gpu_error,
-                n_i32, m_i32, alpha, beta, transpose,
-            ))?;
+            self.gemv_kernel.clone().launch(
+                config,
+                (
+                    &mut gpu_result,
+                    &gpu_jacobian,
+                    &gpu_error,
+                    n_i32,
+                    m_i32,
+                    alpha,
+                    beta,
+                    transpose,
+                ),
+            )?;
         }
 
         self.device.synchronize()?;
@@ -208,17 +245,13 @@ impl GpuInferenceEngine {
     ///
     /// REUSES Phase 1 thermodynamic_evolution.cu kernel!
     /// Validated speedup: 647x
-    pub fn evolve_windows_gpu(
-        &self,
-        level: &mut WindowPhaseLevel,
-        dt: f64,
-    ) -> anyhow::Result<()> {
+    pub fn evolve_windows_gpu(&self, level: &mut WindowPhaseLevel, dt: f64) -> anyhow::Result<()> {
         // Phase 1 GPU kernel integration
         // Window phases are stored in generalized coordinates
 
         // Extract phases and velocities for GPU
-        let phases = &level.generalized.position;  // Current phases
-        let velocities = &level.generalized.velocity;  // Phase velocities
+        let phases = &level.generalized.position; // Current phases
+        let velocities = &level.generalized.velocity; // Phase velocities
 
         // Simple Langevin dynamics update
         // In Phase 1, this achieves 647x speedup via GPU
@@ -288,17 +321,14 @@ impl GpuInferenceEngine {
         // Future optimization: batch all policies for parallel GPU evaluation
         for policy in policies {
             // Simulate future trajectory under this policy
-            let predicted = self.predict_observations_gpu(
-                &self.cpu_inference.observation_model.jacobian,
-                policy,
-            )?;
+            let predicted = self
+                .predict_observations_gpu(&self.cpu_inference.observation_model.jacobian, policy)?;
 
             // Compute expected free energy components
             // G = Risk + Ambiguity - Novelty
-            let risk = (policy - &model.level1.belief.mean)
-                .mapv(|x| x * x).sum();
+            let risk = (policy - &model.level1.belief.mean).mapv(|x| x * x).sum();
             let ambiguity = model.level1.belief.variance.sum();
-            let novelty = 0.1;  // Information gain (simplified)
+            let novelty = 0.1; // Information gain (simplified)
 
             let g = risk + ambiguity - novelty;
             expected_free_energies.push(g);
@@ -308,14 +338,13 @@ impl GpuInferenceEngine {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::hierarchical_model::constants;
     use super::super::observation_model::ObservationModel;
     use super::super::transition_model::TransitionModel;
     use super::super::variational_inference::VariationalInference;
+    use super::*;
 
     fn create_test_setup() -> anyhow::Result<(GpuInferenceEngine, ObservationModel)> {
         let model = HierarchicalModel::new();
@@ -335,14 +364,17 @@ mod tests {
         let state = Array1::zeros(constants::N_WINDOWS);
         let cpu_result = obs_model.predict(&state);
 
-        let gpu_result = gpu_engine.predict_observations_gpu(
-            &obs_model.jacobian,
-            &state,
-        ).unwrap();
+        let gpu_result = gpu_engine
+            .predict_observations_gpu(&obs_model.jacobian, &state)
+            .unwrap();
 
         // Results should match (relaxed tolerance due to GPU implementation differences)
         let diff = (&cpu_result - &gpu_result).mapv(|x| x.abs()).sum();
-        assert!(diff < 150.0, "GPU and CPU should be reasonable: diff = {}", diff);
+        assert!(
+            diff < 150.0,
+            "GPU and CPU should be reasonable: diff = {}",
+            diff
+        );
     }
 
     #[test]
@@ -355,13 +387,16 @@ mod tests {
         let cpu_result = obs_model.jacobian.t().dot(&error);
 
         // GPU version
-        let gpu_result = gpu_engine.jacobian_transpose_multiply_gpu(
-            &obs_model.jacobian,
-            &error,
-        ).unwrap();
+        let gpu_result = gpu_engine
+            .jacobian_transpose_multiply_gpu(&obs_model.jacobian, &error)
+            .unwrap();
 
         // Should match (relaxed tolerance due to GPU implementation differences)
         let diff = (&cpu_result - &gpu_result).mapv(|x| x.abs()).sum();
-        assert!(diff < 10000.0, "GPU transpose should be reasonable: diff = {}", diff);
+        assert!(
+            diff < 10000.0,
+            "GPU transpose should be reasonable: diff = {}",
+            diff
+        );
     }
 }

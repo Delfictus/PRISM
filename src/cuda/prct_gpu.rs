@@ -36,37 +36,61 @@ impl PRCTGpuManager {
 
         // Load PTX from compiled kernels
         let ptx = include_str!(concat!(env!("OUT_DIR"), "/ptx/prct_kernels.ptx"));
-        device.load_ptx(ptx.into(), "prct_kernels", &[
-            "process_spikes_to_states",
-            "find_max_state",
-            "normalize_states",
-            "compute_phase_coherence",
-            "quantum_phase_evolution",
-            "compute_norm_squared",
-            "normalize_amplitudes",
-            "extract_quantum_phases",
-            "compute_phase_coherence_matrix",
-            "kuramoto_step",
-            "kuramoto_order_parameter",
-            "compute_local_coherence",
-            "compute_correlation",
-        ])?;
+        device.load_ptx(
+            ptx.into(),
+            "prct_kernels",
+            &[
+                "process_spikes_to_states",
+                "find_max_state",
+                "normalize_states",
+                "compute_phase_coherence",
+                "quantum_phase_evolution",
+                "compute_norm_squared",
+                "normalize_amplitudes",
+                "extract_quantum_phases",
+                "compute_phase_coherence_matrix",
+                "kuramoto_step",
+                "kuramoto_order_parameter",
+                "compute_local_coherence",
+                "compute_correlation",
+            ],
+        )?;
 
         Ok(Self {
             device: device.clone(),
-            process_spikes: device.get_func("prct_kernels", "process_spikes_to_states").unwrap(),
+            process_spikes: device
+                .get_func("prct_kernels", "process_spikes_to_states")
+                .unwrap(),
             find_max_state: device.get_func("prct_kernels", "find_max_state").unwrap(),
             normalize_states: device.get_func("prct_kernels", "normalize_states").unwrap(),
-            compute_phase_coherence: device.get_func("prct_kernels", "compute_phase_coherence").unwrap(),
-            quantum_phase_evolution: device.get_func("prct_kernels", "quantum_phase_evolution").unwrap(),
-            compute_norm_squared: device.get_func("prct_kernels", "compute_norm_squared").unwrap(),
-            normalize_amplitudes: device.get_func("prct_kernels", "normalize_amplitudes").unwrap(),
-            extract_quantum_phases: device.get_func("prct_kernels", "extract_quantum_phases").unwrap(),
-            compute_phase_coherence_matrix: device.get_func("prct_kernels", "compute_phase_coherence_matrix").unwrap(),
+            compute_phase_coherence: device
+                .get_func("prct_kernels", "compute_phase_coherence")
+                .unwrap(),
+            quantum_phase_evolution: device
+                .get_func("prct_kernels", "quantum_phase_evolution")
+                .unwrap(),
+            compute_norm_squared: device
+                .get_func("prct_kernels", "compute_norm_squared")
+                .unwrap(),
+            normalize_amplitudes: device
+                .get_func("prct_kernels", "normalize_amplitudes")
+                .unwrap(),
+            extract_quantum_phases: device
+                .get_func("prct_kernels", "extract_quantum_phases")
+                .unwrap(),
+            compute_phase_coherence_matrix: device
+                .get_func("prct_kernels", "compute_phase_coherence_matrix")
+                .unwrap(),
             kuramoto_step: device.get_func("prct_kernels", "kuramoto_step").unwrap(),
-            kuramoto_order_parameter: device.get_func("prct_kernels", "kuramoto_order_parameter").unwrap(),
-            compute_local_coherence: device.get_func("prct_kernels", "compute_local_coherence").unwrap(),
-            compute_correlation: device.get_func("prct_kernels", "compute_correlation").unwrap(),
+            kuramoto_order_parameter: device
+                .get_func("prct_kernels", "kuramoto_order_parameter")
+                .unwrap(),
+            compute_local_coherence: device
+                .get_func("prct_kernels", "compute_local_coherence")
+                .unwrap(),
+            compute_correlation: device
+                .get_func("prct_kernels", "compute_correlation")
+                .unwrap(),
         })
     }
 
@@ -132,10 +156,9 @@ impl PRCTGpuManager {
         // Normalize on GPU
         let cfg = LaunchConfig::for_num_elems(n as u32);
         unsafe {
-            self.normalize_states.clone().launch(
-                cfg,
-                (&d_states, n as i32, max_val),
-            )?;
+            self.normalize_states
+                .clone()
+                .launch(cfg, (&d_states, n as i32, max_val))?;
         }
 
         // Synchronize and copy back
@@ -150,7 +173,10 @@ impl PRCTGpuManager {
         // For small arrays, atomic operations have issues
         // Use CPU for reduction (still faster overall due to other GPU ops)
         let n = states.len() as f64;
-        let phases: Vec<f64> = states.iter().map(|&s| s * 2.0 * std::f64::consts::PI).collect();
+        let phases: Vec<f64> = states
+            .iter()
+            .map(|&s| s * 2.0 * std::f64::consts::PI)
+            .collect();
 
         let sum_cos: f64 = phases.iter().map(|p| p.cos()).sum();
         let sum_sin: f64 = phases.iter().map(|p| p.sin()).sum();
@@ -180,10 +206,9 @@ impl PRCTGpuManager {
 
         let cfg = LaunchConfig::for_num_elems(n as u32);
         unsafe {
-            self.quantum_phase_evolution.clone().launch(
-                cfg,
-                (&d_re, &d_im, &d_eigenvals, time, n as i32),
-            )?;
+            self.quantum_phase_evolution
+                .clone()
+                .launch(cfg, (&d_re, &d_im, &d_eigenvals, time, n as i32))?;
         }
 
         // Synchronize and copy back
@@ -192,7 +217,8 @@ impl PRCTGpuManager {
         self.device.dtoh_sync_copy_into(&d_im, amplitudes_imag)?;
 
         // Normalize on CPU (avoids atomic operations)
-        let norm_sq: f64 = amplitudes_real.iter()
+        let norm_sq: f64 = amplitudes_real
+            .iter()
             .zip(amplitudes_imag.iter())
             .map(|(re, im)| re * re + im * im)
             .sum();
@@ -222,10 +248,9 @@ impl PRCTGpuManager {
 
         let cfg = LaunchConfig::for_num_elems(n as u32);
         unsafe {
-            self.extract_quantum_phases.clone().launch(
-                cfg,
-                (&d_re, &d_im, &d_phases, n as i32),
-            )?;
+            self.extract_quantum_phases
+                .clone()
+                .launch(cfg, (&d_re, &d_im, &d_phases, n as i32))?;
         }
 
         let phases = self.device.dtoh_sync_copy(&d_phases)?;
@@ -249,10 +274,9 @@ impl PRCTGpuManager {
         };
 
         unsafe {
-            self.compute_phase_coherence_matrix.clone().launch(
-                cfg,
-                (&d_phases, n as i32, &d_matrix),
-            )?;
+            self.compute_phase_coherence_matrix
+                .clone()
+                .launch(cfg, (&d_phases, n as i32, &d_matrix))?;
         }
 
         let matrix = self.device.dtoh_sync_copy(&d_matrix)?;
@@ -325,10 +349,9 @@ impl PRCTGpuManager {
 
         let cfg = LaunchConfig::for_num_elems(n as u32);
         unsafe {
-            self.compute_local_coherence.clone().launch(
-                cfg,
-                (&d_phases, &d_coupling, &d_coherence, n as i32),
-            )?;
+            self.compute_local_coherence
+                .clone()
+                .launch(cfg, (&d_phases, &d_coupling, &d_coherence, n as i32))?;
         }
 
         let coherence_levels = self.device.dtoh_sync_copy(&d_coherence)?;
@@ -346,21 +369,27 @@ impl PRCTGpuManager {
         // Use CPU for correlation computation (avoids atomic issues)
         let n = source.len().min(target.len());
 
-        let covariance: f64 = source.iter()
+        let covariance: f64 = source
+            .iter()
             .zip(target.iter())
             .take(n)
             .map(|(s, t)| (s - source_mean) * (t - target_mean))
-            .sum::<f64>() / n as f64;
+            .sum::<f64>()
+            / n as f64;
 
-        let source_var: f64 = source.iter()
+        let source_var: f64 = source
+            .iter()
             .take(n)
             .map(|s| (s - source_mean).powi(2))
-            .sum::<f64>() / n as f64;
+            .sum::<f64>()
+            / n as f64;
 
-        let target_var: f64 = target.iter()
+        let target_var: f64 = target
+            .iter()
             .take(n)
             .map(|t| (t - target_mean).powi(2))
-            .sum::<f64>() / n as f64;
+            .sum::<f64>()
+            / n as f64;
 
         Ok((covariance, source_var, target_var))
     }

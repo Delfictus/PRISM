@@ -10,10 +10,10 @@
 //! Total ingestion rate: ~6,500 messages/second
 
 use super::satellite_adapters::*;
-use tokio::sync::mpsc;
-use tokio::time::{Duration, Instant, interval};
-use std::collections::VecDeque;
 use anyhow::Result;
+use std::collections::VecDeque;
+use tokio::sync::mpsc;
+use tokio::time::{interval, Duration, Instant};
 
 /// Streaming PWSA fusion platform with async telemetry ingestion
 ///
@@ -122,7 +122,9 @@ impl StreamingPwsaFusionPlatform {
             self.total_latency_us += latency.as_micros();
 
             // Send output
-            self.output_tx.send(awareness).await
+            self.output_tx
+                .send(awareness)
+                .await
                 .map_err(|e| anyhow::anyhow!("Failed to send output: {:?}", e))?;
 
             // Clear buffers for next fusion
@@ -196,7 +198,8 @@ impl RateLimiter {
         if self.window.len() >= max_in_window {
             // Calculate sleep time
             if let Some(&oldest) = self.window.front() {
-                let time_until_free = self.window_duration
+                let time_until_free = self
+                    .window_duration
                     .saturating_sub(now.duration_since(oldest));
 
                 if !time_until_free.is_zero() {
@@ -233,7 +236,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_rate_limiter() {
-        let mut limiter = RateLimiter::new(10.0);  // 10 Hz
+        let mut limiter = RateLimiter::new(10.0); // 10 Hz
 
         let start = Instant::now();
 
@@ -245,7 +248,7 @@ mod tests {
         let elapsed = start.elapsed();
 
         // Should take approximately 2 seconds
-        assert!(elapsed >= Duration::from_millis(1800));  // Allow some variance
+        assert!(elapsed >= Duration::from_millis(1800)); // Allow some variance
         assert!(elapsed <= Duration::from_millis(2500));
     }
 }

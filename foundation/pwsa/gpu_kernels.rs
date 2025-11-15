@@ -6,10 +6,10 @@
 //! These are simple feature extraction helpers - not computational bottlenecks.
 //! They use simple arithmetic (not heavy GPU kernel worthy).
 
-use cudarc::driver::CudaDevice;
-use std::sync::Arc;
-use ndarray::{Array1, Array2};
 use anyhow::Result;
+use cudarc::driver::CudaDevice;
+use ndarray::{Array1, Array2};
+use std::sync::Arc;
 
 /// Simple threat classifier helper (lightweight)
 ///
@@ -38,11 +38,31 @@ impl GpuThreatClassifier {
         let thermal_indicator = features[11];
         let maneuver_indicator = features[7];
 
-        probs[0] = if velocity_indicator < 0.2 && thermal_indicator < 0.3 { 0.9 } else { 0.1 };
-        probs[1] = if velocity_indicator < 0.3 && thermal_indicator < 0.5 { 0.7 } else { 0.1 };
-        probs[2] = if velocity_indicator < 0.5 && maneuver_indicator < 0.5 { 0.6 } else { 0.1 };
-        probs[3] = if velocity_indicator > 0.6 && maneuver_indicator < 0.3 { 0.8 } else { 0.1 };
-        probs[4] = if velocity_indicator > 0.5 && maneuver_indicator > 0.4 { 0.9 } else { 0.1 };
+        probs[0] = if velocity_indicator < 0.2 && thermal_indicator < 0.3 {
+            0.9
+        } else {
+            0.1
+        };
+        probs[1] = if velocity_indicator < 0.3 && thermal_indicator < 0.5 {
+            0.7
+        } else {
+            0.1
+        };
+        probs[2] = if velocity_indicator < 0.5 && maneuver_indicator < 0.5 {
+            0.6
+        } else {
+            0.1
+        };
+        probs[3] = if velocity_indicator > 0.6 && maneuver_indicator < 0.3 {
+            0.8
+        } else {
+            0.1
+        };
+        probs[4] = if velocity_indicator > 0.5 && maneuver_indicator > 0.4 {
+            0.9
+        } else {
+            0.1
+        };
 
         let sum: f64 = probs.iter().sum();
         if sum > 0.0 {
@@ -142,11 +162,11 @@ mod tests {
         let extractor = GpuFeatureExtractor::new(ctx).unwrap();
 
         let features = extractor.normalize_oct_telemetry_simd(
-            -15.0,  // optical_power
-            1e-9,   // BER
-            5.0,    // pointing
-            10.0,   // data_rate
-            22.0,   // temperature
+            -15.0, // optical_power
+            1e-9,  // BER
+            5.0,   // pointing
+            10.0,  // data_rate
+            22.0,  // temperature
         );
 
         // Validate normalization

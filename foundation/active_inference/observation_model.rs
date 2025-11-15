@@ -15,7 +15,7 @@
 use ndarray::{Array1, Array2};
 use std::f64::consts::PI;
 
-use super::hierarchical_model::{GaussianBelief, constants};
+use super::hierarchical_model::{constants, GaussianBelief};
 
 /// Observation model for wavefront sensing
 ///
@@ -51,10 +51,7 @@ impl ObservationModel {
         integration_time: f64,
     ) -> Self {
         // Compute photon shot noise from stellar magnitude
-        let photon_count = Self::photons_per_measurement(
-            star_magnitude,
-            integration_time,
-        );
+        let photon_count = Self::photons_per_measurement(star_magnitude, integration_time);
         let shot_noise = 1.0 / photon_count.sqrt();
 
         // Initialize noise covariance (isotropic photon noise)
@@ -265,9 +262,7 @@ impl MeasurementPattern {
     /// Create uniform sampling pattern (every Nth window)
     pub fn uniform(n_active: usize, n_windows: usize) -> Self {
         let stride = n_windows / n_active;
-        let active_windows: Vec<usize> = (0..n_active)
-            .map(|i| i * stride)
-            .collect();
+        let active_windows: Vec<usize> = (0..n_active).map(|i| i * stride).collect();
 
         Self::new(active_windows, n_windows)
     }
@@ -293,9 +288,7 @@ impl MeasurementPattern {
 
         // Sort windows by variance (descending)
         let mut indices: Vec<usize> = (0..n_windows).collect();
-        indices.sort_by(|&i, &j| {
-            belief.variance[j].partial_cmp(&belief.variance[i]).unwrap()
-        });
+        indices.sort_by(|&i, &j| belief.variance[j].partial_cmp(&belief.variance[i]).unwrap());
 
         // Take top-N most uncertain windows
         let active_windows = indices.into_iter().take(n_active).collect();

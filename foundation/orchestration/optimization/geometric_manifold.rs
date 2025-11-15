@@ -5,9 +5,9 @@
 //! for optimizing over the space of LLM responses.
 
 use crate::orchestration::OrchestrationError;
-use nalgebra::{DMatrix, DVector, SVD, SymmetricEigen};
-use std::collections::{HashMap, VecDeque};
+use nalgebra::{DMatrix, DVector, SymmetricEigen, SVD};
 use ordered_float::OrderedFloat;
+use std::collections::{HashMap, VecDeque};
 
 /// Geometric manifold optimizer for LLM response optimization
 pub struct GeometricManifoldOptimizer {
@@ -49,11 +49,11 @@ enum ManifoldType {
     Euclidean,
     Sphere,
     Hyperbolic,
-    StiefelManifold,     // Orthogonal matrices
-    GrassmannManifold,   // Subspaces
-    SymmetricPositiveDefinite,  // SPD matrices
-    ProbabilitySimplex,  // Probability distributions
-    ProductManifold(Vec<ManifoldType>),  // Product of manifolds
+    StiefelManifold,                    // Orthogonal matrices
+    GrassmannManifold,                  // Subspaces
+    SymmetricPositiveDefinite,          // SPD matrices
+    ProbabilitySimplex,                 // Probability distributions
+    ProductManifold(Vec<ManifoldType>), // Product of manifolds
 }
 
 /// Metric tensor for Riemannian geometry
@@ -532,7 +532,10 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Create manifold based on type
-    fn create_manifold(manifold_type: ManifoldType, dimension: usize) -> Result<RiemannianManifold, OrchestrationError> {
+    fn create_manifold(
+        manifold_type: ManifoldType,
+        dimension: usize,
+    ) -> Result<RiemannianManifold, OrchestrationError> {
         let metric = match &manifold_type {
             ManifoldType::Euclidean => MetricTensor {
                 g: Box::new(move |_x| DMatrix::identity(dimension, dimension)),
@@ -671,7 +674,10 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Compute Christoffel symbols
-    fn compute_christoffel_symbols(manifold_type: &ManifoldType, dimension: usize) -> ChristoffelSymbols {
+    fn compute_christoffel_symbols(
+        manifold_type: &ManifoldType,
+        dimension: usize,
+    ) -> ChristoffelSymbols {
         let mut gamma = HashMap::new();
         let mut gamma_lower = HashMap::new();
 
@@ -695,7 +701,8 @@ impl GeometricManifoldOptimizer {
                                     } else {
                                         0.0
                                     }
-                                }) as Box<dyn Fn(&DVector<f64>) -> f64 + Send + Sync>,
+                                })
+                                    as Box<dyn Fn(&DVector<f64>) -> f64 + Send + Sync>,
                             );
                         }
                     }
@@ -708,7 +715,8 @@ impl GeometricManifoldOptimizer {
                         for k in 0..dimension {
                             gamma.insert(
                                 (i, j, k),
-                                Box::new(|_: &DVector<f64>| 0.0) as Box<dyn Fn(&DVector<f64>) -> f64 + Send + Sync>,
+                                Box::new(|_: &DVector<f64>| 0.0)
+                                    as Box<dyn Fn(&DVector<f64>) -> f64 + Send + Sync>,
                             );
                             gamma_lower.insert((i, j, k), 0.0);
                         }
@@ -721,9 +729,11 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Optimize function on manifold
-    pub fn optimize<F>(&mut self,
-                       objective: F,
-                       initial_point: DVector<f64>) -> Result<OptimizationResult, OrchestrationError>
+    pub fn optimize<F>(
+        &mut self,
+        objective: F,
+        initial_point: DVector<f64>,
+    ) -> Result<OptimizationResult, OrchestrationError>
     where
         F: Fn(&DVector<f64>) -> f64 + Clone,
     {
@@ -748,9 +758,15 @@ impl GeometricManifoldOptimizer {
             // Compute search direction
             let search_dir = match self.optimizer.algorithm {
                 OptimizationAlgorithm::RiemannianGradientDescent => -&riemannian_grad,
-                OptimizationAlgorithm::RiemannianAdam => self.adam_direction(&x, &riemannian_grad, iter)?,
-                OptimizationAlgorithm::NaturalGradientDescent => self.natural_gradient_direction(&x, &riemannian_grad)?,
-                OptimizationAlgorithm::RiemannianNewton => self.newton_direction(&x, &riemannian_grad, &objective)?,
+                OptimizationAlgorithm::RiemannianAdam => {
+                    self.adam_direction(&x, &riemannian_grad, iter)?
+                }
+                OptimizationAlgorithm::NaturalGradientDescent => {
+                    self.natural_gradient_direction(&x, &riemannian_grad)?
+                }
+                OptimizationAlgorithm::RiemannianNewton => {
+                    self.newton_direction(&x, &riemannian_grad, &objective)?
+                }
                 _ => -&riemannian_grad,
             };
 
@@ -772,14 +788,20 @@ impl GeometricManifoldOptimizer {
             optimal_value: objective(&x),
             iterations: iter,
             converged,
-            final_gradient_norm: self.history.convergence.back()
+            final_gradient_norm: self
+                .history
+                .convergence
+                .back()
                 .map(|c| c.grad_norm)
                 .unwrap_or(0.0),
         })
     }
 
     /// Project point onto manifold
-    fn project_onto_manifold(&self, point: DVector<f64>) -> Result<DVector<f64>, OrchestrationError> {
+    fn project_onto_manifold(
+        &self,
+        point: DVector<f64>,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         match self.manifold.manifold_type {
             ManifoldType::Sphere => {
                 let norm = point.norm();
@@ -787,7 +809,7 @@ impl GeometricManifoldOptimizer {
                     Ok(point / norm)
                 } else {
                     Err(OrchestrationError::InvalidInput(
-                        "Zero vector cannot be projected onto sphere".to_string()
+                        "Zero vector cannot be projected onto sphere".to_string(),
                     ))
                 }
             }
@@ -808,7 +830,8 @@ impl GeometricManifoldOptimizer {
                     if sum > 0.0 {
                         projected /= sum;
                     } else {
-                        projected = DVector::from_element(projected.len(), 1.0 / projected.len() as f64);
+                        projected =
+                            DVector::from_element(projected.len(), 1.0 / projected.len() as f64);
                     }
                 }
 
@@ -816,7 +839,11 @@ impl GeometricManifoldOptimizer {
             }
             ManifoldType::StiefelManifold => {
                 // Project onto Stiefel manifold using SVD
-                let svd = SVD::new(DMatrix::from_column_slice(point.len(), 1, point.as_slice()), true, true);
+                let svd = SVD::new(
+                    DMatrix::from_column_slice(point.len(), 1, point.as_slice()),
+                    true,
+                    true,
+                );
                 if let (Some(u), Some(vt)) = (svd.u, svd.v_t) {
                     Ok((&u * &vt).column(0).into())
                 } else {
@@ -828,7 +855,11 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Compute Euclidean gradient using finite differences
-    fn compute_euclidean_gradient<F>(&self, f: &F, x: &DVector<f64>) -> Result<DVector<f64>, OrchestrationError>
+    fn compute_euclidean_gradient<F>(
+        &self,
+        f: &F,
+        x: &DVector<f64>,
+    ) -> Result<DVector<f64>, OrchestrationError>
     where
         F: Fn(&DVector<f64>) -> f64,
     {
@@ -850,7 +881,11 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Project gradient to tangent space
-    fn project_to_tangent_space(&self, x: &DVector<f64>, grad: &DVector<f64>) -> Result<DVector<f64>, OrchestrationError> {
+    fn project_to_tangent_space(
+        &self,
+        x: &DVector<f64>,
+        grad: &DVector<f64>,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         match self.manifold.manifold_type {
             ManifoldType::Sphere => {
                 // Tangent space projection for sphere: grad - <grad, x> * x
@@ -872,13 +907,22 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Compute Riemannian norm
-    fn riemannian_norm(&self, x: &DVector<f64>, v: &DVector<f64>) -> Result<f64, OrchestrationError> {
+    fn riemannian_norm(
+        &self,
+        x: &DVector<f64>,
+        v: &DVector<f64>,
+    ) -> Result<f64, OrchestrationError> {
         let g = (self.manifold.metric.g)(x);
         Ok((v.transpose() * &g * v)[(0, 0)].sqrt())
     }
 
     /// Adam direction on manifold
-    fn adam_direction(&mut self, x: &DVector<f64>, grad: &DVector<f64>, iter: usize) -> Result<DVector<f64>, OrchestrationError> {
+    fn adam_direction(
+        &mut self,
+        x: &DVector<f64>,
+        grad: &DVector<f64>,
+        iter: usize,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         // Riemannian Adam algorithm
         let beta1 = 0.9;
         let beta2 = 0.999;
@@ -893,8 +937,14 @@ impl GeometricManifoldOptimizer {
 
         // Get previous moments (simplified - would maintain proper moment buffers)
         let m = self.history.gradients.back().unwrap() * beta1 + grad * (1.0 - beta1);
-        let v = self.history.gradients.back().unwrap().component_mul(&self.history.gradients.back().unwrap()) * beta2
-                + grad.component_mul(grad) * (1.0 - beta2);
+        let v = self
+            .history
+            .gradients
+            .back()
+            .unwrap()
+            .component_mul(&self.history.gradients.back().unwrap())
+            * beta2
+            + grad.component_mul(grad) * (1.0 - beta2);
 
         // Bias correction
         let m_hat = &m / (1.0 - beta1.powi((iter + 1) as i32));
@@ -911,7 +961,11 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Natural gradient direction
-    fn natural_gradient_direction(&mut self, x: &DVector<f64>, grad: &DVector<f64>) -> Result<DVector<f64>, OrchestrationError> {
+    fn natural_gradient_direction(
+        &mut self,
+        x: &DVector<f64>,
+        grad: &DVector<f64>,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         // Update Fisher information matrix
         if self.history.points.len() % self.natural_gradient.fisher.update_freq == 0 {
             self.update_fisher_information(x)?;
@@ -930,7 +984,12 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Newton direction on manifold
-    fn newton_direction<F>(&self, x: &DVector<f64>, grad: &DVector<f64>, objective: &F) -> Result<DVector<f64>, OrchestrationError>
+    fn newton_direction<F>(
+        &self,
+        x: &DVector<f64>,
+        grad: &DVector<f64>,
+        objective: &F,
+    ) -> Result<DVector<f64>, OrchestrationError>
     where
         F: Fn(&DVector<f64>) -> f64,
     {
@@ -948,7 +1007,11 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Compute Riemannian Hessian
-    fn compute_riemannian_hessian<F>(&self, f: &F, x: &DVector<f64>) -> Result<DMatrix<f64>, OrchestrationError>
+    fn compute_riemannian_hessian<F>(
+        &self,
+        f: &F,
+        x: &DVector<f64>,
+    ) -> Result<DMatrix<f64>, OrchestrationError>
     where
         F: Fn(&DVector<f64>) -> f64,
     {
@@ -964,10 +1027,14 @@ impl GeometricManifoldOptimizer {
                 let mut x_mp = x.clone();
                 let mut x_mm = x.clone();
 
-                x_pp[i] += h; x_pp[j] += h;
-                x_pm[i] += h; x_pm[j] -= h;
-                x_mp[i] -= h; x_mp[j] += h;
-                x_mm[i] -= h; x_mm[j] -= h;
+                x_pp[i] += h;
+                x_pp[j] += h;
+                x_pm[i] += h;
+                x_pm[j] -= h;
+                x_mp[i] -= h;
+                x_mp[j] += h;
+                x_mm[i] -= h;
+                x_mm[j] -= h;
 
                 let h_ij = (f(&x_pp) - f(&x_pm) - f(&x_mp) + f(&x_mm)) / (4.0 * h * h);
 
@@ -986,7 +1053,11 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Compute Christoffel correction for Hessian
-    fn compute_christoffel_correction(&self, x: &DVector<f64>, hess: &DMatrix<f64>) -> Result<DMatrix<f64>, OrchestrationError> {
+    fn compute_christoffel_correction(
+        &self,
+        x: &DVector<f64>,
+        hess: &DMatrix<f64>,
+    ) -> Result<DMatrix<f64>, OrchestrationError> {
         let n = x.len();
         let mut correction = DMatrix::zeros(n, n);
 
@@ -1023,8 +1094,13 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Compute step size
-    fn compute_step_size<F>(&mut self, objective: &F, x: &DVector<f64>,
-                            direction: &DVector<f64>, iter: usize) -> Result<f64, OrchestrationError>
+    fn compute_step_size<F>(
+        &mut self,
+        objective: &F,
+        x: &DVector<f64>,
+        direction: &DVector<f64>,
+        iter: usize,
+    ) -> Result<f64, OrchestrationError>
     where
         F: Fn(&DVector<f64>) -> f64,
     {
@@ -1040,13 +1116,17 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Armijo line search
-    fn armijo_line_search<F>(&self, objective: &F, x: &DVector<f64>,
-                             direction: &DVector<f64>) -> Result<f64, OrchestrationError>
+    fn armijo_line_search<F>(
+        &self,
+        objective: &F,
+        x: &DVector<f64>,
+        direction: &DVector<f64>,
+    ) -> Result<f64, OrchestrationError>
     where
         F: Fn(&DVector<f64>) -> f64,
     {
-        let c1 = 0.0001;  // Armijo constant
-        let rho = 0.5;    // Backtracking factor
+        let c1 = 0.0001; // Armijo constant
+        let rho = 0.5; // Backtracking factor
         let mut alpha = 1.0;
         let max_iter = 50;
 
@@ -1070,7 +1150,11 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Exponential map (geodesic from x in direction v)
-    fn exponential_map(&self, x: &DVector<f64>, v: &DVector<f64>) -> Result<DVector<f64>, OrchestrationError> {
+    fn exponential_map(
+        &self,
+        x: &DVector<f64>,
+        v: &DVector<f64>,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         match self.manifold.manifold_type {
             ManifoldType::Euclidean => Ok(x + v),
             ManifoldType::Sphere => {
@@ -1105,7 +1189,11 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Möbius addition for hyperbolic space
-    fn mobius_add(&self, x: &DVector<f64>, y: &DVector<f64>) -> Result<DVector<f64>, OrchestrationError> {
+    fn mobius_add(
+        &self,
+        x: &DVector<f64>,
+        y: &DVector<f64>,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         let x_norm2 = x.norm_squared();
         let y_norm2 = y.norm_squared();
         let xy = x.dot(y);
@@ -1117,14 +1205,23 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Retraction (first-order approximation of exponential map)
-    fn retraction(&self, x: &DVector<f64>, v: &DVector<f64>) -> Result<DVector<f64>, OrchestrationError> {
+    fn retraction(
+        &self,
+        x: &DVector<f64>,
+        v: &DVector<f64>,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         let y = x + v;
         self.project_onto_manifold(y)
     }
 
     /// Update optimization history
-    fn update_history(&mut self, x: &DVector<f64>, value: f64,
-                     grad: &DVector<f64>, step_size: f64) {
+    fn update_history(
+        &mut self,
+        x: &DVector<f64>,
+        value: f64,
+        grad: &DVector<f64>,
+        step_size: f64,
+    ) {
         self.history.points.push_back(x.clone());
         self.history.values.push_back(value);
         self.history.gradients.push_back(grad.clone());
@@ -1167,7 +1264,11 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Compute geodesic between two points
-    pub fn compute_geodesic(&mut self, start: &DVector<f64>, end: &DVector<f64>) -> Result<Geodesic, OrchestrationError> {
+    pub fn compute_geodesic(
+        &mut self,
+        start: &DVector<f64>,
+        end: &DVector<f64>,
+    ) -> Result<Geodesic, OrchestrationError> {
         // Check cache
         let cache_key = (self.hash_vector(start), self.hash_vector(end));
         if let Some(geodesic) = self.geodesic_solver.flow_cache.get(&cache_key) {
@@ -1181,13 +1282,19 @@ impl GeometricManifoldOptimizer {
         };
 
         // Cache result
-        self.geodesic_solver.flow_cache.insert(cache_key, geodesic.clone());
+        self.geodesic_solver
+            .flow_cache
+            .insert(cache_key, geodesic.clone());
 
         Ok(geodesic)
     }
 
     /// Shooting method for geodesic
-    fn shooting_geodesic(&self, start: &DVector<f64>, end: &DVector<f64>) -> Result<Geodesic, OrchestrationError> {
+    fn shooting_geodesic(
+        &self,
+        start: &DVector<f64>,
+        end: &DVector<f64>,
+    ) -> Result<Geodesic, OrchestrationError> {
         // Initial velocity guess
         let mut velocity = end - start;
 
@@ -1217,7 +1324,7 @@ impl GeometricManifoldOptimizer {
             }
 
             // Update velocity using Newton's method
-            velocity -= &error * 0.1;  // Simplified update
+            velocity -= &error * 0.1; // Simplified update
         }
 
         // Fall back to simple geodesic
@@ -1225,8 +1332,12 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Integrate geodesic flow
-    fn integrate_geodesic_flow(&self, start: &DVector<f64>, velocity: &DVector<f64>,
-                               t_final: f64) -> Result<Vec<DVector<f64>>, OrchestrationError> {
+    fn integrate_geodesic_flow(
+        &self,
+        start: &DVector<f64>,
+        velocity: &DVector<f64>,
+        t_final: f64,
+    ) -> Result<Vec<DVector<f64>>, OrchestrationError> {
         let mut path = vec![start.clone()];
         let mut x = start.clone();
         let mut v = velocity.clone();
@@ -1251,7 +1362,11 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Compute geodesic acceleration
-    fn geodesic_acceleration(&self, x: &DVector<f64>, v: &DVector<f64>) -> Result<DVector<f64>, OrchestrationError> {
+    fn geodesic_acceleration(
+        &self,
+        x: &DVector<f64>,
+        v: &DVector<f64>,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         let n = x.len();
         let mut acceleration = DVector::zeros(n);
 
@@ -1270,7 +1385,11 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Simple geodesic (straight line in ambient space, then project)
-    fn simple_geodesic(&self, start: &DVector<f64>, end: &DVector<f64>) -> Result<Geodesic, OrchestrationError> {
+    fn simple_geodesic(
+        &self,
+        start: &DVector<f64>,
+        end: &DVector<f64>,
+    ) -> Result<Geodesic, OrchestrationError> {
         let n_points = 100;
         let mut path = Vec::new();
         let mut tangents: Vec<DVector<f64>> = Vec::new();
@@ -1302,7 +1421,10 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Compute tangent vectors along path
-    fn compute_tangent_vectors(&self, path: &[DVector<f64>]) -> Result<Vec<DVector<f64>>, OrchestrationError> {
+    fn compute_tangent_vectors(
+        &self,
+        path: &[DVector<f64>],
+    ) -> Result<Vec<DVector<f64>>, OrchestrationError> {
         let mut tangents = Vec::new();
 
         for i in 0..path.len() - 1 {
@@ -1335,8 +1457,8 @@ impl GeometricManifoldOptimizer {
 
     /// Hash vector for caching
     fn hash_vector(&self, v: &DVector<f64>) -> u64 {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
         for value in v.iter() {
@@ -1346,7 +1468,11 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Parallel transport vector along geodesic
-    pub fn parallel_transport(&mut self, vector: &DVector<f64>, geodesic: &Geodesic) -> Result<DVector<f64>, OrchestrationError> {
+    pub fn parallel_transport(
+        &mut self,
+        vector: &DVector<f64>,
+        geodesic: &Geodesic,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         match self.parallel_transport.method {
             TransportMethod::SchildLadder => self.schild_ladder_transport(vector, geodesic),
             TransportMethod::PoleLadder => self.pole_ladder_transport(vector, geodesic),
@@ -1355,7 +1481,11 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Schild's ladder parallel transport
-    fn schild_ladder_transport(&self, vector: &DVector<f64>, geodesic: &Geodesic) -> Result<DVector<f64>, OrchestrationError> {
+    fn schild_ladder_transport(
+        &self,
+        vector: &DVector<f64>,
+        geodesic: &Geodesic,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         let n_rungs = self.parallel_transport.schild_params.n_rungs;
         let mut transported = vector.clone();
 
@@ -1379,7 +1509,11 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Pole ladder parallel transport
-    fn pole_ladder_transport(&self, vector: &DVector<f64>, geodesic: &Geodesic) -> Result<DVector<f64>, OrchestrationError> {
+    fn pole_ladder_transport(
+        &self,
+        vector: &DVector<f64>,
+        geodesic: &Geodesic,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         // Simplified pole ladder
         let mut transported = vector.clone();
 
@@ -1390,7 +1524,9 @@ impl GeometricManifoldOptimizer {
             let g0 = (self.manifold.metric.g)(&geodesic.path[i]);
             let g1 = (self.manifold.metric.g)(&geodesic.path[i + 1]);
 
-            if let (Some(g0_inv), Some(g1_inv)) = (g0.clone().try_inverse(), g1.clone().try_inverse()) {
+            if let (Some(g0_inv), Some(g1_inv)) =
+                (g0.clone().try_inverse(), g1.clone().try_inverse())
+            {
                 transported = &g1_inv * &g0 * &transported;
                 transported = self.project_to_tangent_space(&geodesic.path[i + 1], &transported)?;
             }
@@ -1400,14 +1536,21 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Simple parallel transport (approximation)
-    fn simple_parallel_transport(&self, vector: &DVector<f64>, geodesic: &Geodesic) -> Result<DVector<f64>, OrchestrationError> {
+    fn simple_parallel_transport(
+        &self,
+        vector: &DVector<f64>,
+        geodesic: &Geodesic,
+    ) -> Result<DVector<f64>, OrchestrationError> {
         // Project to tangent space at endpoint
         self.project_to_tangent_space(&geodesic.end, vector)
     }
 
     /// Optimize LLM responses on manifold
-    pub fn optimize_llm_responses(&mut self, responses: &[String],
-                                  quality_fn: fn(&str) -> f64) -> Result<LLMOptimizationResult, OrchestrationError> {
+    pub fn optimize_llm_responses(
+        &mut self,
+        responses: &[String],
+        quality_fn: fn(&str) -> f64,
+    ) -> Result<LLMOptimizationResult, OrchestrationError> {
         // Encode responses as points on manifold
         let encoded = self.encode_responses_on_manifold(responses)?;
 
@@ -1424,7 +1567,7 @@ impl GeometricManifoldOptimizer {
                     response.push(byte as char);
                 }
             }
-            -quality_fn(&response)  // Minimize negative quality
+            -quality_fn(&response) // Minimize negative quality
         };
 
         let result = self.optimize(objective, initial)?;
@@ -1441,8 +1584,12 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Encode responses as points on manifold
-    fn encode_responses_on_manifold(&self, responses: &[String]) -> Result<Vec<DVector<f64>>, OrchestrationError> {
-        responses.iter()
+    fn encode_responses_on_manifold(
+        &self,
+        responses: &[String],
+    ) -> Result<Vec<DVector<f64>>, OrchestrationError> {
+        responses
+            .iter()
             .map(|r| {
                 let mut encoding = DVector::zeros(self.manifold.dimension);
                 for (i, byte) in r.bytes().take(self.manifold.dimension).enumerate() {
@@ -1468,7 +1615,10 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Compute mean on manifold (Karcher/Fréchet mean)
-    fn compute_mean_on_manifold(&mut self, points: &[DVector<f64>]) -> Result<DVector<f64>, OrchestrationError> {
+    fn compute_mean_on_manifold(
+        &mut self,
+        points: &[DVector<f64>],
+    ) -> Result<DVector<f64>, OrchestrationError> {
         if points.is_empty() {
             return Err(OrchestrationError::InsufficientData {
                 required: 1,
@@ -1510,7 +1660,11 @@ impl GeometricManifoldOptimizer {
     }
 
     /// Compute geodesic distances from points to target
-    fn compute_geodesic_distances(&mut self, points: &[DVector<f64>], target: &DVector<f64>) -> Result<Vec<f64>, OrchestrationError> {
+    fn compute_geodesic_distances(
+        &mut self,
+        points: &[DVector<f64>],
+        target: &DVector<f64>,
+    ) -> Result<Vec<f64>, OrchestrationError> {
         let mut distances = Vec::new();
 
         for point in points {
@@ -1584,6 +1738,6 @@ mod tests {
         let result = optimizer.optimize(objective, initial).unwrap();
 
         assert!(result.converged);
-        assert!((result.optimal_point.norm() - 1.0).abs() < 1e-6);  // On sphere
+        assert!((result.optimal_point.norm() - 1.0).abs() < 1e-6); // On sphere
     }
 }

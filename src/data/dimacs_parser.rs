@@ -16,16 +16,16 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Density classification for strategic tuning
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DensityClass {
-    VerySparse,  // < 0.05
-    Sparse,      // 0.05 - 0.2
-    Medium,      // 0.2 - 0.6
-    Dense,       // 0.6 - 0.9
-    VeryDense,   // > 0.9
+    VerySparse, // < 0.05
+    Sparse,     // 0.05 - 0.2
+    Medium,     // 0.2 - 0.6
+    Dense,      // 0.6 - 0.9
+    VeryDense,  // > 0.9
 }
 
 /// Graph type classification based on structural patterns
@@ -33,13 +33,13 @@ pub enum DensityClass {
 pub enum GraphType {
     RandomSparse,
     RandomDense,
-    Register,       // Register allocation graphs
-    Leighton,       // Adversarial graphs designed to fool heuristics
-    Queen,          // Queen graph (geometric)
-    Mycielski,      // Mycielski construction
-    Geometric,      // General geometric graphs
-    ScaleFree,      // Power-law degree distribution
-    SmallWorld,     // High clustering + low diameter
+    Register,   // Register allocation graphs
+    Leighton,   // Adversarial graphs designed to fool heuristics
+    Queen,      // Queen graph (geometric)
+    Mycielski,  // Mycielski construction
+    Geometric,  // General geometric graphs
+    ScaleFree,  // Power-law degree distribution
+    SmallWorld, // High clustering + low diameter
     Unknown,
 }
 
@@ -107,8 +107,7 @@ impl DimacsGraph {
     /// Parse DIMACS .col file and automatically characterize the graph
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, String> {
         let path = path.as_ref();
-        let file = File::open(path)
-            .map_err(|e| format!("Failed to open file: {}", e))?;
+        let file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
         let reader = BufReader::new(file);
 
         let name = path
@@ -147,7 +146,8 @@ impl DimacsGraph {
                     if parts.len() < 4 || parts[1] != "edge" {
                         return Err(format!("Invalid problem line: {}", line));
                     }
-                    num_vertices = parts[2].parse()
+                    num_vertices = parts[2]
+                        .parse()
                         .map_err(|_| format!("Invalid vertex count: {}", parts[2]))?;
                     // num_edges is in parts[3] but we count actual edges below
                 }
@@ -156,9 +156,11 @@ impl DimacsGraph {
                     if parts.len() < 3 {
                         return Err(format!("Invalid edge line: {}", line));
                     }
-                    let v1: usize = parts[1].parse()
+                    let v1: usize = parts[1]
+                        .parse()
                         .map_err(|_| format!("Invalid vertex: {}", parts[1]))?;
-                    let v2: usize = parts[2].parse()
+                    let v2: usize = parts[2]
+                        .parse()
                         .map_err(|_| format!("Invalid vertex: {}", parts[2]))?;
 
                     // DIMACS uses 1-indexed vertices
@@ -183,7 +185,8 @@ impl DimacsGraph {
         let mut actual_edges = 0;
 
         for (v1, v2) in edges {
-            if v1 != v2 { // No self-loops
+            if v1 != v2 {
+                // No self-loops
                 adjacency[[v1, v2]] = true;
                 adjacency[[v2, v1]] = true;
                 actual_edges += 1;
@@ -312,9 +315,9 @@ fn recommend_strategy(
         (_, Leighton) => StrategyMix {
             use_tda: true,
             tda_weight: 0.7,
-            use_gnn: false,  // Don't trust GNN on adversarial inputs
+            use_gnn: false, // Don't trust GNN on adversarial inputs
             gnn_confidence: 0.2,
-            exploration_vs_exploitation: 0.9,  // Maximum exploration
+            exploration_vs_exploitation: 0.9, // Maximum exploration
             temperature_scaling: 3.0,
             parallel_attempts_factor: 3.0,
         },
@@ -365,11 +368,11 @@ fn recommend_strategy(
 
         // SPARSE GRAPHS: Limited structure, high exploration needed
         (VerySparse | Sparse, _) => StrategyMix {
-            use_tda: false,  // Not enough edges for meaningful topology
+            use_tda: false, // Not enough edges for meaningful topology
             tda_weight: 0.2,
             use_gnn: true,
             gnn_confidence: 0.6,
-            exploration_vs_exploitation: 0.8,  // High exploration
+            exploration_vs_exploitation: 0.8, // High exploration
             temperature_scaling: 2.0,
             parallel_attempts_factor: 2.0,
         },
@@ -380,7 +383,7 @@ fn recommend_strategy(
             tda_weight: 0.8,
             use_gnn: true,
             gnn_confidence: 0.8,
-            exploration_vs_exploitation: 0.3,  // More exploitation
+            exploration_vs_exploitation: 0.3, // More exploitation
             temperature_scaling: 0.5,
             parallel_attempts_factor: 1.0,
         },
@@ -480,11 +483,11 @@ fn compute_difficulty(
 
     // Density factor (medium density is hardest)
     let density_difficulty = if density < 0.1 {
-        10.0 * density  // Sparse is somewhat easy
+        10.0 * density // Sparse is somewhat easy
     } else if density > 0.8 {
-        10.0 * (1.0 - density)  // Very dense is somewhat easy
+        10.0 * (1.0 - density) // Very dense is somewhat easy
     } else {
-        20.0  // Medium density is hardest
+        20.0 // Medium density is hardest
     };
     score += density_difficulty;
 
@@ -493,7 +496,7 @@ fn compute_difficulty(
 
     // Graph type modifier
     score += match graph_type {
-        GraphType::Leighton => 25.0,  // Adversarial - very hard
+        GraphType::Leighton => 25.0, // Adversarial - very hard
         GraphType::Register => 15.0,
         GraphType::RandomDense => 10.0,
         GraphType::RandomSparse => 12.0,
@@ -531,7 +534,8 @@ fn compute_variance(values: &[usize], mean: f64) -> f64 {
     if values.is_empty() {
         return 0.0;
     }
-    let sum_sq_diff: f64 = values.iter()
+    let sum_sq_diff: f64 = values
+        .iter()
         .map(|&x| {
             let diff = x as f64 - mean;
             diff * diff
@@ -566,9 +570,7 @@ fn estimate_clustering(adjacency: &Array2<bool>, degrees: &[usize]) -> f64 {
         }
 
         // Get neighbors
-        let neighbors: Vec<usize> = (0..n)
-            .filter(|&j| adjacency[[i, j]])
-            .collect();
+        let neighbors: Vec<usize> = (0..n).filter(|&j| adjacency[[i, j]]).collect();
 
         // Count triangles
         let mut triangles = 0;
@@ -641,9 +643,7 @@ fn compute_transitivity(adjacency: &Array2<bool>) -> f64 {
     let mut triples = 0;
 
     for i in 0..n {
-        let neighbors: Vec<usize> = (0..n)
-            .filter(|&j| adjacency[[i, j]])
-            .collect();
+        let neighbors: Vec<usize> = (0..n).filter(|&j| adjacency[[i, j]]).collect();
 
         let degree = neighbors.len();
         if degree < 2 {

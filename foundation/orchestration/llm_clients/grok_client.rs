@@ -2,14 +2,14 @@
 //!
 //! Mission Charlie: Task 1.4 (replaces Local Llama)
 
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use tokio::time::{sleep, timeout, Duration, Instant};
+use anyhow::{bail, Context, Result};
 use dashmap::DashMap;
 use parking_lot::Mutex;
-use anyhow::{Result, Context, bail};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::SystemTime;
+use tokio::time::{sleep, timeout, Duration, Instant};
 
 use super::{LLMResponse, Usage};
 
@@ -79,9 +79,7 @@ impl GrokClient {
     pub fn new(api_key: String) -> Result<Self> {
         Ok(Self {
             api_key,
-            http_client: Client::builder()
-                .timeout(Duration::from_secs(60))
-                .build()?,
+            http_client: Client::builder().timeout(Duration::from_secs(60)).build()?,
             base_url: "https://api.x.ai/v1".to_string(),
             cache: Arc::new(DashMap::new()),
             token_counter: Arc::new(Mutex::new(TokenCounter::new())),
@@ -108,17 +106,20 @@ impl GrokClient {
                 Ok(mut response) => {
                     response.latency = start.elapsed();
 
-                    self.cache.insert(cache_key, CachedResponse {
-                        response: response.clone(),
-                        timestamp: SystemTime::now(),
-                    });
+                    self.cache.insert(
+                        cache_key,
+                        CachedResponse {
+                            response: response.clone(),
+                            timestamp: SystemTime::now(),
+                        },
+                    );
 
                     let cost = self.calculate_cost(&response.usage);
                     self.token_counter.lock().total_tokens += response.usage.total_tokens;
                     self.token_counter.lock().total_cost += cost;
 
                     return Ok(response);
-                },
+                }
                 Err(e) => {
                     if attempt < self.max_retries - 1 {
                         sleep(Duration::from_millis(1000 * 2_u64.pow(attempt as u32))).await;
@@ -143,7 +144,7 @@ impl GrokClient {
                 GrokMessage {
                     role: "user".to_string(),
                     content: prompt.to_string(),
-                }
+                },
             ],
             temperature,
             stream: false,
@@ -156,8 +157,9 @@ impl GrokClient {
                 .header("Authorization", format!("Bearer {}", self.api_key))
                 .header("Content-Type", "application/json")
                 .json(&request)
-                .send()
-        ).await??;
+                .send(),
+        )
+        .await??;
 
         if !response.status().is_success() {
             bail!("Grok API error: {}", response.status());

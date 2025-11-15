@@ -2,10 +2,10 @@
 // Constitution: Phase 1 Task 1.2
 // Mathematical Foundation: TE_{X→Y}(τ) = Σ p(y_{t+τ}, y_t^k, x_t^l) log[p(y_{t+τ}|y_t^k, x_t^l) / p(y_{t+τ}|y_t^k)]
 
-use std::collections::HashMap;
-use std::f64;
 use ndarray::Array1;
 use rayon::prelude::*;
+use std::collections::HashMap;
+use std::f64;
 
 /// Transfer Entropy Calculator with time-lag support
 ///
@@ -82,7 +82,11 @@ impl TransferEntropy {
     /// # Returns
     /// TransferEntropyResult with TE value, p-value, and bias correction
     pub fn calculate(&self, source: &Array1<f64>, target: &Array1<f64>) -> TransferEntropyResult {
-        assert_eq!(source.len(), target.len(), "Time series must have same length");
+        assert_eq!(
+            source.len(),
+            target.len(),
+            "Time series must have same length"
+        );
 
         let n = source.len();
         let min_len = self.source_embedding.max(self.target_embedding) + self.time_lag + 1;
@@ -96,7 +100,11 @@ impl TransferEntropy {
     }
 
     /// Calculate transfer entropy using binned probability estimation
-    fn calculate_binned(&self, source: &Array1<f64>, target: &Array1<f64>) -> TransferEntropyResult {
+    fn calculate_binned(
+        &self,
+        source: &Array1<f64>,
+        target: &Array1<f64>,
+    ) -> TransferEntropyResult {
         // Use adaptive binning based on Freedman-Diaconis rule
         let n_bins = self.adaptive_bins(source, target);
 
@@ -191,21 +199,21 @@ impl TransferEntropy {
 
         if iqr == 0.0 {
             // Fallback to Scott's rule: bins ≈ n^(1/3)
-            return (n.powf(1.0/3.0).ceil() as usize).max(2).min(20);
+            return (n.powf(1.0 / 3.0).ceil() as usize).max(2).min(20);
         }
 
         // Calculate range
         let range_source = source.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b))
-                         - source.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+            - source.iter().fold(f64::INFINITY, |a, &b| a.min(b));
         let range_target = target.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b))
-                         - target.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+            - target.iter().fold(f64::INFINITY, |a, &b| a.min(b));
         let avg_range = (range_source + range_target) / 2.0;
 
         // bin_width = 2 * IQR * n^(-1/3)
-        let bin_width = 2.0 * iqr * n.powf(-1.0/3.0);
+        let bin_width = 2.0 * iqr * n.powf(-1.0 / 3.0);
 
         if bin_width == 0.0 {
-            return (n.powf(1.0/3.0).ceil() as usize).max(2).min(20);
+            return (n.powf(1.0 / 3.0).ceil() as usize).max(2).min(20);
         }
 
         // Number of bins = range / bin_width
@@ -229,8 +237,12 @@ impl TransferEntropy {
 
     /// Calculate shuffled baseline for bias correction
     /// This is the state-of-the-art method from recent literature
-    fn calculate_shuffled_baseline(&self, source: &Array1<i32>, target: &Array1<i32>,
-                                   n_shuffles: usize) -> f64 {
+    fn calculate_shuffled_baseline(
+        &self,
+        source: &Array1<i32>,
+        target: &Array1<i32>,
+        n_shuffles: usize,
+    ) -> f64 {
         let mut te_shuffled_values = Vec::new();
 
         for i in 0..n_shuffles {
@@ -266,8 +278,11 @@ impl TransferEntropy {
     }
 
     /// Create embedding vectors for transfer entropy calculation
-    fn create_embeddings<T: Clone>(&self, source: &Array1<T>, target: &Array1<T>)
-        -> (Vec<Vec<T>>, Vec<Vec<T>>, Vec<T>) {
+    fn create_embeddings<T: Clone>(
+        &self,
+        source: &Array1<T>,
+        target: &Array1<T>,
+    ) -> (Vec<Vec<T>>, Vec<Vec<T>>, Vec<T>) {
         let n = source.len();
         let start_idx = self.source_embedding.max(self.target_embedding);
         let end_idx = n - self.time_lag;
@@ -299,11 +314,12 @@ impl TransferEntropy {
     }
 
     /// Calculate joint probability distributions
-    fn calculate_joint_probabilities(&self,
+    fn calculate_joint_probabilities(
+        &self,
         x_embed: &[Vec<i32>],
         y_embed: &[Vec<i32>],
-        y_future: &[i32]) -> JointProbabilities {
-
+        y_future: &[i32],
+    ) -> JointProbabilities {
         let n = x_embed.len() as f64;
         let mut joint_xyz = HashMap::new();
         let mut joint_xy = HashMap::new();
@@ -399,8 +415,14 @@ impl TransferEntropy {
 
             for j in 0..n {
                 if i != j {
-                    let dist = self.calculate_distance_xyz(&x_embed[i], &y_embed[i], y_future[i],
-                                                          &x_embed[j], &y_embed[j], y_future[j]);
+                    let dist = self.calculate_distance_xyz(
+                        &x_embed[i],
+                        &y_embed[i],
+                        y_future[i],
+                        &x_embed[j],
+                        &y_embed[j],
+                        y_future[j],
+                    );
                     distances.push((dist, j));
                 }
             }
@@ -409,8 +431,8 @@ impl TransferEntropy {
             let kth_distance = distances[k - 1].0;
 
             // Count neighbors in marginal spaces within kth_distance
-            let n_yz = self.count_neighbors_yz(&y_embed[i], y_future[i],
-                                              y_embed, y_future, kth_distance);
+            let n_yz =
+                self.count_neighbors_yz(&y_embed[i], y_future[i], y_embed, y_future, kth_distance);
             let n_y = self.count_neighbors_y(&y_embed[i], y_embed, kth_distance);
 
             // KSG estimator contribution
@@ -421,8 +443,15 @@ impl TransferEntropy {
     }
 
     /// Calculate distance in joint XYZ space
-    fn calculate_distance_xyz(&self, x1: &[i32], y1: &[i32], z1: i32,
-                              x2: &[i32], y2: &[i32], z2: i32) -> f64 {
+    fn calculate_distance_xyz(
+        &self,
+        x1: &[i32],
+        y1: &[i32],
+        z1: i32,
+        x2: &[i32],
+        y2: &[i32],
+        z2: i32,
+    ) -> f64 {
         let mut dist = 0.0_f64;
 
         for i in 0..x1.len() {
@@ -439,9 +468,14 @@ impl TransferEntropy {
     }
 
     /// Count neighbors in YZ marginal space
-    fn count_neighbors_yz(&self, y_ref: &[i32], z_ref: i32,
-                          y_embed: &[Vec<i32>], y_future: &[i32],
-                          epsilon: f64) -> usize {
+    fn count_neighbors_yz(
+        &self,
+        y_ref: &[i32],
+        z_ref: i32,
+        y_embed: &[Vec<i32>],
+        y_future: &[i32],
+        epsilon: f64,
+    ) -> usize {
         let mut count = 0;
 
         for i in 0..y_embed.len() {
@@ -481,25 +515,32 @@ impl TransferEntropy {
     }
 
     /// Calculate statistical significance using permutation test
-    fn calculate_significance(&self, source: &Array1<i32>, target: &Array1<i32>,
-                             te_observed: f64) -> f64 {
+    fn calculate_significance(
+        &self,
+        source: &Array1<i32>,
+        target: &Array1<i32>,
+        te_observed: f64,
+    ) -> f64 {
         let n_permutations = 100; // Reduced for performance, increase for production
         let mut count_greater = 0;
 
         // Parallel permutation testing
-        let results: Vec<bool> = (0..n_permutations).into_par_iter().map(|i| {
-            let rng = rand::thread_rng();
-            let shuffled_source = self.shuffle_time_series(source, i as u64);
+        let results: Vec<bool> = (0..n_permutations)
+            .into_par_iter()
+            .map(|i| {
+                let rng = rand::thread_rng();
+                let shuffled_source = self.shuffle_time_series(source, i as u64);
 
-            // Create embeddings with shuffled source
-            let (x_embed, y_embed, y_future) = self.create_embeddings(&shuffled_source, target);
+                // Create embeddings with shuffled source
+                let (x_embed, y_embed, y_future) = self.create_embeddings(&shuffled_source, target);
 
-            // Calculate TE with shuffled data
-            let joint_probs = self.calculate_joint_probabilities(&x_embed, &y_embed, &y_future);
-            let te_shuffled = self.calculate_te_from_probabilities(&joint_probs);
+                // Calculate TE with shuffled data
+                let joint_probs = self.calculate_joint_probabilities(&x_embed, &y_embed, &y_future);
+                let te_shuffled = self.calculate_te_from_probabilities(&joint_probs);
 
-            te_shuffled >= te_observed
-        }).collect();
+                te_shuffled >= te_observed
+            })
+            .collect();
 
         count_greater = results.iter().filter(|&&x| x).count();
 
@@ -507,8 +548,12 @@ impl TransferEntropy {
     }
 
     /// Calculate statistical significance for KNN method
-    fn calculate_significance_knn(&self, source: &Array1<f64>, target: &Array1<f64>,
-                                  te_observed: f64) -> f64 {
+    fn calculate_significance_knn(
+        &self,
+        source: &Array1<f64>,
+        target: &Array1<f64>,
+        te_observed: f64,
+    ) -> f64 {
         // Similar to binned version but uses KNN estimator
         let n_permutations = 100;
         let mut count_greater = 0;
@@ -527,8 +572,8 @@ impl TransferEntropy {
 
     /// Shuffle time series while preserving temporal structure
     fn shuffle_time_series(&self, series: &Array1<i32>, seed: u64) -> Array1<i32> {
-        use rand::{Rng, SeedableRng};
         use rand::rngs::StdRng;
+        use rand::{Rng, SeedableRng};
 
         let mut rng = StdRng::seed_from_u64(seed);
         let mut shuffled = series.clone();
@@ -595,18 +640,29 @@ impl TransferEntropy {
     }
 
     /// Multi-scale transfer entropy analysis across multiple time lags
-    pub fn calculate_multiscale(&self, source: &Array1<f64>, target: &Array1<f64>,
-                                max_lag: usize) -> Vec<TransferEntropyResult> {
-        (1..=max_lag).into_par_iter().map(|lag| {
-            let mut te_calc = self.clone();
-            te_calc.time_lag = lag;
-            te_calc.calculate(source, target)
-        }).collect()
+    pub fn calculate_multiscale(
+        &self,
+        source: &Array1<f64>,
+        target: &Array1<f64>,
+        max_lag: usize,
+    ) -> Vec<TransferEntropyResult> {
+        (1..=max_lag)
+            .into_par_iter()
+            .map(|lag| {
+                let mut te_calc = self.clone();
+                te_calc.time_lag = lag;
+                te_calc.calculate(source, target)
+            })
+            .collect()
     }
 
     /// Find optimal time lag with maximum transfer entropy
-    pub fn find_optimal_lag(&self, source: &Array1<f64>, target: &Array1<f64>,
-                            max_lag: usize) -> (usize, TransferEntropyResult) {
+    pub fn find_optimal_lag(
+        &self,
+        source: &Array1<f64>,
+        target: &Array1<f64>,
+        max_lag: usize,
+    ) -> (usize, TransferEntropyResult) {
         let results = self.calculate_multiscale(source, target, max_lag);
 
         let mut best_lag = 1;
@@ -664,8 +720,11 @@ pub enum CausalDirection {
 }
 
 /// Detect causal direction between two time series
-pub fn detect_causal_direction(x: &Array1<f64>, y: &Array1<f64>,
-                               max_lag: usize) -> (CausalDirection, f64, f64) {
+pub fn detect_causal_direction(
+    x: &Array1<f64>,
+    y: &Array1<f64>,
+    max_lag: usize,
+) -> (CausalDirection, f64, f64) {
     let te_calc = TransferEntropy::default();
 
     // Calculate TE(X→Y)
@@ -746,7 +805,10 @@ mod tests {
         // Transfer entropy should be significant for causal relationship
         assert!(result.effective_te > 0.0);
         // Statistical significance can vary; just check TE is positive
-        assert!(result.effective_te > 0.0, "TE should be positive for causal relationship");
+        assert!(
+            result.effective_te > 0.0,
+            "TE should be positive for causal relationship"
+        );
     }
 
     #[test]
@@ -769,13 +831,23 @@ mod tests {
 
         let (direction, te_xy, te_yx) = detect_causal_direction(&x_arr, &y_arr, 5);
 
-        println!("Direction: {:?}, TE(X->Y): {}, TE(Y->X): {}", direction, te_xy, te_yx);
+        println!(
+            "Direction: {:?}, TE(X->Y): {}, TE(Y->X): {}",
+            direction, te_xy, te_yx
+        );
 
         // Due to randomness, the exact direction detection may vary
         // Just verify TE(X->Y) is greater since Y depends on X
-        assert!(te_xy > te_yx * 0.5, "TE(X->Y) should be at least comparable to TE(Y->X)");
+        assert!(
+            te_xy > te_yx * 0.5,
+            "TE(X->Y) should be at least comparable to TE(Y->X)"
+        );
         // Direction should not be YtoX (opposite of truth)
-        assert_ne!(direction, CausalDirection::YtoX, "Should not detect wrong direction");
+        assert_ne!(
+            direction,
+            CausalDirection::YtoX,
+            "Should not detect wrong direction"
+        );
     }
 
     #[test]

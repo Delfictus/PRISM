@@ -28,9 +28,9 @@
 //! - Eigenvalue residual: ||Hv - λv|| < ε₂ (ε₂ = 1e-8)
 //! - Orthonormality: |⟨vᵢ|vⱼ⟩ - δᵢⱼ| < ε₃ (ε₃ = 1e-10)
 
+use anyhow::{bail, Result};
 use ndarray::{Array1, Array2};
 use num_complex::Complex64;
-use anyhow::{Result, bail};
 use std::time::Instant;
 
 // Import traits from their specific modules
@@ -178,9 +178,10 @@ impl RobustEigenSolver {
     /// 1. ||Hv - λv|| < ε (residual bound)
     /// 2. ||v|| = 1 (normalization)
     /// 3. λ is real (for Hermitian H)
-    pub fn solve(&mut self, hamiltonian: &Array2<Complex64>)
-        -> Result<(Array1<f64>, Array2<Complex64>)> {
-
+    pub fn solve(
+        &mut self,
+        hamiltonian: &Array2<Complex64>,
+    ) -> Result<(Array1<f64>, Array2<Complex64>)> {
         let start_time = Instant::now();
 
         // Step 1: Validate matrix properties
@@ -194,7 +195,11 @@ impl RobustEigenSolver {
 
         if self.config.verbose {
             println!("RobustEigenSolver:");
-            println!("  Matrix size: {}×{}", hamiltonian.nrows(), hamiltonian.ncols());
+            println!(
+                "  Matrix size: {}×{}",
+                hamiltonian.nrows(),
+                hamiltonian.ncols()
+            );
             println!("  Hermitian error: {:.2e}", hermitian_error);
             println!("  Condition number: {:.2e}", condition_number);
         }
@@ -203,7 +208,10 @@ impl RobustEigenSolver {
         let mut working_matrix = hamiltonian.clone();
         if hermitian_error > self.config.hermitian_tolerance {
             if self.config.verbose {
-                println!("  Symmetrizing matrix (error > {:.2e})", self.config.hermitian_tolerance);
+                println!(
+                    "  Symmetrizing matrix (error > {:.2e})",
+                    self.config.hermitian_tolerance
+                );
             }
             working_matrix = self.symmetrize(&working_matrix);
             self.diagnostics.symmetrized = true;
@@ -213,7 +221,10 @@ impl RobustEigenSolver {
         let mut scale_factors: Option<Array1<f64>> = None;
         if self.config.use_preconditioning && condition_number > self.config.condition_threshold {
             if self.config.verbose {
-                println!("  Applying preconditioning (κ > {:.2e})", self.config.condition_threshold);
+                println!(
+                    "  Applying preconditioning (κ > {:.2e})",
+                    self.config.condition_threshold
+                );
             }
             let (preconditioned, scales) = self.precondition(&working_matrix)?;
             working_matrix = preconditioned;
@@ -244,7 +255,9 @@ impl RobustEigenSolver {
 
         // Method 2: Shift-invert for ground state (if enabled and direct failed)
         if result.is_none() && self.config.use_shift_invert {
-            self.diagnostics.methods_tried.push(SolverMethod::ShiftInvert);
+            self.diagnostics
+                .methods_tried
+                .push(SolverMethod::ShiftInvert);
             if self.config.verbose {
                 println!("  Attempting shift-invert method...");
             }
@@ -264,7 +277,9 @@ impl RobustEigenSolver {
 
         // Method 3: Power iteration (always works)
         if result.is_none() {
-            self.diagnostics.methods_tried.push(SolverMethod::PowerIteration);
+            self.diagnostics
+                .methods_tried
+                .push(SolverMethod::PowerIteration);
             if self.config.verbose {
                 println!("  Using power iteration fallback...");
             }
@@ -357,7 +372,9 @@ impl RobustEigenSolver {
         }
 
         // Estimate smallest eigenvalue from diagonal
-        let lambda_min = matrix.diag().iter()
+        let lambda_min = matrix
+            .diag()
+            .iter()
             .map(|x| x.norm())
             .filter(|&x| x > 1e-100)
             .fold(f64::INFINITY, f64::min)
@@ -377,7 +394,8 @@ impl RobustEigenSolver {
 
         for i in 0..n {
             for j in 0..n {
-                symmetric[[i, j]] = (matrix[[i, j]] + matrix[[j, i]].conj()) * Complex64::new(0.5, 0.0);
+                symmetric[[i, j]] =
+                    (matrix[[i, j]] + matrix[[j, i]].conj()) * Complex64::new(0.5, 0.0);
             }
         }
 
@@ -409,9 +427,11 @@ impl RobustEigenSolver {
     }
 
     /// Reverse preconditioning on eigenvectors: v = D^(1/2) v'
-    fn reverse_preconditioning(&self, eigenvectors: Array2<Complex64>, scales: &Array1<f64>)
-        -> Result<Array2<Complex64>> {
-
+    fn reverse_preconditioning(
+        &self,
+        eigenvectors: Array2<Complex64>,
+        scales: &Array1<f64>,
+    ) -> Result<Array2<Complex64>> {
         let n = eigenvectors.nrows();
         let m = eigenvectors.ncols();
         let mut unscaled = Array2::zeros((n, m));
@@ -424,7 +444,9 @@ impl RobustEigenSolver {
 
         // Renormalize
         for j in 0..m {
-            let norm = unscaled.column(j).iter()
+            let norm = unscaled
+                .column(j)
+                .iter()
                 .map(|x| x.norm_sqr())
                 .sum::<f64>()
                 .sqrt();
@@ -446,9 +468,10 @@ impl RobustEigenSolver {
     /// Uses optimized LAPACK routines (zheev) for Hermitian matrices.
     /// Time complexity: O(n³)
     /// Memory: O(n²)
-    fn try_direct_eigen(&mut self, matrix: &Array2<Complex64>)
-        -> Result<(Array1<f64>, Array2<Complex64>)> {
-
+    fn try_direct_eigen(
+        &mut self,
+        matrix: &Array2<Complex64>,
+    ) -> Result<(Array1<f64>, Array2<Complex64>)> {
         // Convert to real-valued Hermitian representation for ndarray-linalg
         let n = matrix.nrows();
 
@@ -458,7 +481,7 @@ impl RobustEigenSolver {
 
         // Ensure strictly Hermitian
         for i in 0..n {
-            for j in i+1..n {
+            for j in i + 1..n {
                 h_matrix[[j, i]] = h_matrix[[i, j]].conj();
             }
         }
@@ -489,15 +512,19 @@ impl RobustEigenSolver {
     ///
     /// Time complexity: O(n² × iterations)
     /// Memory: O(n²) for matrix inversion
-    fn try_shift_invert(&mut self, matrix: &Array2<Complex64>)
-        -> Result<(Array1<f64>, Array2<Complex64>)> {
-
+    fn try_shift_invert(
+        &mut self,
+        matrix: &Array2<Complex64>,
+    ) -> Result<(Array1<f64>, Array2<Complex64>)> {
         let n = matrix.nrows();
 
         // Choose shift σ near ground state (use minimum diagonal)
-        let shift = matrix.diag().iter()
+        let shift = matrix
+            .diag()
+            .iter()
             .map(|x| x.re)
-            .fold(f64::INFINITY, f64::min) - 1.0;
+            .fold(f64::INFINITY, f64::min)
+            - 1.0;
 
         if self.config.verbose {
             println!("    Shift σ = {:.4}", shift);
@@ -517,7 +544,9 @@ impl RobustEigenSolver {
 
         // Power iteration on inverted matrix
         let mut v = Array1::from_vec(
-            (0..n).map(|i| Complex64::new((i as f64 * 0.1).sin(), 0.0)).collect()
+            (0..n)
+                .map(|i| Complex64::new((i as f64 * 0.1).sin(), 0.0))
+                .collect(),
         );
         let initial_norm = v.iter().map(|x| x.norm_sqr()).sum::<f64>().sqrt();
         v = v.mapv(|x| x / initial_norm);
@@ -530,7 +559,8 @@ impl RobustEigenSolver {
             let v_new = inv_shifted.dot(&v);
 
             // Rayleigh quotient: μ = v† (H-σI)^(-1) v
-            lambda_inv = v.iter()
+            lambda_inv = v
+                .iter()
                 .zip(v_new.iter())
                 .map(|(vi, hvi)| (vi.conj() * hvi).re)
                 .sum::<f64>();
@@ -540,7 +570,8 @@ impl RobustEigenSolver {
             let v_normalized = v_new.mapv(|x| x / norm);
 
             // Check convergence: ||v_new - v|| < ε
-            let diff: f64 = v_normalized.iter()
+            let diff: f64 = v_normalized
+                .iter()
                 .zip(v.iter())
                 .map(|(a, b)| (a - b).norm_sqr())
                 .sum::<f64>()
@@ -556,7 +587,10 @@ impl RobustEigenSolver {
         }
 
         if !converged {
-            bail!("Shift-invert failed to converge after {} iterations", self.config.max_iterations);
+            bail!(
+                "Shift-invert failed to converge after {} iterations",
+                self.config.max_iterations
+            );
         }
 
         // Convert back: λ = σ + 1/μ
@@ -572,7 +606,10 @@ impl RobustEigenSolver {
         }
 
         if self.config.verbose {
-            println!("    Converged in {} iterations", self.diagnostics.iterations);
+            println!(
+                "    Converged in {} iterations",
+                self.diagnostics.iterations
+            );
             println!("    Ground state energy: {:.6}", ground_energy);
         }
 
@@ -590,14 +627,17 @@ impl RobustEigenSolver {
     ///
     /// Time complexity: O(n² × iterations)
     /// Memory: O(n²)
-    fn try_power_iteration(&mut self, matrix: &Array2<Complex64>)
-        -> Result<(Array1<f64>, Array2<Complex64>)> {
-
+    fn try_power_iteration(
+        &mut self,
+        matrix: &Array2<Complex64>,
+    ) -> Result<(Array1<f64>, Array2<Complex64>)> {
         let n = matrix.nrows();
 
         // Initialize with random-like vector
         let mut v = Array1::from_vec(
-            (0..n).map(|i| Complex64::new((i as f64).sin(), (i as f64).cos())).collect()
+            (0..n)
+                .map(|i| Complex64::new((i as f64).sin(), (i as f64).cos()))
+                .collect(),
         );
         let initial_norm = v.iter().map(|x| x.norm_sqr()).sum::<f64>().sqrt();
         v = v.mapv(|x| x / initial_norm);
@@ -610,14 +650,13 @@ impl RobustEigenSolver {
             let v_new = matrix.dot(&v);
 
             // Rayleigh quotient: λ = v† H v / v† v
-            let numerator = v.iter()
+            let numerator = v
+                .iter()
                 .zip(v_new.iter())
                 .map(|(vi, hvi)| (vi.conj() * hvi).re)
                 .sum::<f64>();
 
-            let denominator = v.iter()
-                .map(|x| x.norm_sqr())
-                .sum::<f64>();
+            let denominator = v.iter().map(|x| x.norm_sqr()).sum::<f64>();
 
             eigenvalue = numerator / denominator;
 
@@ -626,7 +665,8 @@ impl RobustEigenSolver {
             let v_normalized = v_new.mapv(|x| x / norm);
 
             // Check convergence
-            let diff: f64 = v_normalized.iter()
+            let diff: f64 = v_normalized
+                .iter()
                 .zip(v.iter())
                 .map(|(a, b)| (a - b).norm_sqr())
                 .sum::<f64>()
@@ -642,7 +682,10 @@ impl RobustEigenSolver {
         }
 
         if !converged {
-            bail!("Power iteration failed to converge after {} iterations", self.config.max_iterations);
+            bail!(
+                "Power iteration failed to converge after {} iterations",
+                self.config.max_iterations
+            );
         }
 
         // Return dominant eigenvalue/eigenvector
@@ -655,7 +698,10 @@ impl RobustEigenSolver {
         }
 
         if self.config.verbose {
-            println!("    Converged in {} iterations", self.diagnostics.iterations);
+            println!(
+                "    Converged in {} iterations",
+                self.diagnostics.iterations
+            );
             println!("    Dominant eigenvalue: {:.6}", eigenvalue);
         }
 
@@ -669,18 +715,22 @@ impl RobustEigenSolver {
     /// Validate solution satisfies eigenvalue equation
     ///
     /// Checks: ||Hv - λv|| < ε for each eigenvalue/eigenvector pair
-    fn validate_solution(&self,
+    fn validate_solution(
+        &self,
         hamiltonian: &Array2<Complex64>,
         eigenvalues: &Array1<f64>,
-        eigenvectors: &Array2<Complex64>
+        eigenvectors: &Array2<Complex64>,
     ) -> Result<()> {
-
         let n = hamiltonian.nrows();
         let n_eigenvalues = eigenvalues.len();
 
         // Check dimensions
         if eigenvectors.nrows() != n {
-            bail!("Eigenvector dimension mismatch: expected {}, got {}", n, eigenvectors.nrows());
+            bail!(
+                "Eigenvector dimension mismatch: expected {}, got {}",
+                n,
+                eigenvectors.nrows()
+            );
         }
 
         // Validate each eigenvalue/eigenvector pair
@@ -701,7 +751,8 @@ impl RobustEigenSolver {
             // Compute residual: r = Hv - λv
             let hv = hamiltonian.dot(&v.to_owned());
             let lambda_v = v.to_owned().mapv(|x| x * lambda);
-            let residual: f64 = hv.iter()
+            let residual: f64 = hv
+                .iter()
                 .zip(lambda_v.iter())
                 .map(|(a, b)| (a - b).norm_sqr())
                 .sum::<f64>()
@@ -711,7 +762,9 @@ impl RobustEigenSolver {
             if residual > self.config.eigenvalue_tolerance {
                 bail!(
                     "Eigenvalue {} failed validation: residual = {:.2e} > {:.2e}",
-                    i, residual, self.config.eigenvalue_tolerance
+                    i,
+                    residual,
+                    self.config.eigenvalue_tolerance
                 );
             }
 
@@ -722,7 +775,9 @@ impl RobustEigenSolver {
             if norm_error > self.config.tolerance {
                 bail!(
                     "Eigenvector {} not normalized: ||v|| = {:.6}, error = {:.2e}",
-                    i, norm, norm_error
+                    i,
+                    norm,
+                    norm_error
                 );
             }
         }
@@ -731,12 +786,12 @@ impl RobustEigenSolver {
     }
 
     /// Calculate residual norm for diagnostics
-    fn calculate_residual(&self,
+    fn calculate_residual(
+        &self,
         hamiltonian: &Array2<Complex64>,
         eigenvalues: &Array1<f64>,
-        eigenvectors: &Array2<Complex64>
+        eigenvectors: &Array2<Complex64>,
     ) -> f64 {
-
         let n_check = eigenvalues.len().min(eigenvectors.ncols()).min(10);
         let mut max_residual: f64 = 0.0;
 
@@ -747,7 +802,8 @@ impl RobustEigenSolver {
             let hv = hamiltonian.dot(&v.to_owned());
             let lambda_v = v.to_owned().mapv(|x| x * lambda);
 
-            let residual: f64 = hv.iter()
+            let residual: f64 = hv
+                .iter()
                 .zip(lambda_v.iter())
                 .map(|(a, b)| (a - b).norm_sqr())
                 .sum::<f64>()
@@ -767,10 +823,16 @@ mod tests {
 
     /// Create simple 2×2 Hermitian test matrix
     fn create_simple_matrix() -> Array2<Complex64> {
-        Array2::from_shape_vec((2, 2), vec![
-            Complex64::new(2.0, 0.0), Complex64::new(1.0, 0.0),
-            Complex64::new(1.0, 0.0), Complex64::new(3.0, 0.0),
-        ]).unwrap()
+        Array2::from_shape_vec(
+            (2, 2),
+            vec![
+                Complex64::new(2.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(3.0, 0.0),
+            ],
+        )
+        .unwrap()
     }
 
     /// Create ill-conditioned matrix
@@ -780,9 +842,9 @@ mod tests {
             matrix[[i, i]] = Complex64::new(1.0 / (i as f64 + 1.0), 0.0);
         }
         // Add small off-diagonal coupling
-        for i in 0..n-1 {
-            matrix[[i, i+1]] = Complex64::new(0.01, 0.0);
-            matrix[[i+1, i]] = Complex64::new(0.01, 0.0);
+        for i in 0..n - 1 {
+            matrix[[i, i + 1]] = Complex64::new(0.01, 0.0);
+            matrix[[i + 1, i]] = Complex64::new(0.01, 0.0);
         }
         matrix
     }
@@ -840,9 +902,9 @@ mod tests {
         }
 
         // Add nearest-neighbor coupling
-        for i in 0..n-1 {
-            matrix[[i, i+1]] = Complex64::new(0.1, 0.0);
-            matrix[[i+1, i]] = Complex64::new(0.1, 0.0);
+        for i in 0..n - 1 {
+            matrix[[i, i + 1]] = Complex64::new(0.1, 0.0);
+            matrix[[i + 1, i]] = Complex64::new(0.1, 0.0);
         }
 
         let mut solver = RobustEigenSolver::default();
